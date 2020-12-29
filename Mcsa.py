@@ -3,7 +3,7 @@
 import json
 from collections import defaultdict
 from glob import glob
-from .config import INFO_JSON, WORKING_DIR
+from .config import INFO_JSON, WORKING_DIR, ASSEMBLIES_DIR
 from .Entry import Entry
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -65,6 +65,8 @@ class Mcsa:
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
             for site in PdbSite.build_all(pdb, reference_site):
+                cif = glob('{}/*{}*.cif'.format(ASSEMBLIES_DIR, site.pdb_id))[0]
+                site.find_ligands(parent_structure=cif)
                 self.entries[entry].add(site)
         # TODO check cases like mcsa 2, 1xxm, and cases with two pdb references
 

@@ -1,6 +1,7 @@
 # !/usr/bin/env python3
 
 from Bio.PDB.PDBParser import PDBParser
+from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, EQUIVALENT_RESIDUES
 from ..templates.common import transform_chain
 
@@ -131,3 +132,18 @@ class PdbResidue:
                           chain, funcloc, is_reference)
         except KeyError:
             return
+
+
+class Het(Residue):
+    @classmethod
+    def from_residue(cls, residue, parity_score=None, centrality=None):
+        return cls(residue.id, residue.resname, residue.segid, parity_score, centrality)
+
+    def __init__(self, id=None, resname=None, segid=None, parity_score=None, centrality=None):
+        super().__init__(id=None, resname=None, segid=None)
+        self.id = id
+        self.resname = resname
+        self.segid = segid
+        self.parity_score = parity_score
+        self.centrality = centrality
+

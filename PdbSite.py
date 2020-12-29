@@ -6,10 +6,13 @@ from copy import deepcopy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
+from Bio.PDB.Residue import Residue
 from Bio.SVDSuperimposer import SVDSuperimposer
+from Bio.PDB.MMCIFParser import  MMCIFParser
 # from ..templates.annotate_site import annotate_site
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
-from .PdbResidue import PdbResidue
+from ..templates.config import COMPOUND_SIMILARITIES
+from .PdbResidue import PdbResidue, Het
 
 
 class PdbSite:
@@ -21,6 +24,8 @@ class PdbSite:
         self.mapped_unisites = []
         self.reference_site = None
         self.structure = None
+        self.structure_hets = []
+        self.nearby_hets = []
 
     def __str__(self):
         """Print as pseudo-sequence in one-letter code"""
@@ -82,6 +87,51 @@ class PdbSite:
             return
         return True
 
+    def find_ligands(self, parent_structure, headroom=1):
+        mmcif_parser = MMCIFParser(QUIET=True)
+        all_hets = []
+        nearby_hets = []
+        try:
+            parent_structure = mmcif_parser.get_structure(self.pdb_id, parent_structure)
+        except:
+            print('Failed to parse parent structure {}'.format(self.pdb_id))
+            return False, False
+        # Get coordinates of catalytic residues from mmCIF
+        residue_list = []
+        for residue in self.structure.get_residues():
+            chain = residue.get_parent().get_id()
+            resid = residue.get_id()[1]
+            try:
+                residue_list.append(parent_structure[0][chain][resid])
+            except KeyError:
+                try:
+                    for res in parent_structure[0][chain]:
+                        if res.get_id()[1] == resid:
+                            residue_list.append(res)
+                except:
+                    print('Warning while searching for ligands:\n'
+                          'Could not find residue {} {} from {}'.format(chain, resid, self.pdb_id))
+                    continue
+        if len(residue_list) == 0:
+            return False, False
+
+        # Search for ligands in a box around catalytic residues
+        box = Box(residue_list, headroom)
+        for residue in parent_structure[0].get_residues():
+            residue_id = residue.get_id()
+            hetfield = residue_id[0]
+            # Capture all HETs in the structure
+            if hetfield[0] == 'H':
+                all_hets.append(residue)
+                # Capture HETs in the box
+                if residue in box:
+                    residue.parity_score = Box.similarity_with_cognate(residue)
+                    residue.centrality = box.mean_distance_from_residues(residue)
+                    nearby_hets.append(residue)
+        self.structure_hets = all_hets
+        self.nearby_hets = nearby_hets
+
+
     def write_pdb(self, outdir=None, outfile=None, annotate=True):
         """Writes site coordinates in PDB format"""
         if not outdir:
@@ -98,7 +148,10 @@ class PdbSite:
                                                        'reference' if self.is_reference else 'cat_site',
                                                        conservation)
         with open(outfile, 'w') as o:
-            for res in self.residues:
+            all_res = self.residues + self.nearby_hets
+            for res in all_res:
+                if type(res) == Residue:
+                    res.structure = res
                 if res.structure is not None:
                     for atom in res.structure:
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
@@ -167,6 +220,10 @@ class PdbSite:
         See https://github.com/charnley/rmsd for more"""
         p = deepcopy(self)
         q = deepcopy(other)
+
+        # TODO check cases where site is fit to reference site.fit(site.reference_structure)
+        # I get a stack bug, mcsa 1
+
         # In case gaps are present, remove the corresponding residues
         # from both structures
         for gap in sorted(q.get_gaps(), reverse=True):
@@ -335,10 +392,6 @@ class PdbSite:
         """Builds reference active site from a list of PDB catalytic residues.
         Assumes that the list only contains one active site, so use it only
         if it is a list of manually annotated catalytic residues"""
-        # ref_residues = []
-        # for res in cat_residues:
-        #    if res.is_reference:
-        #        ref_residues.append(res)
         return PdbSite.from_list(cat_residues)
 
     @classmethod
@@ -386,3 +439,89 @@ class PdbSite:
         for seed in seeds:
             sites.append(cls.build(seed, reslist, reference_site))
         return sites
+
+
+class Box:
+
+    def __init__(self, residue_list, headroom=1):
+        """Define a box using the provided residues coordinates adding
+        some safe distance around (headroom)"""
+        self.residue_list = residue_list
+        self.headroom = float(headroom)
+        self.points = self._get_boundaries(self.residue_list, self.headroom)
+        if not self.points:
+            return
+
+    def __contains__(self, residue):
+        """Checks if the provided residue is in the box"""
+        for atom in residue.get_atoms():
+            x = atom.get_coord()[0]
+            y = atom.get_coord()[1]
+            z = atom.get_coord()[2]
+            if self.points['min_x'] <= x <= self.points['max_x'] and \
+                    self.points['min_y'] <= y <= self.points['max_y'] and \
+                    self.points['min_z'] <= z <= self.points['max_z']:
+                return True
+        return False
+
+    def _get_boundaries(self, residue_list, headroom):
+        """Parse residues (BioPython objects) and get the coordinates
+        to make the box"""
+        self.coords_x = []
+        self.coords_y = []
+        self.coords_z = []
+        try:
+            for residue in self.residue_list:
+                for atom in residue:
+                    self.coords_x.append(atom.get_coord()[0])
+                    self.coords_y.append(atom.get_coord()[1])
+                    self.coords_z.append(atom.get_coord()[2])
+        except KeyError:
+            print('Warning: Error occured while trying to parse structure')
+            return
+        min_x = min(self.coords_x) - headroom
+        max_x = max(self.coords_x) + headroom
+        min_y = min(self.coords_y) - headroom
+        max_y = max(self.coords_y) + headroom
+        min_z = min(self.coords_z) - headroom
+        max_z = max(self.coords_z) + headroom
+        return {'min_x': min_x, 'max_x': max_x,
+                'min_y': min_y, 'max_y': max_y,
+                'min_z': min_z, 'max_z': max_z}
+
+    def mean_distance_from_residues(self, component):
+        """Calculates the mean distance of an arbitrary residue (protein or HET)
+        from the residues that define the box"""
+        dist_sum = 0
+        nofres = len(self.residue_list)
+        for residue in self.residue_list:
+            dist_sum += Box.min_distance(residue, component)
+        return round(dist_sum / nofres, 3)
+
+    @staticmethod
+    def similarity_with_cognate(component):
+        """Checks the similarity score of the given compound with the cognate
+        ligand of the given pdb, using the PARITY-derived data
+        (COMPOUND_SIMILARITIES.json) from Jon"""
+        try:
+            pdb_id = component.get_full_id()[0]
+            hetcode = component.get_resname()
+        except:
+            return None
+        r_key = (pdb_id, hetcode, 'r')
+        p_key = (pdb_id, hetcode, 'p')
+        if r_key in COMPOUND_SIMILARITIES:
+            return float(COMPOUND_SIMILARITIES[r_key])
+        elif p_key in COMPOUND_SIMILARITIES:
+            return float(COMPOUND_SIMILARITIES[p_key])
+        else:
+            return None
+
+    @staticmethod
+    def min_distance(residue_i, residue_j):
+        """Calculates the minimum distance between this residue and residue in argument"""
+        distances = []
+        for atom_i in residue_i:
+            for atom_j in residue_j:
+                distances.append(atom_i - atom_j)
+        return (min(distances))

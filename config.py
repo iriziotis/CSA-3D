@@ -1,6 +1,7 @@
 import csv
 
 WORKING_DIR = '/Users/riziotis/ebi/phd'
+ASSEMBLIES_DIR = '{}/datasets/assembly_cif'.format(WORKING_DIR)
 INFO_JSON = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
 uniprot_pdb_mapping = '{}/datasets/sifts/uniprot_pdb.csv'.format(WORKING_DIR)
 UNI2PDB = dict()
