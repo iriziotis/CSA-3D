@@ -6,7 +6,6 @@ from copy import deepcopy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
-from Bio.PDB.Residue import Residue
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import  MMCIFParser
 # from ..templates.annotate_site import annotate_site
@@ -122,17 +121,20 @@ class PdbSite:
             hetfield = residue_id[0]
             # Capture all HETs in the structure
             if hetfield[0] == 'H':
-                all_hets.append(residue)
+                het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(), 
+                          resid=residue.get_id()[1], chain=residue.get_parent().get_id())
+                het.structure = residue
+                all_hets.append(het)
                 # Capture HETs in the box
-                if residue in box:
-                    residue.parity_score = Box.similarity_with_cognate(residue)
-                    residue.centrality = box.mean_distance_from_residues(residue)
-                    nearby_hets.append(residue)
+                if het.structure in box:
+                    residue.parity_score = Box.similarity_with_cognate(het.structure)
+                    residue.centrality = box.mean_distance_from_residues(het.structure)
+                    nearby_hets.append(het)
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
 
-    def write_pdb(self, outdir=None, outfile=None, annotate=True):
+    def write_pdb(self, write_hets=False, outdir=None, outfile=None, annotate=True):
         """Writes site coordinates in PDB format"""
         if not outdir:
             outdir = '.'
@@ -148,16 +150,16 @@ class PdbSite:
                                                        'reference' if self.is_reference else 'cat_site',
                                                        conservation)
         with open(outfile, 'w') as o:
-            all_res = self.residues + self.nearby_hets
-            for res in all_res:
-                if type(res) == Residue:
-                    res.structure = res
+            residues = self.residues
+            if write_hets:
+                residues += self.nearby_hets
+            for res in residues:
                 if res.structure is not None:
                     for atom in res.structure:
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
                                    '{:>8.3f}{:>8.3f} {:6}'.format(
                             'ATOM' if atom.get_parent().get_id()[0] == ' ' else 'HETATM',
-                            atom.get_serial_number(),
+                            atom.get_serial_number() if atom.get_serial_number() else 0,
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name),
                             atom.get_altloc(),
                             atom.get_parent().get_resname(),

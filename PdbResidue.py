@@ -134,16 +134,14 @@ class PdbResidue:
             return
 
 
-class Het(Residue):
-    @classmethod
-    def from_residue(cls, residue, parity_score=None, centrality=None):
-        return cls(residue.id, residue.resname, residue.segid, parity_score, centrality)
+class Het(PdbResidue):
 
-    def __init__(self, id=None, resname=None, segid=None, parity_score=None, centrality=None):
-        super().__init__(id=None, resname=None, segid=None)
-        self.id = id
-        self.resname = resname
-        self.segid = segid
+    def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
+                 auth_resid=None, chain='', funcloc=None, is_reference=None,
+                 parity_score=None, centrality=None):
+        super().__init__(mcsa_id, pdb_id, resname, resid, chain)
         self.parity_score = parity_score
         self.centrality = centrality
+
+
 
