@@ -55,15 +55,15 @@ EQUIVALENT_ATOMS = {
         }
 
 EQUIVALENT_RESIDUES = {
-        'GLU' : 'ASP',
-        'ASP' : 'GLU',
-        'GLN' : 'ASN',
-        'ASN' : 'GLN',
-        'VAL' : {'LEU', 'ILE'},
-        'LEU' : {'ILE', 'VAL'},
-        'ILE' : {'VAL', 'LEU'},
-        'SER' : 'THR',
-        'THR' : 'SER'
+        'Glu' : 'Asp',
+        'Asp' : 'Glu',
+        'Gln' : 'Asn',
+        'Asn' : 'Gln',
+        'Val' : {'Leu', 'Ile'},
+        'Leu' : {'Ile', 'Val'},
+        'Ile' : {'Val', 'Leu'},
+        'Ser' : 'Thr',
+        'Thr' : 'Ser'
         }
         
 

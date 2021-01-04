@@ -26,14 +26,14 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entries=None):
+    def build(self, entries=None, annotate=True):
         if not entries:
             entries = self.json_residues.keys()
 
         for entry in entries:
             self._build_pdb_residues(entry)
             self._build_uniprot_residues(entry)
-            self._build_pdb_sites(entry)
+            self._build_pdb_sites(entry, annotate)
             self._build_uniprot_sites(entry)
             
     def _build_pdb_residues(self, entry):
@@ -45,7 +45,6 @@ class Mcsa:
                     self.ref_pdb_residues[residue.mcsa_id].append(residue)
                 else:
                     self.pdb_residues[residue.mcsa_id][residue.pdb_id].append(residue)
-                residue.add_structure(self._get_catres_path(residue.mcsa_id, residue.pdb_id))
                 residue.reference_residue = reference_residue
 
     def _build_uniprot_residues(self, entry):
@@ -59,14 +58,13 @@ class Mcsa:
                     self.uni_residues[residue.mcsa_id][residue.uniprot_id].append(residue)
                 residue.reference_residue = reference_residue
 
-    def _build_pdb_sites(self, entry):
+    def _build_pdb_sites(self, entry, annotate=True):
         self.entries[entry] = Entry(entry)
-        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry])
+        ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
+        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry], self._get_cif_path(ref_pdb_id))
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
-            for site in PdbSite.build_all(pdb, reference_site):
-                cif = glob('{}/*{}*.cif'.format(ASSEMBLIES_DIR, site.pdb_id))[0]
-                site.find_ligands(parent_structure=cif)
+            for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id), annotate):
                 self.entries[entry].add(site)
         # TODO check cases like mcsa 2, 1xxm, and cases with two pdb references
 
@@ -92,9 +90,10 @@ class Mcsa:
         return json_residues
 
     @staticmethod
-    def _get_catres_path(mcsa_id, pdb_id):
-        path = '{0}/results/entries/mcsa_{1}/mcsa_{1}.{2}.*.pdb'.format(
-            WORKING_DIR, str(mcsa_id).zfill(4), pdb_id)
+    def _get_cif_path(pdb_id):
+        path = '{0}/datasets/assembly_cif/{1}-assembly-*.cif'.format(WORKING_DIR, pdb_id)
+        #path = '{0}/results/entries/mcsa_{1}/mcsa_{1}.{2}.*.pdb'.format(
+        #    WORKING_DIR, str(mcsa_id).zfill(4), pdb_id)
         if len(glob(path)) > 0:
             return glob(path)[0]
         return

@@ -1,7 +1,7 @@
 # !/usr/bin/env python3
 
-from Bio.PDB.PDBParser import PDBParser
 from Bio.PDB.Residue import Residue
+from Bio.PDB.Structure import Structure
 from .residue_definitions import AA_3TO1, EQUIVALENT_RESIDUES
 from ..templates.common import transform_chain
 
@@ -10,7 +10,7 @@ class PdbResidue:
     """M-CSA PDB residue"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funcloc=None, is_reference=False):
+                 auth_resid=None, chain='', funcloc='', is_reference=False):
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
         self.resname = resname
@@ -33,16 +33,14 @@ class PdbResidue:
     def __sub__(self, other):
         return self.get_distance(other)
 
-    def add_structure(self, path):
+    def add_structure(self, structure):
         """Map residue to Biopython residue object"""
-        if path is None:
+        if type(structure) != Structure:
             return False
-        parser = PDBParser(QUIET=True)
-        struct = parser.get_structure(self.pdb_id, path)
         try:
-            structure = struct[0][self.chain][self.auth_resid]
-            if structure.get_resname().capitalize() == self.resname:
-                self.structure = structure
+            residue = structure[0][self.chain][self.auth_resid]
+            if residue.get_resname().capitalize() == self.resname:
+                self.structure = residue
                 return True
         except KeyError:
             return False
@@ -98,6 +96,7 @@ class PdbResidue:
         """Check if residue are conserved by comparing to the reference"""
         return self.resname == self.reference_residue.resname or self.is_reference
 
+    @property
     def is_conservative_mutation(self):
         """Checks if residue is functionally equivalent to its reference"""
         if self.resname in EQUIVALENT_RESIDUES:
@@ -137,7 +136,7 @@ class PdbResidue:
 class Het(PdbResidue):
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funcloc=None, is_reference=None,
+                 auth_resid=None, chain='', funcloc='', is_reference=None,
                  parity_score=None, centrality=None):
         super().__init__(mcsa_id, pdb_id, resname, resid, chain)
         self.parity_score = parity_score

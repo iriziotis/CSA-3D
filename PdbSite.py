@@ -7,7 +7,7 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.SVDSuperimposer import SVDSuperimposer
-from Bio.PDB.MMCIFParser import  MMCIFParser
+from Bio.PDB.MMCIFParser import MMCIFParser
 # from ..templates.annotate_site import annotate_site
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from ..templates.config import COMPOUND_SIMILARITIES
@@ -87,15 +87,10 @@ class PdbSite:
         return True
 
     def find_ligands(self, parent_structure, headroom=1):
-        mmcif_parser = MMCIFParser(QUIET=True)
+        if type(parent_structure) != Structure:
+            return False, False
         all_hets = []
         nearby_hets = []
-        try:
-            parent_structure = mmcif_parser.get_structure(self.pdb_id, parent_structure)
-        except:
-            print('Failed to parse parent structure {}'.format(self.pdb_id))
-            return False, False
-        # Get coordinates of catalytic residues from mmCIF
         residue_list = []
         for residue in self.structure.get_residues():
             chain = residue.get_parent().get_id()
@@ -142,15 +137,14 @@ class PdbSite:
             conservation = 'c'
             if not self.is_conserved:
                 conservation = 'm'
-            if self.is_conservative_mutation:
-                # TODO test this
+            elif self.is_conservative_mutation:
                 conservation = 'cm'
             outfile = '{}/mcsa_{}.{}.{}.{}.pdb'.format(outdir.strip('/'),
                                                        str(self.mcsa_id).zfill(4), self.id,
                                                        'reference' if self.is_reference else 'cat_site',
                                                        conservation)
         with open(outfile, 'w') as o:
-            residues = self.residues
+            residues = self.residues.copy()
             if write_hets:
                 residues += self.nearby_hets
             for res in residues:
@@ -365,13 +359,13 @@ class PdbSite:
         result = False
         for res in self.residues:
             if not res.is_conserved:
-                return False
+                result = False
             if res.is_conservative_mutation:
                 result = True
         return result
 
     @classmethod
-    def from_list(cls, res_list):
+    def from_list(cls, res_list, cif_path=None, annotate=True):
         """Construct PdbSite object directly from residue list"""
         # If we have duplicate residues, each one with a different function
         # location annotation, keep only the one with the side chain
@@ -384,17 +378,24 @@ class PdbSite:
         for i in (sorted(to_del, reverse=True)):
             if res_list[i].funcloc == '':
                 del res_list[i]
+        if cif_path:
+            parser = MMCIFParser(QUIET=True)
+            structure = parser.get_structure('', cif_path) 
         site = cls()
         for res in res_list:
+            if structure:
+                res.add_structure(structure)
             site.add(res)
+        if annotate and structure:
+            site.find_ligands(structure)
         return site
 
     @classmethod
-    def build_reference(cls, cat_residues):
+    def build_reference(cls, cat_residues, cif_path=None, annotate=True):
         """Builds reference active site from a list of PDB catalytic residues.
         Assumes that the list only contains one active site, so use it only
         if it is a list of manually annotated catalytic residues"""
-        return PdbSite.from_list(cat_residues)
+        return PdbSite.from_list(cat_residues, cif_path, annotate)
 
     @classmethod
     def build(cls, seed, reslist, reference_site):
@@ -417,13 +418,18 @@ class PdbSite:
         return site
 
     @classmethod
-    def build_all(cls, reslist, reference_site):
+    def build_all(cls, reslist, reference_site, cif_path, annotate=True):
         """Builds all sites in using as input a list of catalytic residues.
         Returns a list of PdbSite objects"""
         # TODO check if number of res is the same in all chains
         sites = []
         seeds = []
-        # Find the first existent residue
+        # Map structure objects in every residue
+        parser = MMCIFParser(QUIET=True)
+        structure = parser.get_structure('', cif_path) 
+        for res in reslist:
+            res.add_structure(structure)
+        # Find the first residue with a structure and use it as a reference
         ref = None
         for res in reslist:
             if res.auth_resid is not None and res.structure is not None:
@@ -439,7 +445,10 @@ class PdbSite:
                 seeds.append(res)
         # Build a site from each seed
         for seed in seeds:
-            sites.append(cls.build(seed, reslist, reference_site))
+            site = cls.build(seed, reslist, reference_site)
+            if annotate and structure:
+                site.find_ligands(structure)
+            sites.append(site)
         return sites
 
 
