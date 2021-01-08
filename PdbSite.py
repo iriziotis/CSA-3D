@@ -216,7 +216,6 @@ class PdbSite:
 
         return atoms, coords
 
-    #@profile
     def fit(self, other, cycles=10, transform=False, mutate=True, reorder=True, allow_symmetrics=True, get_index=False):
         """Calculates RMSD using the Kabsch algorithm from the rmsd module.
         Can also find the optimal atom alignment using the Hungarian algorithm.
@@ -449,7 +448,7 @@ class PdbSite:
                     continue
                 try:
                     res_structure = chain[res.auth_resid]
-                    new_res = deepcopy(res)
+                    new_res = res.copy()
                     new_res.chain = chain.get_id()
                     new_res.structure = res_structure
                     new_reslist.append(new_res)

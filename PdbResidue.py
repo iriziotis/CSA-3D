@@ -32,6 +32,12 @@ class PdbResidue:
     def __sub__(self, other):
         return self.get_distance(other)
 
+    def copy(self):
+        res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
+                         self.auth_resid, self.chain, self.funcloc, self.is_reference)
+        res.reference_residue = self.reference_residue
+        return res
+
     def add_structure(self, structure):
         """Map residue to Biopython residue object"""
         if self.is_gap:
