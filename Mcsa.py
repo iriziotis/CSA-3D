@@ -26,15 +26,16 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entries=None, annotate=True):
+    def build(self, entries=None, annotate=True, verbose=False):
         if not entries:
             entries = self.json_residues.keys()
 
         for entry in entries:
-            self._build_pdb_residues(entry)
-            self._build_uniprot_residues(entry)
-            self._build_pdb_sites(entry, annotate)
-            self._build_uniprot_sites(entry)
+            if entry in self.json_residues.keys():
+                self._build_pdb_residues(entry)
+                self._build_uniprot_residues(entry)
+                self._build_pdb_sites(entry, annotate, verbose)
+                self._build_uniprot_sites(entry)
             
     def _build_pdb_residues(self, entry):
         reference_residue = None
@@ -58,15 +59,17 @@ class Mcsa:
                     self.uni_residues[residue.mcsa_id][residue.uniprot_id].append(residue)
                 residue.reference_residue = reference_residue
 
-    def _build_pdb_sites(self, entry, annotate=True):
+    def _build_pdb_sites(self, entry, annotate=True, verbose=False):
         self.entries[entry] = Entry(entry)
         ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
         reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry], self._get_cif_path(ref_pdb_id))
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id), annotate):
+                if verbose:
+                    print(site.id, site)
                 self.entries[entry].add(site)
-        # TODO check cases like mcsa 2, 1xxm, and cases with two pdb references
+        # TODO check cases with two pdb references
 
     def _build_uniprot_sites(self, entry):
         if entry not in self.entries:
@@ -92,8 +95,6 @@ class Mcsa:
     @staticmethod
     def _get_cif_path(pdb_id):
         path = '{0}/datasets/assembly_cif/{1}-assembly-*.cif'.format(WORKING_DIR, pdb_id)
-        #path = '{0}/results/entries/mcsa_{1}/mcsa_{1}.{2}.*.pdb'.format(
-        #    WORKING_DIR, str(mcsa_id).zfill(4), pdb_id)
         if len(glob(path)) > 0:
             return glob(path)[0]
         return

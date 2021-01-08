@@ -3,7 +3,6 @@
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
 from .residue_definitions import AA_3TO1, EQUIVALENT_RESIDUES
-from ..templates.common import transform_chain
 
 
 class PdbResidue:
@@ -35,8 +34,8 @@ class PdbResidue:
 
     def add_structure(self, structure):
         """Map residue to Biopython residue object"""
-        if type(structure) != Structure:
-            return False
+        if self.is_gap:
+            return True
         try:
             residue = structure[0][self.chain][self.auth_resid]
             if residue.get_resname().capitalize() == self.resname:
@@ -68,10 +67,6 @@ class PdbResidue:
                 self.auth_resid == other.auth_resid and
                 self.resid == other.resid)
 
-    def is_gap(self):
-        """Check if residue is empty (no alignment with reference)"""
-        return self.structure is None and self.mcsa_id is None and \
-            self.pdb_id is None and self.resid is None
 
     def get_nearest_equivalent(self, other, reslist):
         """Finds the closest equivalent of another residue in a list"""
@@ -90,6 +85,11 @@ class PdbResidue:
     @property
     def id(self):
         return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
+
+    @property
+    def is_gap(self):
+        """Check if residue is empty (no alignment with reference)"""
+        return self.mcsa_id is None and self.pdb_id is None and self.resid is None
 
     @property
     def is_conserved(self):
@@ -120,18 +120,32 @@ class PdbResidue:
                 is_reference = pdb_res['is_reference']
                 chain = pdb_res['assembly_chain_name'] if is_reference \
                     else pdb_res['chain_name']
-                chain = transform_chain(chain, to_dash=False)
-                assembly_chain = transform_chain(pdb_res['assembly_chain_name'], to_dash=False)
+                assembly_chain = PdbResidue.transform_chain(pdb_res['assembly_chain_name'], to_dash=False)
                 funcloc = residue['function_location_abv']
 
-                if not is_reference and assembly_chain != chain:
-                    yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                              assembly_chain, funcloc, is_reference)
+                #if not is_reference and assembly_chain != chain:
+                #    yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
+                #              assembly_chain, funcloc, is_reference)
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
                           chain, funcloc, is_reference)
         except KeyError:
             return
 
+    @staticmethod
+    def transform_chain(chain, to_dash=False):  # this is not universal, should use assembly identityId instead
+        """Transforms the chain field from X-n to XY and reverse"""
+
+        letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        if to_dash:
+            if len(chain) == 2 and all(c.isalpha for c in chain):
+                return "{}-{}".format(chain[0], letters.find(chain[1])+2)
+            else:
+                return chain
+        else:
+            if '-' in chain:
+                return "{}{}".format(chain.split("-")[0], letters[int(chain.split("-")[1])-2])
+            else:
+                return chain
 
 class Het(PdbResidue):
 
@@ -141,6 +155,4 @@ class Het(PdbResidue):
         super().__init__(mcsa_id, pdb_id, resname, resid, chain)
         self.parity_score = parity_score
         self.centrality = centrality
-
-
 

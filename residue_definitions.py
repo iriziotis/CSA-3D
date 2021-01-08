@@ -30,6 +30,18 @@ RESIDUE_DEFINITIONS = {
     'VAL.CA', 'VAL.CB', 'VAL.CG',
     }
 
+EQUIVALENT_RESIDUES = {
+        'Glu' : 'Asp',
+        'Asp' : 'Glu',
+        'Gln' : 'Asn',
+        'Asn' : 'Gln',
+        'Val' : {'Leu', 'Ile'},
+        'Leu' : {'Ile', 'Val'},
+        'Ile' : {'Val', 'Leu'},
+        'Ser' : 'Thr',
+        'Thr' : 'Ser'
+        }
+
 EQUIVALENT_ATOMS = {
         'HIS.CD2' : 'HIS.ND1',
         'ASP.OD2' : 'ASP.OD1',
@@ -54,17 +66,6 @@ EQUIVALENT_ATOMS = {
         'VAL.CG'  : 'LEU.CG',
         }
 
-EQUIVALENT_RESIDUES = {
-        'Glu' : 'Asp',
-        'Asp' : 'Glu',
-        'Gln' : 'Asn',
-        'Asn' : 'Gln',
-        'Val' : {'Leu', 'Ile'},
-        'Leu' : {'Ile', 'Val'},
-        'Ile' : {'Val', 'Leu'},
-        'Ser' : 'Thr',
-        'Thr' : 'Ser'
-        }
         
 
 
