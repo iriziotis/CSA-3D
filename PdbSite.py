@@ -3,7 +3,7 @@
 import rmsd
 import numpy as np
 from numba import jit, prange
-from copy import deepcopy
+from copy import copy, deepcopy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
@@ -117,7 +117,7 @@ class PdbSite:
             residue_id = residue.get_id()
             hetfield = residue_id[0]
             # Capture all HETs in the structure
-            if hetfield[0] == 'H':
+            if hetfield[0] == 'H' and 'HOH' not in hetfield:
                 het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(), 
                           resid=residue.get_id()[1], chain=residue.get_parent().get_id())
                 het.structure = residue
@@ -171,7 +171,7 @@ class PdbSite:
                             atom.get_occupancy() if atom.get_occupancy() else '')
                         print(pdb_line, file=o)
 
-    def get_atom_strings_and_coords(self, functional_atoms=True, ca_only=False, allow_symmetrics=True):
+    def get_atom_strings_and_coords(self, functional_atoms=True, ca_only=False, allow_symmetrics=True, omit=[]):
         """Gets atoms and coordinates for superposition and atom reordering
         calculations
 
@@ -194,6 +194,8 @@ class PdbSite:
         atoms = []
         coords = []
         for i, res in enumerate(self.residues):
+            if i in omit:
+                continue
             # Temporary
             if not res.structure:
                 break
@@ -214,23 +216,19 @@ class PdbSite:
 
         return atoms, coords
 
+    #@profile
     def fit(self, other, cycles=10, transform=False, mutate=True, reorder=True, allow_symmetrics=True, get_index=False):
         """Calculates RMSD using the Kabsch algorithm from the rmsd module.
         Can also find the optimal atom alignment using the Hungarian algorithm.
         See https://github.com/charnley/rmsd for more"""
-        p = deepcopy(self)
-        q = deepcopy(other)
-
         # TODO check cases where site is fit to reference site.fit(site.reference_structure)
         # I get a stack bug, mcsa 1
 
-        # In case gaps are present, remove the corresponding residues from both structures
-        for gap in sorted(q.get_gaps(), reverse=True):
-            del p.residues[gap]
-            del q.residues[gap]
+        # In case gaps are present, exclude them
+        gaps = other.get_gaps()
         # Get atom identifier strings and coords as numpy arrays
-        p_atoms, p_coords = p.get_atom_strings_and_coords(allow_symmetrics=allow_symmetrics)
-        q_atoms, q_coords = q.get_atom_strings_and_coords(allow_symmetrics=allow_symmetrics)
+        p_atoms, p_coords = self.get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
+        q_atoms, q_coords = other.get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
         q_review = []
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))

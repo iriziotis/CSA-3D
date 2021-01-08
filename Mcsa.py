@@ -62,7 +62,7 @@ class Mcsa:
     def _build_pdb_sites(self, entry, annotate=True, verbose=False):
         self.entries[entry] = Entry(entry)
         ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
-        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry], self._get_cif_path(ref_pdb_id))
+        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry], self._get_cif_path(ref_pdb_id), annotate)
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id), annotate):
