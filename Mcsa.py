@@ -110,10 +110,13 @@ class Mcsa:
                                                  self._get_cif_path(ref_pdb_id), annotate)
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
-            for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id), annotate):
+            for site in PdbSite.build_all(pdb, reference_site, 
+                                          self._get_cif_path(pdb_id), annotate,
+                                          redundancy_cutoff=0.1):
                 if verbose:
                     print(site.id, site)
                 self.entries[entry].add(site)
+        # TODO check mcsa 2 - 1xxm
         # TODO check cases with two pdb references
 
     def _build_uniprot_sites(self, entry):
@@ -122,6 +125,7 @@ class Mcsa:
         if entry not in self.entries:
             self.entries[entry] = Entry(entry)
         reference_site = UniSite.build(self.ref_uni_residues[entry])
+        self.entries[entry].add(reference_site)
         for uniprot_id, uniprot in self.uni_residues[entry].items():
             site = UniSite.build(uniprot, reference_site)
             self.entries[entry].add(site)
