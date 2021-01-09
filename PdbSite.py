@@ -637,7 +637,7 @@ class Box:
                     self.coords_x.append(atom.get_coord()[0])
                     self.coords_y.append(atom.get_coord()[1])
                     self.coords_z.append(atom.get_coord()[2])
-        except KeyError:
+        except (IndexError, KeyError):
             print('Warning: Error occurred while trying to parse structure')
             return
         min_x = min(self.coords_x) - headroom
