@@ -1,12 +1,11 @@
-# !/usr/bin/env python3
-
 from .config import UNI2PDB
 from .PdbSite import PdbSite
 from .UniSite import UniSite
 
 
 class Entry:
-    """M-CSA entry. Contains a list of UniSites and a list of PdbSites"""
+    """M-CSA entry. Contains a list of UniSite objects and a list
+    of PdbSite objects"""
 
     def __init__(self, mcsa_id=None):
         self.mcsa_id = mcsa_id
@@ -17,7 +16,8 @@ class Entry:
         self.pdb_ids = set()
 
     def add(self, site):
-        """Adds UniProt catalytic Site in unisites list"""
+        """Adds catalytic site in the appropriate list depending on its
+        type (PdbSite or UniSite)"""
         if type(site) == UniSite:
             self.unisites.append(site)
             self.unisites_dict[site.id] = site
@@ -32,24 +32,24 @@ class Entry:
         return True
 
     def get_unisite(self, _id):
-        """Return UniProt active site with id"""
+        """Return UniProt active site with the given UniProt accession ID"""
         if _id in self.unisites_dict:
             return self.unisites_dict[_id]
         return
 
     def get_pdbsite(self, _id):
-        """Return PDB active site with specific id"""
+        """Return PDB active site with specific PDB ID"""
         if _id in self.unisites_dict:
             return self.unisites_dict[_id]
         return
 
     def get_unisites(self):
-        """Return generator of all UniProt sites to iterate through"""
+        """Return a generator of all UniProt sites"""
         yield from self.unisites
 
     def get_pdbsites(self, pdb_id=None):
-        """Return PDB active sites that have the same PDB ID, or return a generator
-        of all pdbsites to iterate through"""
+        """Return a generator of PDB active sites that have the same PDB ID,
+        or a generator of all PdbSites"""
         result = []
         if not pdb_id:
             yield from self.pdbsites
@@ -58,6 +58,8 @@ class Entry:
         yield from result
 
     def update_mapped_sites(self):
+        """Updates the mapping of all UniProt catalytic sites to their
+        respective PDB sites"""
         for unisite in self.unisites:
             if unisite.id in UNI2PDB:
                 for sifts_pdb_id in UNI2PDB[unisite.id]:

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from Bio.SeqUtils import IUPACData
 
 AA_3TO1 = IUPACData.protein_letters_3to1_extended.copy()
@@ -13,7 +12,7 @@ RESIDUE_DEFINITIONS = {
     'ASP.CG', 'ASP.OD1', 'ASP.OD2',
     'GLU.CD', 'GLU.OE1', 'GLU.OE2',
     'PHE.CE1', 'PHE.CE2', 'PHE.CZ',
-    'GLY.N' , 'GLY.CA', 'GLY.C',
+    'GLY.N', 'GLY.CA', 'GLY.C',
     'HIS.CG', 'HIS.CD2', 'HIS.ND1',
     'ILE.CA', 'ILE.CB', 'ILE.CG1',
     'LYS.CD', 'LYS.CE', 'LYS.NZ',
@@ -31,46 +30,37 @@ RESIDUE_DEFINITIONS = {
     }
 
 EQUIVALENT_RESIDUES = {
-        'Glu' : 'Asp',
-        'Asp' : 'Glu',
-        'Gln' : 'Asn',
-        'Asn' : 'Gln',
-        'Val' : {'Leu', 'Ile'},
-        'Leu' : {'Ile', 'Val'},
-        'Ile' : {'Val', 'Leu'},
-        'Ser' : 'Thr',
-        'Thr' : 'Ser'
+        'Glu': 'Asp',
+        'Asp': 'Glu',
+        'Gln': 'Asn',
+        'Asn': 'Gln',
+        'Val': {'Leu', 'Ile'},
+        'Leu': {'Ile', 'Val'},
+        'Ile': {'Val', 'Leu'},
+        'Ser': 'Thr',
+        'Thr': 'Ser'
         }
 
 EQUIVALENT_ATOMS = {
-        'HIS.CD2' : 'HIS.ND1',
-        'ASP.OD2' : 'ASP.OD1',
-        'ASN.ND2' : 'ASN.OD1',
-        'ARG.NH2' : 'ARG.NH1',
-        'PHE.CE2' : 'PHE.CE1',
-        'TYR.CE2' : 'TYR.CE1',
-        'GLU.CD'  : 'ASP.CG',
-        'GLU.OE1' : 'ASP.OD1',
-        'GLU.OE2' : 'ASP.OD1',
-        'GLN.CD'  : 'ASN.CG',
-        'GLN.OE1' : 'ASN.OD1',
-        'GLN.NE2' : 'ASN.OD1',
-        'SER.CA'  : 'THR.CA',
-        'SER.OG'  : 'THR.OG1',
-        'SER.CB'  : 'THR.CB',
-        'ILE.CA'  : 'LEU.CA',
-        'ILE.CB'  : 'LEU.CB',
-        'ILE.CG1' : 'LEU.CG',
-        'VAL.CA'  : 'LEU.CA',
-        'VAL.CB'  : 'LEU.CB',
-        'VAL.CG'  : 'LEU.CG',
+        'HIS.CD2': 'HIS.ND1',
+        'ASP.OD2': 'ASP.OD1',
+        'ASN.ND2': 'ASN.OD1',
+        'ARG.NH2': 'ARG.NH1',
+        'PHE.CE2': 'PHE.CE1',
+        'TYR.CE2': 'TYR.CE1',
+        'GLU.CD': 'ASP.CG',
+        'GLU.OE1': 'ASP.OD1',
+        'GLU.OE2': 'ASP.OD1',
+        'GLN.CD': 'ASN.CG',
+        'GLN.OE1': 'ASN.OD1',
+        'GLN.NE2': 'ASN.OD1',
+        'SER.CA': 'THR.CA',
+        'SER.OG': 'THR.OG1',
+        'SER.CB': 'THR.CB',
+        'ILE.CA': 'LEU.CA',
+        'ILE.CB': 'LEU.CB',
+        'ILE.CG1': 'LEU.CG',
+        'VAL.CA': 'LEU.CA',
+        'VAL.CB': 'LEU.CB',
+        'VAL.CG': 'LEU.CG',
         }
-
-        
-
-
-
-
-
-
-

@@ -1,12 +1,12 @@
-# !/usr/bin/env python3
-
-from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
+from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, EQUIVALENT_RESIDUES
 
 
 class PdbResidue:
-    """M-CSA PDB residue"""
+    """M-CSA PDB residue. Basic information is collected from the M-CSA
+    API catalytic residue info .json. Residue structure is set independently
+    as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
                  auth_resid=None, chain='', funcloc='', is_reference=False):
@@ -22,32 +22,56 @@ class PdbResidue:
         self.structure = None
 
     def __str__(self):
+        """Returns one-letter representation"""
         return AA_3TO1[self.resname]
 
     def __eq__(self, other):
+        """Checks if residues share the same information"""
         return (self.resname == other.resname and
                 self.auth_resid == other.auth_resid and
                 self.chain == other.chain)
 
     def __sub__(self, other):
+        """Returns an approximate distance of self to other PdbResidue"""
         return self.get_distance(other)
 
     def copy(self):
+        """Returns a copy of the object without the structure mapping"""
         res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
                          self.auth_resid, self.chain, self.funcloc, self.is_reference)
         res.reference_residue = self.reference_residue
         return res
 
     def add_structure(self, structure):
-        """Map residue to Biopython residue object"""
+        """
+        Map residue to Biopython residue object
+
+        Args:
+             structure: Biopython Structure or Residue object. If
+                        object is Structure, it automatically gets the
+                        Residue that has the same chain and auth_resid
+        Returns:
+            True if structure is added successfully or the PdbResidue is a gap
+            (non-aligned, empty residue), False if residue cannot be found in the
+            given structure.
+        """
         if self.is_gap:
             return True
-        try:
-            residue = structure[0][self.chain][self.auth_resid]
-            if residue.get_resname().capitalize() == self.resname:
-                self.structure = residue
+        if type(structure) == Residue:
+            if structure.get_resname().capitalize() == self.resname and \
+               structure.get_parent().get_id() == self.chain and \
+               structure.get_id()[1] == self.auth_resid:
+                self.structure = structure
                 return True
-        except KeyError:
+        if type(structure) == Structure:
+            try:
+                residue = structure[0][self.chain][self.auth_resid]
+                if residue.get_resname().capitalize() == self.resname:
+                    self.structure = residue
+                    return True
+            except KeyError:
+                return False
+        else:
             return False
 
     def get_distance(self, other):
@@ -73,9 +97,20 @@ class PdbResidue:
                 self.auth_resid == other.auth_resid and
                 self.resid == other.resid)
 
-
     def get_nearest_equivalent(self, other, reslist):
-        """Finds the closest equivalent of another residue in a list"""
+        """
+        Finds the closest equivalent of another residue in a list.
+        Equivalent = same pdb_id, resid, auth_resid and resname,
+                     different chain
+
+        Args:
+            other: The residue for which we want get the closest equivalent
+                   in the list
+            reslist: A list of PdbResidue objects
+        Returns:
+            The equivalent residue to other that is located closest to self
+            in the 3D space.
+        """
         min_dist = 999
         result = None
         for res in reslist:
@@ -90,6 +125,7 @@ class PdbResidue:
 
     @property
     def id(self):
+        """Unique ID of a residue as a tuple"""
         return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
 
     @property
@@ -126,21 +162,26 @@ class PdbResidue:
                 is_reference = pdb_res['is_reference']
                 chain = pdb_res['assembly_chain_name'] if is_reference \
                     else pdb_res['chain_name']
-                assembly_chain = PdbResidue.transform_chain(pdb_res['assembly_chain_name'], to_dash=False)
                 funcloc = residue['function_location_abv']
 
-                #if not is_reference and assembly_chain != chain:
-                #    yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                #              assembly_chain, funcloc, is_reference)
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
                           chain, funcloc, is_reference)
         except KeyError:
             return
 
     @staticmethod
-    def transform_chain(chain, to_dash=False):  # this is not universal, should use assembly identityId instead
-        """Transforms the chain field from X-n to XY and reverse"""
+    def transform_chain(chain, to_dash=False):
+        """
+        Transforms the chain field from X-n to XY and reverse.
+        Useful for chain IDs found in PDB assembly structures.
 
+        Args:
+            chain: The chain ID to be transformed
+            to_dash: if True, transform to X-n format. If false,
+                     transform to XY
+        Returns:
+            Transformed ID if input was of different format
+        """
         letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         if to_dash:
             if len(chain) == 2 and all(c.isalpha for c in chain):
@@ -153,12 +194,15 @@ class PdbResidue:
             else:
                 return chain
 
-class Het(PdbResidue):
 
+class Het(PdbResidue):
+    """PdbResidue with two extra attributes.
+        parity_score: chemical similarity to the cognate ligand (PARITY score,
+                      from a pre-compiled dataset)
+        centrality: the mean minimum distance of the het to the catalytic
+    """
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funcloc='', is_reference=None,
-                 parity_score=None, centrality=None):
+                 chain='', parity_score=None, centrality=None):
         super().__init__(mcsa_id, pdb_id, resname, resid, chain)
         self.parity_score = parity_score
         self.centrality = centrality
-

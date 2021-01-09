@@ -5,7 +5,8 @@ from .UniResidue import UniResidue
 
 
 class UniSite:
-    """M-CSA Uniprot catalytic site. A list of UniResidue objects"""
+    """M-CSA UniProt catalytic site. Contains lists of UniResidues and mapped PDB
+    catalytic sites (UniSite objects)."""
 
     def __init__(self):
         self.residues = []
@@ -14,6 +15,7 @@ class UniSite:
         self.reference_site = None
 
     def __str__(self):
+        """Print as pseudo-sequence in one-letter code"""
         return ''.join([AA_3TO1[res.resname] for res in self.residues])
 
     def __iter__(self):
@@ -21,14 +23,47 @@ class UniSite:
         yield from self.residues
 
     def __contains__(self, _id):
-        """Check if residue of specific is there"""
+        """Check if residue of specific ID is there"""
         return id in self.residues_dict
 
     def __getitem__(self, _id):
-        """Return the child with given id."""
+        """Return the child with given ID."""
         return self.residues_dict[id]
 
+    # Properties
+
+    @property
+    def mcsa_id(self):
+        """Get M-CSA ID of catalytic residues."""
+        for res in self.residues:
+            if res.mcsa_id:
+                return res.mcsa_id
+        return
+
+    @property
+    def id(self):
+        """UniProt site ID is the UniProt id of the sequence"""
+        return self.residues[0].uniprot_id
+
+    @property
+    def size(self):
+        """Get site size in residue count"""
+        return len(self.residues)
+
+    @property
+    def is_reference(self):
+        """Check if site is reference site"""
+        if self.size > 0:
+            return self.residues[0].is_reference
+        return False
+
+    @property
+    def is_conserved(self):
+        """Check if all residues are conserved by comparing to the reference"""
+        return str(self) == str(self.reference_site) or self.is_reference
+
     def get_residues(self):
+        """Iterate over residues"""
         yield from self.residues
 
     def add(self, residue):
@@ -41,6 +76,8 @@ class UniSite:
             return
         return True
 
+    # Alternative constructors
+
     @classmethod
     def build(cls, reslist, reference_site=None):
         """Build UniProt site from a list of residues, and map reference residues"""
@@ -51,6 +88,16 @@ class UniSite:
             site.reference_site = reference_site
             site._map_reference_residues()
         return site
+
+    @classmethod
+    def from_list(cls, reslist):
+        """Construct UniSite object directly from residue list"""
+        site = cls()
+        for res in reslist:
+            site.add(res)
+        return site
+
+    # Private methods
 
     def _map_reference_residues(self):
         """Puts each residue in the site in the correct order, according
@@ -84,41 +131,3 @@ class UniSite:
                     reorder.append(j)
         self.residues = [self.residues[i] for i in reorder]
         return
-
-    @property
-    def mcsa_id(self):
-        """Get M-CSA ID of catalytic residues."""
-        for res in self.residues:
-            if res.mcsa_id:
-                return res.mcsa_id
-        return
-
-    @property
-    def id(self):
-        """UniProt site ID is the UniProt id of the sequence"""
-        return self.residues[0].uniprot_id
-
-    @property
-    def size(self):
-        """Get site size in residue count"""
-        return len(self.residues)
-
-    @property
-    def is_reference(self):
-        """Check if site is reference site"""
-        if self.size > 0:
-            return self.residues[0].is_reference
-        return False
-
-    @property
-    def is_conserved(self):
-        """Check if all residues are conserved by comparing to the reference"""
-        return str(self) == str(self.reference_site) or self.is_reference
-
-    @classmethod
-    def from_list(cls, res_list):
-        """Construct UniSite object directly from residue list"""
-        site = cls()
-        for res in res_list:
-            site.add(res)
-        return site

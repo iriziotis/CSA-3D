@@ -4,7 +4,8 @@ from .residue_definitions import AA_3TO1
 
 
 class UniResidue:
-    """M-CSA UniProt residue"""
+    """M-CSA UniProt residue. Basic information is collected from the M-CSA
+    API catalytic residue info .json"""
 
     def __init__(self, mcsa_id=None, uniprot_id=None, resname='', resid=None,
                  funcloc=None, is_reference=False):
@@ -19,8 +20,16 @@ class UniResidue:
     def __str__(self):
         return AA_3TO1[self.resname]
 
+    def copy(self):
+        """Returns a copy of the object without the structure mapping"""
+        res = UniResidue(self.mcsa_id, self.uniprot_id, self.resname, self.resid,
+                         self.funcloc, self.is_reference)
+        res.reference_residue = self.reference_residue
+        return res
+
     @property
     def id(self):
+        """Unique ID of a residue as a tuple"""
         return self.uniprot_id, self.resname, self.resid
 
     @property
@@ -31,7 +40,7 @@ class UniResidue:
     @classmethod
     def from_json(cls, residue):
         """Constructs a list of UniResidue objects using information directly from
-        the M-CSA homologues json file. Input is a top-level residue entry in the json.
+        the M-CSA homologues .json file. Input is a top-level residue entry in the json.
         """
         try:
             for uniprot_res in residue['residue_sequences']:
