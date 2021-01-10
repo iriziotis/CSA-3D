@@ -283,7 +283,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, cycles=10, transform=False, mutate=True, reorder=True, allow_symmetrics=True, get_index=False):
+    def fit(self, other, cycles=10, transform=False, mutate=True, reorder=True, allow_symmetrics=True):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -344,8 +344,6 @@ class PdbSite:
             other.structure.transform(rot, tran)
             for het in other.nearby_hets:
                 het.structure.transform(rot, tran)
-        if get_index:
-            return rot, tran, rms, q_review.tolist()
         return rot, tran, rms
 
 
