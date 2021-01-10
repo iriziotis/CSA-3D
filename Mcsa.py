@@ -28,7 +28,7 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entries=None, annotate=True, verbose=False):
+    def build(self, entries=None, annotate=True, redundancy_cutoff=None, verbose=False):
         """
         Builds M-CSA entries (Entry objects) containing PDB and UniProt
         catalytic sites (PdbSite and UniSite objects respectively
@@ -47,7 +47,7 @@ class Mcsa:
             if entry in self.json_residues.keys():
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
-                self._build_pdb_sites(entry, annotate, verbose)
+                self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry)
 
     def add(self, entry):
@@ -93,7 +93,7 @@ class Mcsa:
                     self.uni_residues[residue.mcsa_id][residue.uniprot_id].append(residue)
                 residue.reference_residue = reference_residue
 
-    def _build_pdb_sites(self, entry, annotate=True, verbose=False):
+    def _build_pdb_sites(self, entry, annotate=True, redundancy_cutoff=None, verbose=False):
         """
         Builds PdbSite objects from PdbResidue lists using distance
         criteria and adds them to Entry objects.
@@ -112,7 +112,7 @@ class Mcsa:
         for pdb_id, pdb in self.pdb_residues[entry].items():
             for site in PdbSite.build_all(pdb, reference_site, 
                                           self._get_cif_path(pdb_id), annotate,
-                                          redundancy_cutoff=0.1):
+                                          redundancy_cutoff):
                 if verbose:
                     print(site.id, site)
                 self.entries[entry].add(site)
