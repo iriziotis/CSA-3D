@@ -1,11 +1,11 @@
-import rmsd
 import numpy as np
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.SVDSuperimposer import SVDSuperimposer
-from Bio.PDB.MMCIFParser import FastMMCIFParser
+from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.MMCIF2Dict import MMCIF2Dict
+from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC
 from .PdbResidue import PdbResidue, Het
@@ -31,6 +31,8 @@ class PdbSite:
         self.structure_hets = []
         self.nearby_hets = []
         self.annotations = None
+        # TODO add UniProt IDs from SIFTS -- regardless if we don't have the corresponding sites in M-CSA
+        # TODO set reference site of reference as itself
 
     def __str__(self):
         """Print as pseudo-sequence in one-letter code"""
@@ -114,14 +116,25 @@ class PdbSite:
         return str(self) == str(self.reference_site) or self.is_reference
 
     @property
-    def is_conservative_mutation(self):
+    def is_conservative_mutation(self, ignore_funcloc_main=True):
         result = False
         for res in self.residues:
-            if not res.is_conserved:
-                result = False
+            if ignore_funcloc_main:
+                if 'main' in res.funcloc:
+                    result = True
+                    continue
+            if not res.is_conserved and not res.is_conservative_mutation:
+                return False
             if res.is_conservative_mutation:
                 result = True
         return result
+
+    @property
+    def has_missing_functional_atoms(self):
+        gaps = set(self.get_gaps())
+        self_atoms, _ = self.get_atom_strings_and_coords(omit=gaps)
+        ref_atoms, _ = self.reference_site.get_atom_strings_and_coords(omit=gaps)
+        return len(self_atoms) != len(ref_atoms)
 
     def get_residues(self):
         """To iterate over catalytic residues"""
@@ -136,7 +149,7 @@ class PdbSite:
         return gaps
 
     def add(self, residue):
-        """Add PdbResidue object to site (in the residues list and dict"""
+        """Add PdbResidue object to site (in the residues list and dict)"""
         if type(residue) == PdbResidue:
             self.residues.append(residue)
             self.residues_dict[residue.id] = residue
@@ -202,6 +215,7 @@ class PdbSite:
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
+    # TODO write ligands as REMARK entries
     def write_pdb(self, write_hets=False, outdir=None, outfile=None):
         """
         Writes site coordinates in PDB format
@@ -292,29 +306,24 @@ class PdbSite:
             Exception: If number of functions atoms in the two sites is not the same (e.g.
                        if there are missing atoms from the parent structure)
         """
-
-        # TODO check cases where site is fit to reference site.fit(site.reference_structure)
-        # I get a stack bug, mcsa 1
-
-        # In case gaps are present, exclude them
-        gaps = other.get_gaps()
+        # In case gaps are present, exclude those positions
+        gaps = set(self.get_gaps() + other.get_gaps())
         # Get atom identifier strings and coords as numpy arrays
         p_atoms, p_coords = self.get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
         q_atoms, q_coords = other.get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
-        q_review = []
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
         # Initial crude superposition
         rot, tran, rms = PdbSite._super(p_coords, q_coords, cycles=1)
         q_trans = PdbSite._transform(q_coords, rot, tran)
-        # In case of non-conservative mutations, make a pseudo-mutation to facilitate superposition
+        # In case of non-conservative mutations, make pseudo-mutations to facilitate superposition
         if mutate:
             for i, (p_atom, q_atom) in enumerate(zip(p_atoms, q_atoms)):
                 if p_atom != q_atom:
                     q_atoms[i] = p_atoms[i]
         # Reorder atoms using the Hungarian algorithm from rmsd package
         if reorder:
-            q_review = rmsd.reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
+            q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
         rot, tran, rms = PdbSite._super(p_coords, q_coords, cycles, cutoff=6)
@@ -325,6 +334,7 @@ class PdbSite:
         if get_index:
             return rot, tran, rms, q_review.tolist()
         return rot, tran, rms
+
 
     def get_atom_strings_and_coords(self, functional_atoms=True, ca_only=False, allow_symmetrics=True, omit=None):
         """Gets atoms and coordinates for superposition and atom reordering
@@ -352,7 +362,10 @@ class PdbSite:
             if omit:
                 if i in omit:
                     continue
+            # TODO have a look at this, try superimposing a reference on a site
+            # I think we should not return here
             if not res.structure:
+                print('fdfdfd')
                 return
             for atom in res.structure:
                 resname = res.resname.upper()
@@ -462,14 +475,19 @@ class PdbSite:
             if res_list[i].funcloc == '':
                 del res_list[i]
         site = cls()
-        parser = FastMMCIFParser(QUIET=True)
-        site.structure = parser.get_structure('', cif_path)
+        if annotate:
+            parser = MMCIFParser(QUIET=True)
+            structure = parser.get_structure('', cif_path)
+            annotations = PdbSite.get_annotations(parser._mmcif_dict)
+        else:
+            parser = FastMMCIFParser(QUIET=True)
+            structure = parser.get_structure('', cif_path)
         for res in res_list:
-            if site.structure:
-                res.add_structure(site.structure)
+            if structure:
+                res.add_structure(structure)
             site.add(res)
-        if annotate and site.structure:
-            site.annotations = PdbSite.get_annotations(cif_path)
+        if annotate:
+            site.annotations = annotations
             site.find_ligands()
         return site
 
@@ -504,13 +522,15 @@ class PdbSite:
     def build_all(cls, reslist, reference_site, cif_path, annotate=True, redundancy_cutoff=None):
         """Builds all sites in using as input a list of catalytic residues.
         Returns a list of PdbSite objects"""
-        sites = []
         # Map structure objects in every residue
-        parser = FastMMCIFParser(QUIET=True)
-        structure = parser.get_structure('', cif_path) 
         if annotate:
-            annotations = PdbSite.get_annotations(cif_path)
-        # We want all assembly chains
+            parser = MMCIFParser(QUIET=True)
+            structure = parser.get_structure('', cif_path) 
+            annotations = PdbSite.get_annotations(parser._mmcif_dict)
+        else:
+            parser = FastMMCIFParser(QUIET=True)
+            structure = parser.get_structure('', cif_path) 
+        # We want all equivalent residues from identical assembly chains as distinct PdbResidue objects
         new_reslist = []
         for res in reslist:
             for chain in structure[0]:
@@ -525,6 +545,7 @@ class PdbSite:
                 except KeyError:
                     continue
         reslist = new_reslist
+        sites = []
         # Set a reference residue to make seeds
         ref = None
         for res in reslist:
@@ -543,6 +564,8 @@ class PdbSite:
         # Build a site from each seed
         for seed in seeds:
             site = cls.build(seed, reslist, reference_site)
+            if site.has_missing_functional_atoms:
+                continue
             if redundancy_cutoff:
                 if len(sites) > 0:
                     _, _, rms = site.fit(sites[-1])
@@ -556,12 +579,19 @@ class PdbSite:
         return sites
 
     @staticmethod
-    def get_annotations(cif_path):
-        """Parsed an MMCIF file and gets all necessary info for a site.
-        Returns a dictionary of annotations"""
-        if not cif_path.endswith('cif'):
-            return
-        cif = MMCIF2Dict(cif_path)
+    def get_annotations(cif):
+        """
+        Parses an MMCIF raw file or dictionary and gets all necessary info for a site.
+
+        Args:
+            cif: Either the path of the raw mmCIF file, or a pre-made dictionary from
+                 MMCIF2Dict()
+        Returns: A smaller dictionary of annotations with less complex key names
+        """
+        if type(cif) != dict:
+            if type(cif) != str or not cif_path.endswith('cif'):
+                return
+            cif = MMCIF2Dict(cif_path)
         annotations = dict()
         annotations['title'] = cif['_struct.title'][0]
         annotations['enzyme'] = cif['_struct.pdbx_descriptor'][0]

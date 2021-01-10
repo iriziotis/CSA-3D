@@ -94,7 +94,7 @@ class PdbResidue:
         and auth_resid"""
         return (self.pdb_id == other.pdb_id and
                 self.resname == other.resname and
-                self.auth_resid == other.auth_resid and
+                #self.auth_resid == other.auth_resid and
                 self.resid == other.resid)
 
     def get_nearest_equivalent(self, other, reslist):

@@ -23,3 +23,4 @@ with open(compound_similarities_json, 'r') as f:
 with open(pdb_ec_mapping_csv, 'r') as f:
     next(f)
     PDB2EC = {(line[0], line[1]): line[3] for line in csv.reader(f)}
+
