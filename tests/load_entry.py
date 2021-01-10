@@ -3,8 +3,8 @@ import sys
 sys.path.append('/Users/riziotis/ebi/phd/src/')
 import pickle
 
-def main():
-    with open('entry_2.ent', 'rb') as f:
+def main(mcsa_id):
+    with open('entry_{}.ent'.format(mcsa_id), 'rb') as f:
         entry = pickle.load(f)
 
     print('Fitting')
@@ -15,13 +15,12 @@ def main():
             continue
         try:
             pdbsite.reference_site.fit(pdbsite, transform=True)
-        except:
+        except Exception as e:
+            print(e)
             continue
         pdbsite.write_pdb(outdir='./out', write_hets=True)
 
 
-
-main()
-
-
+if __name__ == '__main__':
+    main(int(sys.argv[1]))
 

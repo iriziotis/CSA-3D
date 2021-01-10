@@ -1,0 +1,66 @@
+REMARK 5.1.1.3
+REMARK TITLE Crystal structure of B.subtilis glutamate racemase (RacE) with D-Glu
+REMARK ENZYME glutamate racemase 1 (E.C.5.1.1.3)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 1.75
+REMARK ORGANISM_NAME Bacillus subtilis
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 562
+ATOM      0  N   HIS C 187      18.107  34.012  26.817    1.0
+ATOM      0  CA  HIS C 187      17.255  33.950  25.633    1.0
+ATOM      0  C   HIS C 187      15.798  33.850  25.920    1.0
+ATOM      0  O   HIS C 187      14.987  34.168  25.066    1.0
+ATOM      0  CB  HIS C 187      17.679  32.723  24.809    1.0
+ATOM      0  CG  HIS C 187      18.997  32.863  24.126    1.0
+ATOM      0  ND1 HIS C 187      20.171  33.206  24.775    1.0
+ATOM      0  CD2 HIS C 187      19.326  32.691  22.815    1.0
+ATOM      0  CE1 HIS C 187      21.163  33.231  23.898    1.0
+ATOM      0  NE2 HIS C 187      20.676  32.925  22.698    1.0
+ATOM      0  N   ASP C  10      28.742  38.224  28.123    1.0
+ATOM      0  CA  ASP C  10      27.774  37.171  27.839    1.0
+ATOM      0  C   ASP C  10      28.369  36.217  26.830    1.0
+ATOM      0  O   ASP C  10      29.386  36.505  26.206    1.0
+ATOM      0  CB  ASP C  10      26.483  37.782  27.254    1.0
+ATOM      0  CG  ASP C  10      25.431  36.712  26.908    1.0
+ATOM      0  OD1 ASP C  10      25.023  36.015  27.835    1.0
+ATOM      0  OD2 ASP C  10      25.027  36.572  25.716    1.0
+ATOM      0  N   SER C  11      27.751  35.047  26.663    1.0
+ATOM      0  CA  SER C  11      28.308  34.112  25.701    1.0
+ATOM      0  C   SER C  11      27.971  34.543  24.260    1.0
+ATOM      0  O   SER C  11      28.532  33.975  23.314    1.0
+ATOM      0  CB  SER C  11      27.718  32.696  25.925    1.0
+ATOM      0  OG  SER C  11      26.314  32.816  25.755    1.0
+ATOM      0  N   CYS C  74      25.177  36.473  31.372    1.0
+ATOM      0  CA  CYS C  74      24.913  35.063  31.015    1.0
+ATOM      0  C   CYS C  74      24.600  34.248  32.271    1.0
+ATOM      0  O   CYS C  74      25.366  34.280  33.232    1.0
+ATOM      0  CB  CYS C  74      26.132  34.495  30.311    1.0
+ATOM      0  SG  CYS C  74      26.018  32.706  29.851    1.0
+ATOM      0  N   GLU C 153      17.511  31.248  18.734    1.0
+ATOM      0  CA  GLU C 153      18.584  31.640  17.789    1.0
+ATOM      0  C   GLU C 153      18.210  31.383  16.324    1.0
+ATOM      0  O   GLU C 153      18.511  32.197  15.438    1.0
+ATOM      0  CB  GLU C 153      19.838  30.835  18.046    1.0
+ATOM      0  CG  GLU C 153      20.529  31.165  19.357    1.0
+ATOM      0  CD  GLU C 153      21.506  32.318  19.234    1.0
+ATOM      0  OE1 GLU C 153      22.028  32.727  20.295    1.0
+ATOM      0  OE2 GLU C 153      21.768  32.810  18.098    1.0
+ATOM      0  N   CYS C 185      17.792  32.074  31.885    1.0
+ATOM      0  CA  CYS C 185      18.611  32.047  30.661    1.0
+ATOM      0  C   CYS C 185      18.373  33.352  29.896    1.0
+ATOM      0  O   CYS C 185      17.281  33.828  29.840    1.0
+ATOM      0  CB  CYS C 185      18.143  30.861  29.836    1.0
+ATOM      0  SG  CYS C 185      19.045  30.718  28.261    1.0
+HETATM    0  N   DGL F3301      23.632  33.090  27.633    1.0
+HETATM    0  CA  DGL F3301      23.306  31.670  27.976    1.0
+HETATM    0  C   DGL F3301      22.519  31.648  29.314    1.0
+HETATM    0  O   DGL F3301      22.387  30.559  29.872    1.0
+HETATM    0  CB  DGL F3301      22.394  31.042  26.906    1.0
+HETATM    0  CG  DGL F3301      23.153  30.777  25.625    1.0
+HETATM    0  CD  DGL F3301      24.323  29.834  25.872    1.0
+HETATM    0  OE1 DGL F3301      24.112  28.643  26.150    1.0
+HETATM    0  OE2 DGL F3301      25.482  30.276  25.805    1.0
+HETATM    0  OXT DGL F3301      22.025  32.699  29.731    1.0
+END

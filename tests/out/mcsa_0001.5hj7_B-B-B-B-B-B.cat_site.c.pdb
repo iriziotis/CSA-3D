@@ -1,0 +1,66 @@
+REMARK 5.1.1.3
+REMARK TITLE Glutamate Racemase Mycobacterium tuberculosis (MurI) with bound D-glutamate, 2.3 Angstrom resolution, X-ray diffraction
+REMARK ENZYME Glutamate racemase (E.C.5.1.1.3)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 2.300
+REMARK ORGANISM_NAME Mycobacterium tuberculosis (strain ATCC 25618 / H37Rv)
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 469008
+ATOM      0  N   HIS B 187      18.121  33.984  26.795    1.0
+ATOM      0  CA  HIS B 187      17.226  33.997  25.646    1.0
+ATOM      0  C   HIS B 187      15.762  33.926  26.042    1.0
+ATOM      0  O   HIS B 187      14.902  34.354  25.267    1.0
+ATOM      0  CB  HIS B 187      17.557  32.836  24.702    1.0
+ATOM      0  CG  HIS B 187      18.880  32.968  24.008    1.0
+ATOM      0  ND1 HIS B 187      20.052  33.250  24.678    1.0
+ATOM      0  CD2 HIS B 187      19.216  32.836  22.700    1.0
+ATOM      0  CE1 HIS B 187      21.053  33.289  23.813    1.0
+ATOM      0  NE2 HIS B 187      20.572  33.040  22.607    1.0
+ATOM      0  N   ASP B  12      28.569  38.390  28.082    1.0
+ATOM      0  CA  ASP B  12      27.648  37.290  27.853    1.0
+ATOM      0  C   ASP B  12      28.352  36.289  26.958    1.0
+ATOM      0  O   ASP B  12      29.396  36.587  26.363    1.0
+ATOM      0  CB  ASP B  12      26.342  37.792  27.213    1.0
+ATOM      0  CG  ASP B  12      25.413  36.655  26.783    1.0
+ATOM      0  OD1 ASP B  12      24.937  35.928  27.679    1.0
+ATOM      0  OD2 ASP B  12      25.158  36.494  25.559    1.0
+ATOM      0  N   SER B  13      27.763  35.089  26.868    1.0
+ATOM      0  CA  SER B  13      28.253  34.055  25.960    1.0
+ATOM      0  C   SER B  13      28.119  34.447  24.493    1.0
+ATOM      0  O   SER B  13      28.776  33.843  23.641    1.0
+ATOM      0  CB  SER B  13      27.498  32.748  26.196    1.0
+ATOM      0  OG  SER B  13      26.146  32.835  25.781    1.0
+ATOM      0  N   CYS B  75      25.149  36.474  31.473    1.0
+ATOM      0  CA  CYS B  75      24.903  35.091  31.086    1.0
+ATOM      0  C   CYS B  75      24.707  34.203  32.312    1.0
+ATOM      0  O   CYS B  75      25.563  34.158  33.209    1.0
+ATOM      0  CB  CYS B  75      26.077  34.592  30.239    1.0
+ATOM      0  SG  CYS B  75      26.039  32.889  29.838    1.0
+ATOM      0  N   GLU B 153      16.966  32.044  18.785    1.0
+ATOM      0  CA  GLU B 153      17.917  32.707  17.899    1.0
+ATOM      0  C   GLU B 153      17.492  32.616  16.442    1.0
+ATOM      0  O   GLU B 153      17.742  33.551  15.676    1.0
+ATOM      0  CB  GLU B 153      19.329  32.133  18.081    1.0
+ATOM      0  CG  GLU B 153      20.040  32.631  19.336    1.0
+ATOM      0  CD  GLU B 153      21.509  32.216  19.408    1.0
+ATOM      0  OE1 GLU B 153      21.990  31.560  18.457    1.0
+ATOM      0  OE2 GLU B 153      22.182  32.542  20.420    1.0
+ATOM      0  N   CYS B 185      17.942  32.008  31.873    1.0
+ATOM      0  CA  CYS B 185      18.747  32.005  30.669    1.0
+ATOM      0  C   CYS B 185      18.485  33.307  29.917    1.0
+ATOM      0  O   CYS B 185      17.377  33.832  29.943    1.0
+ATOM      0  CB  CYS B 185      18.424  30.776  29.810    1.0
+ATOM      0  SG  CYS B 185      19.278  30.739  28.207    1.0
+HETATM    0  N   DGL D 301      23.813  33.176  27.489    1.0
+HETATM    0  CA  DGL D 301      23.442  31.790  27.769    1.0
+HETATM    0  C   DGL D 301      22.720  31.671  29.100    1.0
+HETATM    0  O   DGL D 301      22.171  32.667  29.609    1.0
+HETATM    0  CB  DGL D 301      22.556  31.227  26.644    1.0
+HETATM    0  CG  DGL D 301      23.312  30.961  25.347    1.0
+HETATM    0  CD  DGL D 301      24.444  29.958  25.519    1.0
+HETATM    0  OE1 DGL D 301      25.627  30.362  25.382    1.0
+HETATM    0  OE2 DGL D 301      24.151  28.768  25.800    1.0
+HETATM    0  OXT DGL D 301      22.666  30.575  29.681    1.0
+END

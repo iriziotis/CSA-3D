@@ -1,0 +1,56 @@
+REMARK 5.1.1.3
+REMARK TITLE Crystal Structure of Glutamate Racemase from Campylobacter jejuni subsp. jejuni
+REMARK ENZYME Glutamate racemase (E.C.5.1.1.3)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 2.794
+REMARK ORGANISM_NAME Campylobacter jejuni
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 562
+ATOM      0  N   HIS A 182      18.233  34.271  25.103    1.0
+ATOM      0  CA  HIS A 182      17.625  34.131  23.788    1.0
+ATOM      0  C   HIS A 182      16.107  34.209  23.907    1.0
+ATOM      0  O   HIS A 182      15.420  34.661  22.994    1.0
+ATOM      0  CB  HIS A 182      18.010  32.786  23.162    1.0
+ATOM      0  CG  HIS A 182      19.466  32.651  22.849    1.0
+ATOM      0  ND1 HIS A 182      20.452  32.800  23.802    1.0
+ATOM      0  CD2 HIS A 182      20.105  32.365  21.690    1.0
+ATOM      0  CE1 HIS A 182      21.634  32.620  23.240    1.0
+ATOM      0  NE2 HIS A 182      21.451  32.354  21.960    1.0
+ATOM      0  N   ASP A   7      28.020  38.913  27.009    1.0
+ATOM      0  CA  ASP A   7      27.341  37.630  26.948    1.0
+ATOM      0  C   ASP A   7      28.232  36.684  26.160    1.0
+ATOM      0  O   ASP A   7      29.118  37.130  25.430    1.0
+ATOM      0  CB  ASP A   7      25.982  37.776  26.267    1.0
+ATOM      0  CG  ASP A   7      25.223  36.462  26.186    1.0
+ATOM      0  OD1 ASP A   7      25.356  35.639  27.117    1.0
+ATOM      0  OD2 ASP A   7      24.500  36.249  25.188    1.0
+ATOM      0  N   SER A   8      28.009  35.383  26.319    1.0
+ATOM      0  CA  SER A   8      28.779  34.377  25.596    1.0
+ATOM      0  C   SER A   8      28.586  34.532  24.096    1.0
+ATOM      0  O   SER A   8      29.553  34.663  23.349    1.0
+ATOM      0  CB  SER A   8      28.361  32.969  26.022    1.0
+ATOM      0  OG  SER A   8      27.057  32.656  25.560    1.0
+ATOM      0  N   CYS A  70      25.328  36.483  30.804    1.0
+ATOM      0  CA  CYS A  70      25.239  35.035  30.722    1.0
+ATOM      0  C   CYS A  70      24.855  34.450  32.075    1.0
+ATOM      0  O   CYS A  70      25.587  34.598  33.053    1.0
+ATOM      0  CB  CYS A  70      26.565  34.444  30.243    1.0
+ATOM      0  SG  CYS A  70      26.478  32.697  29.798    1.0
+ATOM      0  N   GLU A 150      17.802  31.403  17.033    1.0
+ATOM      0  CA  GLU A 150      18.918  31.696  16.136    1.0
+ATOM      0  C   GLU A 150      18.615  31.382  14.670    1.0
+ATOM      0  O   GLU A 150      19.324  31.843  13.773    1.0
+ATOM      0  CB  GLU A 150      20.199  30.982  16.587    1.0
+ATOM      0  CG  GLU A 150      20.784  31.507  17.898    1.0
+ATOM      0  CD  GLU A 150      22.096  30.837  18.281    1.0
+ATOM      0  OE1 GLU A 150      22.134  29.591  18.359    1.0
+ATOM      0  OE2 GLU A 150      23.090  31.560  18.509    1.0
+ATOM      0  N   CYS A 180      17.166  32.431  30.211    1.0
+ATOM      0  CA  CYS A 180      18.082  32.377  29.082    1.0
+ATOM      0  C   CYS A 180      17.912  33.653  28.269    1.0
+ATOM      0  O   CYS A 180      16.803  34.169  28.136    1.0
+ATOM      0  CB  CYS A 180      17.833  31.142  28.219    1.0
+ATOM      0  SG  CYS A 180      19.130  30.855  26.994    1.0
+END

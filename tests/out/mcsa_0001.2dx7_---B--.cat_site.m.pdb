@@ -1,0 +1,16 @@
+REMARK 5.1.1.13
+REMARK TITLE Crystal structure of Pyrococcus horikoshii OT3 aspartate racemase complex with citric acid
+REMARK ENZYME aspartate racemase (E.C.5.1.1.13)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 2.0
+REMARK ORGANISM_NAME Pyrococcus horikoshii
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 562
+ATOM      0  N   ALA B  82      24.734  34.541  29.865    1.0
+ATOM      0  CA  ALA B  82      25.747  33.732  30.531    1.0
+ATOM      0  C   ALA B  82      26.969  34.625  30.701    1.0
+ATOM      0  O   ALA B  82      27.323  35.378  29.793    1.0
+ATOM      0  CB  ALA B  82      26.098  32.500  29.689    1.0
+END

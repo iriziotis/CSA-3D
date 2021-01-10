@@ -1,0 +1,17 @@
+REMARK 5.1.1.13
+REMARK TITLE Picrophilus torridus aspartate racemase
+REMARK ENZYME Aspartate racemase (E.C.5.1.1.13)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 1.851
+REMARK ORGANISM_NAME Picrophilus torridus (strain ATCC 700027 / DSM 9790 / JCM 10055 / NBRC 100828)
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 562
+ATOM      0  N   CYS B  83      24.592  35.215  30.137    1.0
+ATOM      0  CA  CYS B  83      25.478  34.489  31.064    1.0
+ATOM      0  C   CYS B  83      25.867  35.383  32.233    1.0
+ATOM      0  O   CYS B  83      25.823  34.959  33.386    1.0
+ATOM      0  CB  CYS B  83      26.749  33.968  30.374    1.0
+ATOM      0  SG  CYS B  83      26.587  32.400  29.483    1.0
+END

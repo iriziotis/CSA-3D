@@ -1,0 +1,57 @@
+REMARK 5.1.1.3
+REMARK TITLE Crystal structure of glutamate racemase from Listeria monocytogenes
+REMARK ENZYME Glutamate racemase (E.C.5.1.1.3)
+REMARK ASSEMBLY_ID 1
+REMARK EXPTL_METHOD X-ray diffraction
+REMARK RESOLUTION 2.30
+REMARK ORGANISM_NAME Listeria monocytogenes
+REMARK ORGANISM_ID ?
+REMARK HOST_NAME Escherichia coli
+REMARK HOST_ID 562
+ATOM      0  N   HIS B 185      17.634  34.439  26.932    1.0
+ATOM      0  CA  HIS B 185      16.864  34.352  25.669    1.0
+ATOM      0  C   HIS B 185      15.350  34.210  25.913    1.0
+ATOM      0  O   HIS B 185      14.540  34.612  25.067    1.0
+ATOM      0  CB  HIS B 185      17.250  33.114  24.828    1.0
+ATOM      0  CG  HIS B 185      18.561  33.205  24.110    1.0
+ATOM      0  ND1 HIS B 185      19.776  33.057  24.748    1.0
+ATOM      0  CD2 HIS B 185      18.842  33.338  22.788    1.0
+ATOM      0  CE1 HIS B 185      20.747  33.140  23.854    1.0
+ATOM      0  NE2 HIS B 185      20.209  33.317  22.659    1.0
+ATOM      0  N   ASP B   9      28.297  38.659  27.804    1.0
+ATOM      0  CA  ASP B   9      27.454  37.492  27.565    1.0
+ATOM      0  C   ASP B   9      28.131  36.594  26.546    1.0
+ATOM      0  O   ASP B   9      29.062  37.030  25.867    1.0
+ATOM      0  CB  ASP B   9      26.066  37.914  27.036    1.0
+ATOM      0  CG  ASP B   9      25.050  36.756  27.024    1.0
+ATOM      0  OD1 ASP B   9      25.103  35.887  27.909    1.0
+ATOM      0  OD2 ASP B   9      24.207  36.691  26.105    1.0
+ATOM      0  N   SER B  10      27.678  35.341  26.470    1.0
+ATOM      0  CA  SER B  10      28.140  34.410  25.452    1.0
+ATOM      0  C   SER B  10      27.523  34.711  24.075    1.0
+ATOM      0  O   SER B  10      28.046  34.265  23.062    1.0
+ATOM      0  CB  SER B  10      27.866  32.959  25.868    1.0
+ATOM      0  OG  SER B  10      26.497  32.631  25.784    1.0
+ATOM      0  N   CYS B  72      25.558  36.178  31.497    1.0
+ATOM      0  CA  CYS B  72      25.689  34.770  31.192    1.0
+ATOM      0  C   CYS B  72      25.674  33.962  32.485    1.0
+ATOM      0  O   CYS B  72      26.517  34.172  33.358    1.0
+ATOM      0  CB  CYS B  72      26.989  34.536  30.441    1.0
+ATOM      0  SG  CYS B  72      27.254  32.843  30.001    1.0
+ATOM      0  N   GLU B 151      16.508  32.557  18.856    1.0
+ATOM      0  CA  GLU B 151      17.535  33.133  17.970    1.0
+ATOM      0  C   GLU B 151      17.060  33.117  16.524    1.0
+ATOM      0  O   GLU B 151      17.298  34.063  15.772    1.0
+ATOM      0  CB  GLU B 151      18.885  32.402  18.102    1.0
+ATOM      0  CG  GLU B 151      19.536  32.532  19.493    1.0
+ATOM      0  CD  GLU B 151      21.067  32.438  19.487    1.0
+ATOM      0  OE1 GLU B 151      21.643  31.860  18.535    1.0
+ATOM      0  OE2 GLU B 151      21.691  32.942  20.455    1.0
+ATOM      0  N   CYS B 183      17.099  31.700  31.561    1.0
+ATOM      0  CA  CYS B 183      17.982  31.897  30.418    1.0
+ATOM      0  C   CYS B 183      17.570  33.232  29.807    1.0
+ATOM      0  O   CYS B 183      16.390  33.477  29.580    1.0
+ATOM      0  CB  CYS B 183      17.810  30.777  29.405    1.0
+ATOM      0  SG  CYS B 183      18.667  31.026  27.820    1.0
+HETATM    0  CL   CL G 267      21.433  32.649  30.101    1.0
+END
