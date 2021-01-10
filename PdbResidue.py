@@ -77,6 +77,7 @@ class PdbResidue:
     def get_distance(self, other):
         """Get distance of two residues by measuring distance of two
         arbitrary atoms. Very approximate, use with care"""
+        # TODO make it use either CAs or minimum distance
         x = None
         y = None
         if self.structure is None or other.structure is None:
@@ -92,19 +93,8 @@ class PdbResidue:
     def is_equivalent(self, other):
         """Check if residues share the same pdb_id, name, resid
         and auth_resid"""
-        return (self.pdb_id == other.pdb_id and
-                self.resname == other.resname and
-                self.resid == other.resid) or \
-                (self.pdb_id == other.pdb_id and
-                 self.resname == other.resname and
-                 self.auth_resid == other.auth_resid) or \
-                (self.pdb_id == other.pdb_id and
-                 self.resname == other.resname and
-                 self.corrected_auth_resid == other.corrected_auth_resid)
-
-        #return (self.pdb_id == other.pdb_id and
-        #        #self.auth_resid == other.auth_resid and
-        #        self.resid == other.resid)
+        return self.pdb_id == other.pdb_id and self.resname == other.resname and \
+               (self.resid == other.resid or self.auth_resid == other.auth_resid) 
 
     def get_nearest_equivalent(self, other, reslist):
         """
