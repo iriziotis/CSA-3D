@@ -136,6 +136,19 @@ class PdbSite:
         ref_atoms, _ = self.reference_site.get_atom_strings_and_coords(omit=gaps)
         return len(self_atoms) != len(ref_atoms)
 
+    def get_distances(self):
+        """Calculates all intra-site residue distances and returns a
+        numpy array"""
+        dists = []
+        seen = set()
+        for p in self.residues:
+            for q in self.residues:
+                if p==q or (q.id, p.id) in seen or p.is_gap or q.is_gap:
+                    continue
+                dists.append(p-q)
+                seen.add((p.id, q.id))
+        return np.array(dists)
+
     def get_residues(self):
         """To iterate over catalytic residues"""
         yield from self.residues

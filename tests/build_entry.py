@@ -6,7 +6,6 @@ sys.path.append('/Users/riziotis/ebi/phd/src/')
 from time import time
 from mcsa3d import Mcsa
 
-
 def main(mcsa_id):
     start = time()
     # Initialize database
@@ -36,4 +35,4 @@ def main(mcsa_id):
     print('Overall time: {:5f}'.format(overall_time))
 
 if __name__ == '__main__':
-    main(int(sys.argv[1])
+    main(int(sys.argv[1]))
