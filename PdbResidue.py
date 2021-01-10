@@ -94,8 +94,17 @@ class PdbResidue:
         and auth_resid"""
         return (self.pdb_id == other.pdb_id and
                 self.resname == other.resname and
-                #self.auth_resid == other.auth_resid and
-                self.resid == other.resid)
+                self.resid == other.resid) or \
+                (self.pdb_id == other.pdb_id and
+                 self.resname == other.resname and
+                 self.auth_resid == other.auth_resid) or \
+                (self.pdb_id == other.pdb_id and
+                 self.resname == other.resname and
+                 self.corrected_auth_resid == other.corrected_auth_resid)
+
+        #return (self.pdb_id == other.pdb_id and
+        #        #self.auth_resid == other.auth_resid and
+        #        self.resid == other.resid)
 
     def get_nearest_equivalent(self, other, reslist):
         """
@@ -127,6 +136,14 @@ class PdbResidue:
     def id(self):
         """Unique ID of a residue as a tuple"""
         return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
+
+    @property
+    def corrected_auth_resid(self):
+        if not self.auth_resid:
+            return
+        if self.auth_resid < 1000 or len(self.chain) > 1:
+            return self.auth_resid
+        return int(str(self.auth_resid)[1:]) + (ord(self.chain)-65)*1000
 
     @property
     def is_gap(self):

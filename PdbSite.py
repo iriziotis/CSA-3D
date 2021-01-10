@@ -538,12 +538,15 @@ class PdbSite:
                     continue
                 try:
                     res_structure = chain[res.auth_resid]
-                    new_res = res.copy()
-                    new_res.chain = chain.get_id()
-                    new_res.structure = res_structure
-                    new_reslist.append(new_res)
                 except KeyError:
-                    continue
+                    try: 
+                        res_structure = chain[res.corrected_auth_resid]
+                    except KeyError:
+                        continue
+                new_res = res.copy()
+                new_res.chain = chain.get_id()
+                new_res.structure = res_structure
+                new_reslist.append(new_res)
         reslist = new_reslist
         sites = []
         # Set a reference residue to make seeds
@@ -588,8 +591,8 @@ class PdbSite:
                  MMCIF2Dict()
         Returns: A smaller dictionary of annotations with less complex key names
         """
-        if type(cif) != dict:
-            if type(cif) != str or not cif_path.endswith('cif'):
+        if not isinstance(cif, dict):
+            if not isinstance(cif, str) or not cif_path.endswith('cif'):
                 return
             cif = MMCIF2Dict(cif_path)
         annotations = dict()
