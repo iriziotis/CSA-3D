@@ -7,26 +7,21 @@ def main():
     with open('entry_2.ent', 'rb') as f:
         entry = pickle.load(f)
 
+    print('Fitting')
     for pdbsite in entry.pdbsites:
-        if len(pdbsite) > 7:
+        print(pdbsite.id, pdbsite)
+        if pdbsite.is_reference:
+            pdbsite.write_pdb(outdir='./out', write_hets=True)
             continue
-        if pdbsite.is_conserved or pdbsite.is_conservative_mutation:
-            if len(pdbsite.mapped_unisites) == 0:
-                print(pdbsite.pdb_id, pdbsite)
-                continue
-            for unisite in pdbsite.mapped_unisites:
-                print(pdbsite.pdb_id, pdbsite, unisite.id)
+        try:
+            pdbsite.reference_site.fit(pdbsite, transform=True)
+        except:
+            continue
+        pdbsite.write_pdb(outdir='./out', write_hets=True)
 
 
 
 main()
 
 
-#print('Fitting')
-#for pdbsite in entry.pdbsites:
-#    if pdbsite.is_reference:
-#        pdbsite.write_pdb(outdir='./out', write_hets=True)
-#        continue
-#    pdbsite.reference_site.fit(pdbsite, transform=True)
-#    pdbsite.write_pdb(outdir='./out', write_hets=True)
 

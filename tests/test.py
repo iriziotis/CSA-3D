@@ -15,7 +15,7 @@ db = Mcsa()
 # Build test entry
 print('Building')
 start = time()
-db.build([entry], annotate=False, verbose=True)
+db.build([entry], annotate=False, verbose=False)
 finish = time()
 build_time = finish-start
 
