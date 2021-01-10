@@ -6,7 +6,7 @@ sys.path.append('/Users/riziotis/ebi/phd/src/')
 from time import time
 from mcsa3d import Mcsa
 
-entry = 4
+entry = 2
 
 # Initialize database
 print('Initializing database')
@@ -15,7 +15,7 @@ db = Mcsa()
 # Build test entry
 print('Building')
 start = time()
-db.build([entry], annotate=False, verbose=False)
+db.build([entry], annotate=False, verbose=True)
 finish = time()
 build_time = finish-start
 
