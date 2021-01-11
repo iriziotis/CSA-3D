@@ -37,6 +37,14 @@ class UniResidue:
         """Check if residue are conserved by comparing to the reference"""
         return self.resname == self.reference_residue.resname or self.is_reference
 
+    @property
+    def is_conservative_mutation(self):
+        """Checks if residue is functionally equivalent to its reference"""
+        if self.resname in EQUIVALENT_RESIDUES:
+            if self.reference_residue.resname in EQUIVALENT_RESIDUES[self.resname]:
+                return True
+        return False
+
     @classmethod
     def from_json(cls, residue):
         """Constructs a list of UniResidue objects using information directly from

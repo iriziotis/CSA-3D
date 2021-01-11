@@ -67,6 +67,22 @@ class UniSite:
         """Check if all residues are conserved by comparing to the reference"""
         return str(self) == str(self.reference_site) or self.is_reference
 
+    @property
+    def is_conservative_mutation(self, ignore_funcloc_main=True):
+        """Checks if the mutations in the site are conservative. Option to
+        ignore residues that function via main chain"""
+        result = False
+        for res in self.residues:
+            if ignore_funcloc_main:
+                if 'main' in res.funcloc:
+                    result = True
+                    continue
+            if not res.is_conserved and not res.is_conservative_mutation:
+                return False
+            if res.is_conservative_mutation:
+                result = True
+        return result
+
     def get_residues(self):
         """Iterate over residues"""
         yield from self.residues
