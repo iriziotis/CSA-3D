@@ -7,7 +7,7 @@ from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.MMCIF2Dict import MMCIF2Dict
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
-from .config import COMPOUND_SIMILARITIES, PDB2EC
+from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 
 
@@ -32,7 +32,6 @@ class PdbSite:
         self.nearby_hets = []
         self.annotations = None
         # TODO add UniProt IDs from SIFTS -- regardless if we don't have the corresponding sites in M-CSA
-        # TODO set reference site of reference as itself
 
     def __str__(self):
         """Print as pseudo-sequence in one-letter code"""
@@ -185,7 +184,18 @@ class PdbSite:
                 try:
                     return PDB2EC[(self.pdb_id, res.chain[0])]
                 except KeyError:
-                    return
+                    continue
+        return
+
+    @property
+    def uniprot_id(self):
+        """Get UniProt ID of the chain of the first residue"""
+        for res in self.residues:
+            if res.chain:
+                try:
+                    return PDB2UNI[(self.pdb_id, res.chain[0])]
+                except KeyError:
+                    continue
         return
 
     @property

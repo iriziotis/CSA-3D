@@ -41,9 +41,14 @@ class UniSite:
         return
 
     @property
-    def id(self):
+    def uniprot_id(self):
         """UniProt site ID is the UniProt id of the sequence"""
         return self.residues[0].uniprot_id
+
+    @property
+    def id(self):
+        """UniProt site ID is the UniProt id of the sequence"""
+        return self.uniprot_id
 
     @property
     def size(self):
