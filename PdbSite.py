@@ -218,8 +218,8 @@ class PdbSite:
     def assembly_id(self):
         """Return PDB assembly ID"""
         try:
-            return self.mmcif_dict['_entity_poly.assembly_id'][0]
-        except KeyError:
+            return int(self.mmcif_dict['_entity_poly.assembly_id'][0][-1])
+        except (TypeError, KeyError):
             return
 
     @property
@@ -400,26 +400,24 @@ class PdbSite:
                 het.structure = residue
                 all_hets.append(het)
                 # Capture HETs in the box
-                if het.structure in box:
-                    residue.parity_score = Box.similarity_with_cognate(het.structure)
-                    residue.centrality = box.mean_distance_from_residues(het.structure)
+                if het in box:
+                    het.parity_score = box.similarity_with_cognate(het)
+                    het.centrality = box.mean_distance_from_residues(het)
                     nearby_hets.append(het)
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
-    # TODO write ligands as REMARK entries
     def write_pdb(self, write_hets=False, outdir=None, outfile=None):
         """
         Writes site coordinates in PDB format
         Args:
             write_hets: Include coordinates of nearby hets.
             outdir: Directory to save the .pdb file
-            outfile: If unspecified, name is formatted to include
-                     info on M-CSA ID, chain of each catalytic residue,
-                     annotation if the site is a reference site and
-                     an annotation about the conservation, relatively
-                     to the reference (c: conserved, m: mutated, cm: has
-                     only conservative mutations)
+            outfile: If unspecified, name is formatted to include info on M-CSA ID, 
+                     chain of each catalytic residue, annotation if the site is a
+                     reference site and an annotation about the conservation, relatively
+                     to the reference (c: conserved, m: mutated, cm: has only conservative
+                     mutations)
         """
         if not outdir:
             outdir = '.'
@@ -432,14 +430,27 @@ class PdbSite:
             outfile = '{}/mcsa_{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
                                                        'reference' if self.is_reference else 'cat_site', conservation)
         with open(outfile, 'w') as o:
+            if bool(self.mmcif_dict):
+                all_hets = ','.join('{0.resname};{0.resid};{0.parity_score};{0.centrality}'.format(h) for h in self.structure_hets)
+                nearby_hets = ','.join('{0.resname};{0.resid};{0.parity_score};{0.centrality}'.format(h) for h in self.nearby_hets)
+                remarks = ('REMARK CATALYTIC SITE\n'
+                           'REMARK ID {0.id}\n'
+                           'REMARK PDB_ID {0.pdb_id}\n'
+                           'REMARK ASSEMBLY_ID {0.assembly_id}\n'
+                           'REMARK UNIPROT_ID {0.uniprot_id}\n'
+                           'REMARK EC {0.ec}\n'
+                           'REMARK TITLE {0.title}\n'
+                           'REMARK ENZYME {0.enzyme}\n'
+                           'REMARK EXPERIMENTAL_METHOD {0.experimental_method}\n'
+                           'REMARK RESOLUTION {0.resolution}\n'
+                           'REMARK ORGANISM_NAME {0.organism_name}\n'
+                           'REMARK ORGANISM_ID {0.organism_id}\n'
+                           'REMARK ALL_HETS {1}\n'
+                           'REMARK NEARBY_HETS {2}\n'.format(self, all_hets, nearby_hets))
+                print(remarks, file=o)
             residues = self.residues.copy()
             if write_hets:
                 residues += self.nearby_hets
-            if self.ec:
-                print('REMARK', self.ec, file=o)
-            if self.mmcif_dict:
-                for k, v in self.mmcif_dict.items():
-                    print('REMARK', k.upper(), v, file=o)
             for res in residues:
                 if res.structure is not None:
                     for atom in res.structure:
@@ -713,20 +724,51 @@ class Box:
         self.residue_list = residue_list
         self.headroom = float(headroom)
         self.points = self._get_boundaries(self.headroom)
-        if not self.points:
-            return
 
     def __contains__(self, residue):
-        """Checks if the provided residue is in the box"""
-        for atom in residue.get_atoms():
-            x = atom.get_coord()[0]
-            y = atom.get_coord()[1]
-            z = atom.get_coord()[2]
+        """Checks if the provided het (or residue) is in the box"""
+        for atom in residue.structure.get_atoms():
+            x,y,z = atom.get_coord()
             if self.points['min_x'] <= x <= self.points['max_x'] and \
                     self.points['min_y'] <= y <= self.points['max_y'] and \
                     self.points['min_z'] <= z <= self.points['max_z']:
                 return True
         return False
+
+    def mean_distance_from_residues(self, het):
+        """Calculates the mean distance of an arbitrary residue (protein or HET)
+        from the residues that define the box"""
+        dist_sum = 0
+        nofres = len(self.residue_list)
+        for residue in self.residue_list:
+            dist_sum += Box.min_distance(residue, het.structure)
+        return round(dist_sum / nofres, 3)
+
+    def similarity_with_cognate(self, het):
+        """Checks the similarity score of the given compound with the cognate
+        ligand of the given pdb, using the PARITY-derived data"""
+        try:
+            pdb_id = het.pdb_id
+            hetcode = het.resname.upper()
+        except IndexError:
+            return None
+        r_key = (pdb_id, hetcode, 'r')
+        p_key = (pdb_id, hetcode, 'p')
+        if r_key in COMPOUND_SIMILARITIES:
+            return float(COMPOUND_SIMILARITIES[r_key])
+        elif p_key in COMPOUND_SIMILARITIES:
+            return float(COMPOUND_SIMILARITIES[p_key])
+        else:
+            return None
+
+    @staticmethod
+    def min_distance(residue_i, residue_j):
+        """Calculates the minimum distance between this residue and residue in argument"""
+        distances = []
+        for atom_i in residue_i:
+            for atom_j in residue_j:
+                distances.append(atom_i - atom_j)
+        return min(distances)
 
     def _get_boundaries(self, headroom):
         """Parse residues (BioPython objects) and get the coordinates
@@ -753,39 +795,3 @@ class Box:
                 'min_y': min_y, 'max_y': max_y,
                 'min_z': min_z, 'max_z': max_z}
 
-    def mean_distance_from_residues(self, component):
-        """Calculates the mean distance of an arbitrary residue (protein or HET)
-        from the residues that define the box"""
-        dist_sum = 0
-        nofres = len(self.residue_list)
-        for residue in self.residue_list:
-            dist_sum += Box.min_distance(residue, component)
-        return round(dist_sum / nofres, 3)
-
-    @staticmethod
-    def similarity_with_cognate(component):
-        """Checks the similarity score of the given compound with the cognate
-        ligand of the given pdb, using the PARITY-derived data
-        (COMPOUND_SIMILARITIES.json) from Jon"""
-        try:
-            pdb_id = component.get_full_id()[0]
-            hetcode = component.get_resname()
-        except IndexError:
-            return None
-        r_key = (pdb_id, hetcode, 'r')
-        p_key = (pdb_id, hetcode, 'p')
-        if r_key in COMPOUND_SIMILARITIES:
-            return float(COMPOUND_SIMILARITIES[r_key])
-        elif p_key in COMPOUND_SIMILARITIES:
-            return float(COMPOUND_SIMILARITIES[p_key])
-        else:
-            return None
-
-    @staticmethod
-    def min_distance(residue_i, residue_j):
-        """Calculates the minimum distance between this residue and residue in argument"""
-        distances = []
-        for atom_i in residue_i:
-            for atom_j in residue_j:
-                distances.append(atom_i - atom_j)
-        return min(distances)
