@@ -4,7 +4,6 @@ from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
-from Bio.PDB.MMCIF2Dict import MMCIF2Dict
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
@@ -30,8 +29,7 @@ class PdbSite:
         self.structure = None
         self.structure_hets = []
         self.nearby_hets = []
-        self.annotations = None
-        # TODO add UniProt IDs from SIFTS -- regardless if we don't have the corresponding sites in M-CSA
+        self.mmcif_dict = dict()
 
     def __str__(self):
         """Print as pseudo-sequence in one-letter code"""
@@ -70,6 +68,7 @@ class PdbSite:
         # If we have duplicate residues, each one with a different function
         # location annotation, keep only the one with the side chain
         seen = set()
+        mmcif_dict = dict()
         to_del = []
         for i, res in enumerate(res_list):
             if res.id in seen:
@@ -82,7 +81,7 @@ class PdbSite:
         if annotate:
             parser = MMCIFParser(QUIET=True)
             structure = parser.get_structure('', cif_path)
-            annotations = PdbSite._get_annotations(parser._mmcif_dict)
+            mmcif_dict = parser._mmcif_dict
         else:
             parser = FastMMCIFParser(QUIET=True)
             structure = parser.get_structure('', cif_path)
@@ -91,7 +90,7 @@ class PdbSite:
                 res.add_structure(structure)
             site.add(res)
         if annotate:
-            site.annotations = annotations
+            site.mmcif_dict = mmcif_dict
             site.find_ligands()
         return site
 
@@ -129,14 +128,15 @@ class PdbSite:
         """Builds all sites in using as input a list of catalytic residues.
         Returns a list of PdbSite objects"""
         # Map structure objects in every residue
+        mmcif_dict = dict()
         if annotate:
             parser = MMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path) 
-            annotations = PdbSite._get_annotations(parser._mmcif_dict)
+            structure = parser.get_structure('', cif_path)
+            mmcif_dict = parser._mmcif_dict
         else:
             parser = FastMMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path) 
-        # We want all equivalent residues from identical assembly chains
+            structure = parser.get_structure('', cif_path)
+            # We want all equivalent residues from identical assembly chains
         reslist = PdbSite._get_assembly_residues(reslist, structure)
         sites = []
         # Set a reference residue to make seeds
@@ -153,7 +153,7 @@ class PdbSite:
                         continue
             if annotate and structure:
                 site.parent_structure = structure
-                site.annotations = annotations
+                site.mmcif_dict = mmcif_dict
                 site.find_ligands()
             sites.append(site)
         return sites
@@ -177,6 +177,17 @@ class PdbSite:
         return
 
     @property
+    def uniprot_id(self):
+        """Get UniProt ID of the chain of the first residue"""
+        for res in self.residues:
+            if res.chain:
+                try:
+                    return PDB2UNI[(self.pdb_id, res.chain[0])]
+                except KeyError:
+                    continue
+        return
+
+    @property
     def ec(self):
         """Get EC number from SIFTS"""
         for res in self.residues:
@@ -188,15 +199,71 @@ class PdbSite:
         return
 
     @property
-    def uniprot_id(self):
-        """Get UniProt ID of the chain of the first residue"""
-        for res in self.residues:
-            if res.chain:
-                try:
-                    return PDB2UNI[(self.pdb_id, res.chain[0])]
-                except KeyError:
-                    continue
-        return
+    def title(self):
+        """Return title of PDB entry"""
+        try:
+            return self.mmcif_dict['_struct.title'][0]
+        except KeyError:
+            return
+
+    @property
+    def enzyme(self):
+        """Return enzyme name"""
+        try:
+            return self.mmcif_dict['_struct.pdbx_descriptor'][0]
+        except KeyError:
+            return
+
+    @property
+    def assembly_id(self):
+        """Return PDB assembly ID"""
+        try:
+            return self.mmcif_dict['_entity_poly.assembly_id'][0]
+        except KeyError:
+            return
+
+    @property
+    def experimental_method(self):
+        """Return structure determination method"""
+        try:
+            return self.mmcif_dict['_exptl.method'][0]
+        except KeyError:
+            return
+
+    @property
+    def resolution(self):
+        """Return resolution in Angstrom"""
+        try:
+            if 'nmr' in self.experimental_method.lower():
+                return
+            elif 'microscopy' in self.experimental_method.lower():
+                return float(self.mmcif_dict['_em_3d_reconstruction.resolution'][0])
+            else:
+                return float(self.mmcif_dict['_refine.ls_d_res_high'][0])
+        except (TypeError, KeyError, AttributeError):
+            return
+
+    @property
+    def organism_name(self):
+        """Return name of organism of origin"""
+        try:
+            return self.mmcif_dict['_entity_src_nat.pdbx_organism_scientific'][0]
+        except KeyError:
+            try:
+                return self.mmcif_dict['_entity_src_gen.pdbx_gene_src_scientific_name'][0]
+            except KeyError:
+                return
+
+    @property
+    def organism_id(self):
+        """Return id of organism of origin"""
+        try:
+            return self.mmcif_dict['_entity_src_nat.pdbx_ncbi_taxonomy_id'][0]
+        except KeyError:
+            try:
+                return self.mmcif_dict['_entity_src_gen.pdbx_gene_src_ncbi_taxonomy_id'][0]
+            except KeyError:
+                return
 
     @property
     def id(self):
@@ -223,6 +290,8 @@ class PdbSite:
 
     @property
     def is_conservative_mutation(self, ignore_funcloc_main=True):
+        """Checks if the mutations in the site are conservative. Option to
+        ignore residues that function via main chain"""
         result = False
         for res in self.residues:
             if ignore_funcloc_main:
@@ -237,10 +306,14 @@ class PdbSite:
 
     @property
     def has_missing_functional_atoms(self):
+        """Checks if there are missing functional atoms from the residue
+        structures"""
         gaps = set(self.get_gaps())
         self_atoms, _ = self._get_atom_strings_and_coords(omit=gaps)
         ref_atoms, _ = self.reference_site._get_atom_strings_and_coords(omit=gaps)
         return len(self_atoms) != len(ref_atoms)
+
+    # Methods
 
     def add(self, residue):
         """Add PdbResidue object to site (in the residues list and dict)"""
@@ -269,9 +342,9 @@ class PdbSite:
         seen = set()
         for p in self.residues:
             for q in self.residues:
-                if p==q or (q.id, p.id) in seen or p.is_gap or q.is_gap:
+                if p == q or (q.id, p.id) in seen or p.is_gap or q.is_gap:
                     continue
-                dists.append(p-q)
+                dists.append(p - q)
                 seen.add((p.id, q.id))
         return np.array(dists)
 
@@ -322,7 +395,7 @@ class PdbSite:
             hetfield = residue_id[0]
             # Capture all HETs in the structure
             if hetfield[0] == 'H' and 'HOH' not in hetfield:
-                het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(), 
+                het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
                           resid=residue.get_id()[1], chain=residue.get_parent().get_id())
                 het.structure = residue
                 all_hets.append(het)
@@ -357,15 +430,15 @@ class PdbSite:
             elif self.is_conservative_mutation:
                 conservation = 'cm'
             outfile = '{}/mcsa_{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
-                      'reference' if self.is_reference else 'cat_site', conservation)
+                                                       'reference' if self.is_reference else 'cat_site', conservation)
         with open(outfile, 'w') as o:
             residues = self.residues.copy()
             if write_hets:
                 residues += self.nearby_hets
             if self.ec:
                 print('REMARK', self.ec, file=o)
-            if self.annotations:
-                for k, v in self.annotations.items():
+            if self.mmcif_dict:
+                for k, v in self.mmcif_dict.items():
                     print('REMARK', k.upper(), v, file=o)
             for res in residues:
                 if res.structure is not None:
@@ -406,10 +479,6 @@ class PdbSite:
                      definitions in residue_definitions.py module.
             allow_symmetrics: Allows flipping of side chains if atoms are
                               equivalent or symmetrical
-            outlier_rms: TODO compute rms over all functional atoms (including the ones
-                         that where excluded during the outlier rejection
-            get_index: To return the new order of atoms after applying the
-                       Hungarian algorithm as an index list.
 
         Returns: rot, tran, rms, rms_all
             rot: Rotation matrix to transform mobile site into the fixed site
@@ -550,7 +619,7 @@ class PdbSite:
                 try:
                     res_structure = chain[res.auth_resid]
                 except KeyError:
-                    try: 
+                    try:
                         res_structure = chain[res.corrected_auth_resid]
                     except KeyError:
                         continue
@@ -559,7 +628,7 @@ class PdbSite:
                 new_res.structure = res_structure
                 new_reslist.append(new_res)
         return new_reslist
-    
+
     @staticmethod
     def _get_seeds(reslist):
         """Finds residues in a list of that can be used as seeds when
@@ -594,10 +663,11 @@ class PdbSite:
         Returns: rot, tran, rms, rms_all
             rot: Rotation matrix
             tran: Translation vector
-            rms: RMSD after fitting (not including outliers)
+            rms: RMSD after fitting, not including outliers
             rms_all: RMSD over all atoms, including outliers
         """
         min_rms = 999
+        result_rot, result_tran, result_rms, result_rms_all = None, None, None, None
         p_all = np.array(p_coords, copy=True)
         q_all = np.array(q_coords, copy=True)
         # Initialize Biopython SVDSuperimposer
@@ -608,85 +678,31 @@ class PdbSite:
             rms = sup.get_rms()
             rot, tran = sup.get_rotran()
             if rms < min_rms:
-                results = (rot, tran, rms)
+                result_rot, result_tran, result_rms = rot, tran, rms
             # Transform coordinates
             q_trans = np.dot(q_coords, rot) + tran
             # Find outliers
-            diff = np.linalg.norm(p_coords-q_trans, axis=1)
+            diff = np.linalg.norm(p_coords - q_trans, axis=1)
             to_keep = np.where(diff < cutoff)
             # Reject outliers
             p_coords = p_coords[to_keep]
             q_coords = q_coords[to_keep]
         # Also compute RMSD over all atoms
-        rot, tran, rms = results
-        q_all = np.dot(q_all, rot) + tran
-        rms_all = PdbSite._rmsd(p_all, q_all)
-        return rot, tran, np.round(rms, 3), np.round(rms_all, 3)
+        q_all = np.dot(q_all, result_rot) + result_tran
+        result_rms_all = PdbSite._rmsd(p_all, q_all)
+        return result_rot, result_tran, np.round(result_rms, 3), np.round(result_rms_all, 3)
 
     @staticmethod
     def _rmsd(p_coords, q_coords):
         """Calculates rmsd on two coordinate sets (NumPy arrays) WITHOUT
         transformation and minimization"""
-        diff = np.square(np.linalg.norm(p_coords-q_coords, axis=1))
-        return np.sqrt(np.sum(diff)/diff.size)
+        diff = np.square(np.linalg.norm(p_coords - q_coords, axis=1))
+        return np.sqrt(np.sum(diff) / diff.size)
 
     @staticmethod
     def _transform(coords, rot, tran):
         """Rotates and translates a set of coordinates (NxD NumPy array)"""
         return np.dot(coords, rot) + tran
-
-    @staticmethod
-    def _get_annotations(cif):
-        """
-        Parses an MMCIF raw file or dictionary and gets all necessary info for a site.
-
-        Args:
-            cif: Either the path of the raw mmCIF file, or a pre-made dictionary from
-                 MMCIF2Dict()
-        Returns: A smaller dictionary of annotations with less complex key names
-        """
-        if not isinstance(cif, dict):
-            if not isinstance(cif, str) or not cif_path.endswith('cif'):
-                return
-            cif = MMCIF2Dict(cif_path)
-        annotations = dict()
-        annotations['title'] = cif['_struct.title'][0]
-        annotations['enzyme'] = cif['_struct.pdbx_descriptor'][0]
-        annotations['assembly_id'] = cif['_entity_poly.assembly_id'][0].split('-')[-1]
-        annotations['exptl_method'] = cif['_exptl.method'][0]
-        if 'nmr' in annotations['exptl_method'].lower():
-            annotations['resolution'] = ''
-        elif 'microscopy' in annotations['exptl_method'].lower():
-            annotations['resolution'] = cif['_em_3d_reconstruction.resolution'][0]
-        else:
-            try:
-                annotations['resolution'] = cif['_refine.ls_d_res_high'][0]
-            except KeyError:
-                annotations['resolution'] = '?'
-        try:
-            annotations['organism_name'] = cif['_entity_src_nat.pdbx_organism_scientific'][0]
-        except KeyError:
-            try:
-                annotations['organism_name'] = cif['_entity_src_gen.pdbx_gene_src_scientific_name'][0]
-            except KeyError:
-                annotations['organism_name'] = '?'
-        try:
-            annotations['organism_id'] = cif['_entity_src_nat.pdbx_ncbi_taxonomy_id'][0]
-        except KeyError:
-            try:
-                annotations['organism_id'] = cif['_entity_src_gen.pdbx_gene_ncbi_taxonomy_id'][0]
-            except KeyError:
-                annotations['organism_id'] = '?'
-        try:
-            annotations['host_name'] = cif['_entity_src_gen.pdbx_host_org_scientific_name'][0]
-        except KeyError:
-            annotations['host_name'] = '?'[0]
-        try:
-            annotations['host_id'] = cif['_entity_src_gen.pdbx_host_org_ncbi_taxonomy_id'][0]
-        except KeyError:
-            annotations['host_id'] = '?'
-
-        return annotations
 
 
 class Box:
