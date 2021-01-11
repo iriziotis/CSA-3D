@@ -97,11 +97,13 @@ class PdbSite:
         return site
 
     @classmethod
-    def build_reference(cls, cat_residues, cif_path=None, annotate=True):
+    def build_reference(cls, cat_residues, cif_path, annotate=True):
         """Builds reference active site from a list of PDB catalytic residues.
         Assumes that the list only contains one active site, so use it only
         if it is a list of manually annotated catalytic residues"""
-        return PdbSite.from_list(cat_residues, cif_path, annotate)
+        ref = PdbSite.from_list(cat_residues, cif_path, annotate)
+        ref.reference_site = ref
+        return ref
 
     @classmethod
     def build(cls, seed, reslist, reference_site):

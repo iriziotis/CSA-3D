@@ -83,7 +83,7 @@ class UniSite:
         """Build UniProt site from a list of residues, and map reference residues"""
         site = cls.from_list(reslist)
         if site.is_reference:
-            site.reference_site = None
+            site.reference_site = site
         else:
             site.reference_site = reference_site
             site._map_reference_residues()

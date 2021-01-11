@@ -9,9 +9,6 @@ def main(mcsa_id):
         entry = pickle.load(f)
 
     for pdbsite in entry.pdbsites:
-        if pdbsite.is_reference:
-            pdbsite.write_pdb(outdir='./out', write_hets=True)
-            continue
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
         print(pdbsite.id, rms, rms_all)
         pdbsite.write_pdb(outdir='./out', write_hets=True)
