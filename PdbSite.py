@@ -5,7 +5,7 @@ from Bio.PDB.Chain import Chain
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from rmsd import reorder_hungarian
-from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES,  RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 
@@ -407,7 +407,7 @@ class PdbSite:
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
-    def write_pdb(self, write_hets=False, outdir=None, outfile=None):
+    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False):
         """
         Writes site coordinates in PDB format
         Args:
@@ -422,11 +422,11 @@ class PdbSite:
         if not outdir:
             outdir = '.'
         if not outfile:
-            conservation = 'c'
-            if not self.is_conserved:
-                conservation = 'm'
-            elif self.is_conservative_mutation:
+            conservation = 'm'
+            if self.is_conservative_mutation:
                 conservation = 'cm'
+            if self.is_conserved:
+                conservation = 'c'
             outfile = '{}/mcsa_{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
                                                        'reference' if self.is_reference else 'cat_site', conservation)
         with open(outfile, 'w') as o:
@@ -446,7 +446,7 @@ class PdbSite:
                            'REMARK ORGANISM_NAME {0.organism_name}\n'
                            'REMARK ORGANISM_ID {0.organism_id}\n'
                            'REMARK ALL_HETS {1}\n'
-                           'REMARK NEARBY_HETS {2}\n'.format(self, all_hets, nearby_hets))
+                           'REMARK NEARBY_HETS {2}'.format(self, all_hets, nearby_hets))
                 print(remarks, file=o)
             residues = self.residues.copy()
             if write_hets:
@@ -454,6 +454,12 @@ class PdbSite:
             for res in residues:
                 if res.structure is not None:
                     for atom in res.structure:
+                        if func_atoms_only and type(res) == PdbResidue:
+                            resname = res.resname.upper()
+                            if 'main' in res.funcloc.lower() or resname not in STANDARD_RESIDUES:
+                                resname = 'ANY'
+                            if '{}.{}'.format(resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
+                                continue
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
                                    '{:>8.3f}{:>8.3f} {:6}'.format(
                             'ATOM' if atom.get_parent().get_id()[0] == ' ' else 'HETATM',

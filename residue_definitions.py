@@ -4,6 +4,13 @@ AA_3TO1 = IUPACData.protein_letters_3to1_extended.copy()
 AA_3TO1[''] = '_'
 AA_3TO1['X'] = 'X'
 
+STANDARD_RESIDUES = {
+    'ALA', 'CYS', 'ASP', 'GLU', 'PHE', 
+    'GLY', 'HIS', 'ILE', 'LYS', 'LEU',
+    'MET', 'ASN', 'PRO', 'GLN', 'ARG',
+    'SER', 'THR', 'TRP', 'TYR', 'VAL'
+    }
+
 RESIDUE_DEFINITIONS = { 
     'ANY.CA', 'ANY.N', 'ANY.O',
     'PTM.CA', 'PTM.C', 'PTM.CB',
