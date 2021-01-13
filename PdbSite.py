@@ -427,8 +427,12 @@ class PdbSite:
                 conservation = 'cm'
             if self.is_conserved:
                 conservation = 'c'
-            outfile = '{}/mcsa_{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
-                                                       'reference' if self.is_reference else 'cat_site', conservation)
+            if func_atoms_only:
+                atms = 'func'
+            else:
+                atms = 'all'
+            outfile = '{}/mcsa_{}.{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
+                                                       'reference' if self.is_reference else 'cat_site', conservation, atms)
         with open(outfile, 'w') as o:
             if bool(self.mmcif_dict):
                 all_hets = ','.join('{0.resname};{0.resid};{0.parity_score};{0.centrality}'.format(h) for h in self.structure_hets)
@@ -476,7 +480,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, cycles=10, transform=False, mutate=True, reorder=True, allow_symmetrics=True):
+    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, reorder=True, allow_symmetrics=True):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -527,7 +531,7 @@ class PdbSite:
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
-        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff=6)
+        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff)
         if transform:
             other.structure.transform(rot, tran)
             for het in other.nearby_hets:
