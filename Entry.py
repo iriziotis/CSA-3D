@@ -38,9 +38,9 @@ class Entry:
         return
 
     def get_pdbsite(self, _id):
-        """Return PDB active site with specific PDB ID"""
-        if _id in self.unisites_dict:
-            return self.unisites_dict[_id]
+        """Return PDB active site with specific ID"""
+        if _id in self.pdbsites_dict:
+            return self.pdbsites_dict[_id]
         return
 
     def get_unisites(self):
