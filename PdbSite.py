@@ -114,7 +114,7 @@ class PdbSite:
         if seed.structure is None:
             return
         for res in reslist:
-            candidate = seed.get_nearest_equivalent(res, reslist)
+            candidate = PdbSite._get_nearest_equivalent(res, seed, reslist, site)
             if candidate is None:
                 continue
             if candidate not in site:
@@ -128,17 +128,20 @@ class PdbSite:
         """Builds all sites in using as input a list of catalytic residues.
         Returns a list of PdbSite objects"""
         # Map structure objects in every residue
+        sites = []
         mmcif_dict = dict()
-        if annotate:
-            parser = MMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path)
-            mmcif_dict = parser._mmcif_dict
-        else:
-            parser = FastMMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path)
+        try:
+            if annotate:
+                parser = MMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+                mmcif_dict = parser._mmcif_dict
+            else:
+                parser = FastMMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+        except TypeError:
+            return sites
         # We want all equivalent residues from identical assembly chains
         reslist = PdbSite._get_assembly_residues(reslist, structure)
-        sites = []
         # Set a reference residue to make seeds
         seeds = PdbSite._get_seeds(reslist)
         # Build a site from each seed
@@ -146,8 +149,10 @@ class PdbSite:
             site = cls.build(seed, reslist, reference_site)
             if site.has_missing_functional_atoms:
                 continue
-            if redundancy_cutoff:
-                if len(sites) > 0:
+            if len(sites) > 0:
+                if site.has_identical_residues(sites[-1]):
+                    continue
+                if redundancy_cutoff:
                     _, _, _, rms_all = site.fit(sites[-1])
                     if rms_all < redundancy_cutoff:
                         continue
@@ -360,6 +365,24 @@ class PdbSite:
                 gaps.append(i)
         return gaps
 
+    def contains_equivalent(self, res):
+        """Checks if the site contains a catalytic residue of the basic info
+        (name, resid, auth_resid), and either the same index or chain"""
+        for sres in self:
+            if sres.is_equivalent(res, by_index=True) or \
+               sres.is_equivalent(res, by_index=False, by_chain=True):
+                return True
+        return False
+
+    def has_identical_residues(self, other):
+        """Checks if two sites have the same, although their order might be
+        different. Used to cleanup redundant symmetrical active sites like
+        HIV-protease"""
+        for res in other:
+            if not self.contains_equivalent(res):
+                return False
+        return True
+
     def find_ligands(self, headroom=1):
         """
         Searches the parent structure for hetero components close to the
@@ -553,7 +576,7 @@ class PdbSite:
                 if reference_residue == res.reference_residue:
                     found = True
             if not found:
-                gap = PdbResidue()
+                gap = PdbResidue(index=reference_residue.index)
                 gap.reference_residue = reference_residue
                 self.add(gap)
         self._reorder()
@@ -624,7 +647,6 @@ class PdbSite:
         Makes a new residue list of all equivalent residues found in identical assembly
         chains. Also applies an auth_resid correction  where residues in identical chains 
         might have a different auth_resid (usually of 1xxx or 2xxx for chains A and B 
-        respectively). Structures are also mapped in the residues.
 
         Args:
             reslist: The residue list to be enriched
@@ -643,7 +665,10 @@ class PdbSite:
                     try:
                         res_structure = chain[res.corrected_auth_resid]
                     except KeyError:
-                        continue
+                        try:
+                            res_structure = chain[res.resid]
+                        except KeyError:
+                            continue
                 new_res = res.copy()
                 new_res.chain = chain.get_id()
                 new_res.structure = res_structure
@@ -670,6 +695,26 @@ class PdbSite:
                 seeds.append(res)
         return seeds
 
+    @staticmethod
+    def _get_nearest_equivalent(self, other, reslist, site):
+        equivalents = []
+        for res in reslist:
+            if res.structure is None:
+                continue
+            if res.is_equivalent(self):
+                equivalents.append(res)
+        result = None
+        min_dist = 999
+        for eq in equivalents:
+            #Check if the same residue is already in the site
+            if site.contains_equivalent(eq):
+                continue
+            dist = eq.get_distance(other, minimum=True)
+            if dist<min_dist:
+                result = eq
+                min_dist = dist
+        return result
+    
     @staticmethod
     def _super(p_coords, q_coords, cycles=10, cutoff=6):
         """

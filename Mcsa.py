@@ -71,8 +71,8 @@ class Mcsa:
         all equivalent residues from identical chains in biological assemblies,
         and creates individual instances for them"""
         reference_residue = None
-        for json_res in self.json_residues[entry]:
-            for residue in PdbResidue.from_json(json_res):
+        for index, json_res in enumerate(self.json_residues[entry]):
+            for residue in PdbResidue.from_json(json_res, index):
                 if residue.is_reference:
                     reference_residue = residue
                     self.ref_pdb_residues[residue.mcsa_id].append(residue)

@@ -15,7 +15,7 @@ def main(mcsa_id):
     # Build test entry
     print('Building entry {}'.format(mcsa_id))
     i = time()
-    db.build([mcsa_id], annotate=True, redundancy_cutoff=None, verbose=False)
+    db.build([mcsa_id], annotate=True, redundancy_cutoff=0.3, verbose=True)
     f = time()
     build_time = f-i
 

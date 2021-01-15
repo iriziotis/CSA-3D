@@ -9,7 +9,7 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funcloc='', is_reference=False):
+                 auth_resid=None, chain='', funcloc='', is_reference=False, index=None):
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
         self.resname = resname
@@ -18,6 +18,7 @@ class PdbResidue:
         self.chain = chain
         self.funcloc = funcloc
         self.is_reference = is_reference
+        self.index = index
         self.reference_residue = None
         self.structure = None
 
@@ -29,7 +30,8 @@ class PdbResidue:
         """Checks if residues share the same information"""
         return (self.resname == other.resname and
                 self.auth_resid == other.auth_resid and
-                self.chain == other.chain)
+                self.chain == other.chain and
+                self.index == other.index)
 
     def __sub__(self, other):
         """Returns an approximate distance of self to other PdbResidue"""
@@ -38,7 +40,7 @@ class PdbResidue:
     def copy(self):
         """Returns a copy of the object without the structure mapping"""
         res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
-                         self.auth_resid, self.chain, self.funcloc, self.is_reference)
+                         self.auth_resid, self.chain, self.funcloc, self.is_reference, self.index)
         res.reference_residue = self.reference_residue
         return res
 
@@ -96,42 +98,26 @@ class PdbResidue:
             except KeyError:
                 return self.get_distance(other, minimum=True)
 
-    def is_equivalent(self, other):
-        """Check if residues share the same pdb_id, name, resid
+    def is_equivalent(self, other, by_index=True, by_chain=False):
+        """Check if residues share the same pdb_id, index, name, resid
         and auth_resid"""
-        return self.pdb_id == other.pdb_id and self.resname == other.resname and \
-               (self.resid == other.resid or self.auth_resid == other.auth_resid) 
+        basic = self.pdb_id == other.pdb_id and self.resname == other.resname and \
+                (self.resid == other.resid or self.auth_resid == other.auth_resid) 
+        indeces = self.index == other.index
+        chains = self.chain == other.chain
 
-    def get_nearest_equivalent(self, other, reslist):
-        """
-        Finds the closest equivalent of another residue in a list.
-        Equivalent = same pdb_id, resid, auth_resid and resname,
-                     different chain
-
-        Args:
-            other: The residue for which we want get the closest equivalent
-                   in the list
-            reslist: A list of PdbResidue objects
-        Returns:
-            The equivalent residue to other that is located closest to self
-            in the 3D space.
-        """
-        min_dist = 999
-        result = None
-        for res in reslist:
-            if res.structure is None:
-                continue
-            if res.is_equivalent(other):
-                dist = self.get_distance(res)
-                if dist < min_dist:
-                    result = res
-                    min_dist = dist
-        return result
+        if by_index:
+            if by_chain:
+                return basic and indeces and chains
+            return basic and indeces
+        if by_chain:
+            return basic and chains
+        return basic
 
     @property
     def id(self):
-        """Unique ID of a residue as a tuple"""
-        return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
+        """ID of a residue as a tuple, not including index. Might be ambiguous"""
+        return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid, self.index
 
     @property
     def corrected_auth_resid(self):
@@ -160,7 +146,7 @@ class PdbResidue:
         return False
 
     @classmethod
-    def from_json(cls, residue):
+    def from_json(cls, residue, index):
         """Constructs a list of PdbResidue objects using information directly from
         the M-CSA homologues json file. Input is a top-level residue entry in the json.
         """
@@ -178,7 +164,7 @@ class PdbResidue:
                 funcloc = residue['function_location_abv']
 
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                          chain, funcloc, is_reference)
+                          chain, funcloc, is_reference, index)
         except KeyError:
             return
 
