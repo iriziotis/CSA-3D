@@ -74,21 +74,27 @@ class PdbResidue:
         else:
             return False
 
-    def get_distance(self, other):
-        """Get distance of two residues by measuring distance of two
-        arbitrary atoms. Very approximate, use with care"""
+    def get_distance(self, other, minimum=True):
+        """Get distance of two residues. If minimum=True, minimum distance
+        is calculated. If False, distance of CAs is returned"""
         # TODO make it use either CAs or minimum distance
         x = None
         y = None
         if self.structure is None or other.structure is None:
             return
-        for atom in self.structure.get_atoms():
-            x = atom
-            break
-        for atom in other.structure.get_atoms():
-            y = atom
-            break
-        return x - y
+        if minimum:
+            min_dist = 999
+            for i in self.structure.get_atoms():
+                for j in other.structure.get_atoms():
+                    dist = i-j
+                    if dist < min_dist:
+                        min_dist = dist
+            return min_dist
+        else:
+            try:
+                return self.structure['CA'] - other.structure['CA']
+            except KeyError:
+                return self.get_distance(other, minimum=True)
 
     def is_equivalent(self, other):
         """Check if residues share the same pdb_id, name, resid

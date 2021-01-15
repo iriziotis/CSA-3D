@@ -54,7 +54,7 @@ class PdbSite:
 
     def __contains__(self, residue):
         """Check if residue is there"""
-        return residue in self.residues
+        return residue.id in self.residues_dict
 
     def __getitem__(self, _id):
         """Return the residue with given ID."""
@@ -136,7 +136,7 @@ class PdbSite:
         else:
             parser = FastMMCIFParser(QUIET=True)
             structure = parser.get_structure('', cif_path)
-            # We want all equivalent residues from identical assembly chains
+        # We want all equivalent residues from identical assembly chains
         reslist = PdbSite._get_assembly_residues(reslist, structure)
         sites = []
         # Set a reference residue to make seeds
