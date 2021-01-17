@@ -63,20 +63,20 @@ class PdbSite:
     # Alternative constructors
 
     @classmethod
-    def from_list(cls, res_list, cif_path, annotate=True):
+    def from_list(cls, reslist, cif_path, annotate=True):
         """Construct PdbSite object directly from residue list"""
         # If we have duplicate residues, each one with a different function
         # location annotation, keep only the one with the side chain
         seen = set()
         mmcif_dict = dict()
         to_del = []
-        for i, res in enumerate(res_list):
-            if res.id in seen:
+        for i, res in enumerate(reslist):
+            if res.id[:-1] in seen:
                 to_del.append(i)
-            seen.add(res.id)
+            seen.add(res.id[:-1])
         for i in (sorted(to_del, reverse=True)):
-            if res_list[i].funcloc == '':
-                del res_list[i]
+            if reslist[i].funcloc == '':
+                del reslist[i]
         site = cls()
         if annotate:
             parser = MMCIFParser(QUIET=True)
@@ -85,7 +85,7 @@ class PdbSite:
         else:
             parser = FastMMCIFParser(QUIET=True)
             structure = parser.get_structure('', cif_path)
-        for res in res_list:
+        for res in reslist:
             if structure:
                 res.add_structure(structure)
             site.add(res)
@@ -383,6 +383,20 @@ class PdbSite:
                 return False
         return True
 
+    def get_chiral_residues(self):
+        """Gets chiral residues from the site if there are any (residues that have
+        the same resname, resid, auth_resid but different chains)"""
+        identicals = set()
+        seen = set()
+        for i in self:
+            for j in self:
+                if i==j or i.is_gap or j.is_gap:
+                    continue
+                if i.is_equivalent(j, by_index=False, by_chain=False):
+                    if (j.index, i.index) not in identicals:
+                        identicals.add((i.index, j.index))
+        return identicals
+
     def find_ligands(self, headroom=1):
         """
         Searches the parent structure for hetero components close to the
@@ -604,7 +618,7 @@ class PdbSite:
         """
         atoms = []
         coords = []
-        for i, res in enumerate(self.residues):
+        for i, res in enumerate(self):
             if omit:
                 if i in omit:
                     continue
@@ -624,7 +638,6 @@ class PdbSite:
                     coords.append(atom.get_coord())
         atoms = np.array(atoms)
         coords = np.stack(coords, axis=0)
-
         return atoms, coords
 
     def _reorder(self):
@@ -639,6 +652,16 @@ class PdbSite:
                 elif i != j and reference_residue == res.reference_residue:
                     reorder.append(j)
         self.residues = [self.residues[i] for i in reorder]
+
+        # If site contains chiral residues, reorder them by chain
+        chiral = self.get_chiral_residues()
+        if chiral:
+            for pair in chiral:
+                p = self.residues[pair[0]]
+                q = self.residues[pair[1]]
+                if q.chain < p.chain:
+                    self.residues[pair[0]], self.residues[pair[1]] = \
+                    self.residues[pair[1]], self.residues[pair[0]]
         return
 
     @staticmethod
@@ -669,6 +692,8 @@ class PdbSite:
                             res_structure = chain[res.resid]
                         except KeyError:
                             continue
+                    if res_structure.resname != res.resname:
+                        continue
                 new_res = res.copy()
                 new_res.chain = chain.get_id()
                 new_res.structure = res_structure
@@ -739,6 +764,8 @@ class PdbSite:
         # Initialize Biopython SVDSuperimposer
         sup = SVDSuperimposer()
         for i in range(cycles):
+            if p_coords.size == 0:
+                break
             sup.set(p_coords, q_coords)
             sup.run()
             rms = sup.get_rms()
