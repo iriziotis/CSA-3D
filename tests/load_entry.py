@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 sys.path.append('/Users/riziotis/ebi/phd/src/')
+sys.path.append('/nfs/research1/thornton/riziotis/research/phd/src')
 import os
 import pickle
 
@@ -13,9 +14,8 @@ def main(mcsa_id):
         os.makedirs(outdir)
 
     for pdbsite in entry.pdbsites:
-        print(pdbsite.id)
-        #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
-        #print(pdbsite.id, rms, rms_all)
+        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
+        print(pdbsite.id, rms, rms_all)
         pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
 
 if __name__ == '__main__':

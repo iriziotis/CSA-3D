@@ -2,7 +2,8 @@
 
 import pickle
 import sys
-sys.path.append('/Users/riziotis/ebi/phd/src/')
+sys.path.append('/Users/riziotis/ebi/phd/src')
+sys.path.append('/nfs/research1/thornton/riziotis/research/phd/src')
 from time import time
 from mcsa3d import Mcsa
 
@@ -15,7 +16,10 @@ def main(mcsa_id):
     # Build test entry
     print('Building entry {}'.format(mcsa_id))
     i = time()
-    db.build([mcsa_id], annotate=True, redundancy_cutoff=None, verbose=False)
+    build = db.build([mcsa_id], annotate=True, redundancy_cutoff=0.3, verbose=False)
+    if not build:
+        print('No entry {}'.format(mcsa_id))
+        exit()
     f = time()
     build_time = f-i
 

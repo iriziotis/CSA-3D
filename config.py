@@ -1,8 +1,11 @@
+import os
 import csv
 import json
 from ast import literal_eval
 
 WORKING_DIR = '/Users/riziotis/ebi/phd'
+if not os.path.isdir(WORKING_DIR):
+    WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd'
 ASSEMBLIES_DIR = '{}/datasets/assembly_cif'.format(WORKING_DIR)
 INFO_JSON = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
 
