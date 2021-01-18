@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 sys.path.append('/Users/riziotis/ebi/phd/src/')
+sys.path.append('/nfs/research1/thornton/riziotis/research/phd/src')
 import os
 import pickle
 

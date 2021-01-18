@@ -43,12 +43,17 @@ class Mcsa:
         """
         if not entries:
             entries = self.json_residues.keys()
+        if type(entries) != list:
+            entries = [entries]
         for entry in entries:
             if entry in self.json_residues.keys():
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
                 self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry)
+            else:
+                return False
+        return True
 
     def add(self, entry):
         """Adds entry to Mcsa object"""
