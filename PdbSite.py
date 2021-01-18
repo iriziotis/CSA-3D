@@ -692,7 +692,7 @@ class PdbSite:
                             res_structure = chain[res.resid]
                         except KeyError:
                             continue
-                    if res_structure.resname != res.resname:
+                    if res_structure.resname != res.resname.upper():
                         continue
                 new_res = res.copy()
                 new_res.chain = chain.get_id()

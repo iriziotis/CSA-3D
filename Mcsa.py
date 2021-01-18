@@ -84,7 +84,7 @@ class Mcsa:
         """Builds UniResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json)"""
         reference_residue = None
-        for json_res in self.json_residues[entry]:
+        for index, json_res in enumerate(self.json_residues[entry]):
             for residue in UniResidue.from_json(json_res):
                 if residue.is_reference:
                     reference_residue = residue

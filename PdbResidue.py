@@ -146,7 +146,7 @@ class PdbResidue:
         return False
 
     @classmethod
-    def from_json(cls, residue, index):
+    def from_json(cls, residue, index=None):
         """Constructs a list of PdbResidue objects using information directly from
         the M-CSA homologues json file. Input is a top-level residue entry in the json.
         """
