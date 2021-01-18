@@ -46,12 +46,12 @@ class Mcsa:
         if type(entries) != list:
             entries = [entries]
         for entry in entries:
-            if entry in self.json_residues.keys():
+            try:
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
                 self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry)
-            else:
+            except (KeyError, TypeError):
                 return False
         return True
 
