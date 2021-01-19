@@ -46,7 +46,6 @@ class UniSite:
         else:
             site.reference_site = reference_site
             site._map_reference_residues()
-        print(site.id, site)
         return site
 
     @classmethod
