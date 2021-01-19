@@ -317,11 +317,14 @@ class PdbSite:
     @property
     def has_missing_functional_atoms(self):
         """Checks if there are missing functional atoms from the residue
-        structures"""
-        gaps = set(self.get_gaps())
-        self_atoms, _ = self._get_atom_strings_and_coords(omit=gaps)
-        ref_atoms, _ = self.reference_site._get_atom_strings_and_coords(omit=gaps)
-        return len(self_atoms) != len(ref_atoms)
+        structures or site is empty"""
+        try:
+            gaps = set(self.get_gaps())
+            self_atoms, _ = self._get_atom_strings_and_coords(omit=gaps)
+            ref_atoms, _ = self.reference_site._get_atom_strings_and_coords(omit=gaps)
+            return len(self_atoms) != len(ref_atoms)
+        except ValueError:
+            return True
 
     # Methods
 
@@ -594,7 +597,9 @@ class PdbSite:
                 if reference_residue == res.reference_residue:
                     found = True
             if not found:
-                gap = PdbResidue(chiral_id=reference_residue.chiral_id)
+                gap = PdbResidue(mcsa_id=reference_residue.mcsa_id, 
+                                 pdb_id=reference_residue.pdb_id, 
+                                 chiral_id=reference_residue.chiral_id)
                 gap.reference_residue = reference_residue
                 self.add(gap)
         self._reorder()
@@ -624,7 +629,7 @@ class PdbSite:
                 if i in omit:
                     continue
             if not res.structure:
-                return
+                return atoms, coords
             for atom in res.structure:
                 resname = res.resname.upper()
                 if allow_symmetrics:
