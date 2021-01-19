@@ -40,9 +40,9 @@ def main(mcsa_id, outdir):
 
 if __name__ == '__main__':
     try:
-        main(int(sys.argv[1], sys.argv[2]))
+        main(int(sys.argv[1]), sys.argv[2])
     except IndexError:
-        main(int(sys.argv[1], '.'))
+        main(int(sys.argv[1]), '.')
 
 
 
