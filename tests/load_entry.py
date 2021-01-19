@@ -6,7 +6,7 @@ import os
 import pickle
 
 def main(mcsa_id):
-    with open('entry_{}.ent'.format(mcsa_id), 'rb') as f:
+    with open('csa3d_{}.ent'.format(str(mcsa_id).zfill(4)), 'rb') as f:
         entry = pickle.load(f)
 
     outdir = './out/mcsa_{}'.format(str(mcsa_id).zfill(4))
@@ -15,7 +15,7 @@ def main(mcsa_id):
 
     for pdbsite in entry.pdbsites:
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
-        print(pdbsite.id, rms, rms_all)
+        print(pdbsite.id, pdbsite.sequence, rms, rms_all, ','.join(str(i) for i in pdbsite.mapped_unisites))
         pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
 
 if __name__ == '__main__':

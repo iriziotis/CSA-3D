@@ -16,7 +16,7 @@ def main(mcsa_id, outdir):
     # Build test entry
     print('Building entry {}'.format(mcsa_id))
     i = time()
-    build = db.build(mcsa_id, annotate=True, redundancy_cutoff=0.3, verbose=False)
+    build = db.build(mcsa_id, annotate=True, redundancy_cutoff=0.3, verbose=True)
     if not build:
         print('No entry {}'.format(mcsa_id))
         exit()
@@ -40,9 +40,10 @@ def main(mcsa_id, outdir):
 
 if __name__ == '__main__':
     try:
-        main(int(sys.argv[1]), sys.argv[2])
+        outdir = sys.argv[2]
     except IndexError:
-        main(int(sys.argv[1]), '.')
+        outdir = '.'
+    main(int(sys.argv[1]), outdir)
 
 
 

@@ -8,14 +8,14 @@ class UniResidue:
     API catalytic residue info .json"""
 
     def __init__(self, mcsa_id=None, uniprot_id=None, resname='', resid=None,
-                 funcloc=None, is_reference=False, index=None):
+                 funclocs=None, is_reference=False, chiral_id=None):
         self.mcsa_id = mcsa_id
         self.uniprot_id = uniprot_id
         self.resname = resname
         self.resid = resid
-        self.funcloc = funcloc
+        self.funclocs = funclocs if funclocs else []
         self.is_reference = is_reference
-        self.index = index
+        self.chiral_id = chiral_id
         self.reference_residue = None
 
     def __str__(self):
@@ -25,34 +25,39 @@ class UniResidue:
         """Checks if residues share the same information"""
         return (self.uniprot_id == other.uniprot_id and
                 self.resname == other.resname and
-                self.index == other.index)
+                self.chiral_id == other.chiral_id)
 
     def copy(self):
         """Returns a copy of the object without the structure mapping"""
         res = UniResidue(self.mcsa_id, self.uniprot_id, self.resname, self.resid,
-                         self.funcloc, self.is_reference, self.index)
+                         self.funclocs, self.is_reference, self.chiral_id)
         res.reference_residue = self.reference_residue
         return res
 
-    def is_equivalent(self, other, by_index=True):
-        """Check if residues share the same pdb_id, resname, resid and optionally index"""
-        basic = self.pdb_id == other.pdb_id and self.resname == other.resname and \
+    def is_equivalent(self, other, by_chiral_id=True):
+        """Check if residues share the same uniprot_id, resname, resid and optionally chiral_id"""
+        basic = self.uniprot_id == other.uniprot_id and self.resname == other.resname and \
                 self.resid == other.resid 
-        indeces = self.index == other.index
+        chiral_ids = self.chiral_id == other.chiral_id
 
-        if by_index:
-            return basic and indeces
+        if by_chiral_id:
+            return basic and chiral_ids
         return basic
 
     @property
     def id(self):
-        """Unique ID of a residue as a tuple"""
-        return self.uniprot_id, self.resname, self.resid, self.index
+        """ID of a residue as a tuple, not including chiral_id. Might be ambiguous"""
+        return self.uniprot_id, self.resname, self.resid
+
+    @property
+    def full_id(self):
+        """ID of a residue as a tuple, including chiral_id. Always unique"""
+        return self.uniprot_id, self.resname, self.resid, self.chiral_id
 
     @property
     def is_gap(self):
         """Check if residue is empty (no alignment with reference)"""
-        return self.mcsa_id is None and self.pdb_id is None and self.resid is None
+        return self.mcsa_id is None and self.uniprot_id is None and self.resid is None
 
     @property
     def is_conserved(self):
@@ -67,8 +72,26 @@ class UniResidue:
                 return True
         return False
 
+    @property
+    def is_standard(self):
+        """Checks if residue is one of the 20 standard ones"""
+        return self.resname.upper() in STANDARD_RESIDUES
+
+    @property
+    def has_double_funcloc(self):
+        """Checks if residue has two function locations"""
+        return len(self.funclocs) > 1
+
+    @property
+    def has_main_chain_function(self):
+        """Checks if residue has main chain function"""
+        for funcloc in self.funclocs:
+            if 'main' in funcloc.lower():
+                return True
+        return False
+
     @classmethod
-    def from_json(cls, residue, index=None):
+    def from_json(cls, residue, chiral_id=None):
         """Constructs a list of UniResidue objects using information directly from
         the M-CSA homologues .json file. Input is a top-level residue entry in the json.
         """
@@ -79,9 +102,9 @@ class UniResidue:
                 resname = uniprot_res['code']
                 resid = uniprot_res['resid']
                 is_reference = uniprot_res['is_reference']
-                funcloc = residue['function_location_abv']
+                funclocs = [residue['function_location_abv']]
 
                 yield UniResidue(mcsa_id, uniprot_id, resname, resid, 
-                                 funcloc, is_reference, index)
+                                 funclocs, is_reference, chiral_id)
         except KeyError:
             return

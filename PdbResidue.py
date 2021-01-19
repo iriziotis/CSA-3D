@@ -1,6 +1,6 @@
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
-from .residue_definitions import AA_3TO1, EQUIVALENT_RESIDUES
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
 
 
 class PdbResidue:
@@ -9,16 +9,16 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funcloc='', is_reference=False, index=None):
+                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None):
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
         self.resname = resname
         self.resid = resid
         self.auth_resid = auth_resid
         self.chain = chain
-        self.funcloc = funcloc
+        self.funclocs = funclocs if funclocs else []
         self.is_reference = is_reference
-        self.index = index
+        self.chiral_id = chiral_id
         self.reference_residue = None
         self.structure = None
 
@@ -31,7 +31,7 @@ class PdbResidue:
         return (self.resname == other.resname and
                 self.auth_resid == other.auth_resid and
                 self.chain == other.chain and
-                self.index == other.index)
+                self.chiral_id == other.chiral_id)
 
     def __sub__(self, other):
         """Returns an approximate distance of self to other PdbResidue"""
@@ -40,7 +40,7 @@ class PdbResidue:
     def copy(self):
         """Returns a copy of the object without the structure mapping"""
         res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
-                         self.auth_resid, self.chain, self.funcloc, self.is_reference, self.index)
+                         self.auth_resid, self.chain, self.funclocs, self.is_reference, self.chiral_id)
         res.reference_residue = self.reference_residue
         return res
 
@@ -98,29 +98,36 @@ class PdbResidue:
             except KeyError:
                 return self.get_distance(other, minimum=True)
 
-    def is_equivalent(self, other, by_index=True, by_chain=False):
-        """Check if residues share the same pdb_id, index, name, resid
+    def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
+        """Check if residues share the same pdb_id, chiral_id, name, resid
         and auth_resid"""
         basic = self.pdb_id == other.pdb_id and self.resname == other.resname and \
                 (self.resid == other.resid or self.auth_resid == other.auth_resid) 
-        indeces = self.index == other.index
+        chiral_ids = self.chiral_id == other.chiral_id
         chains = self.chain == other.chain
 
-        if by_index:
+        if by_chiral_id:
             if by_chain:
-                return basic and indeces and chains
-            return basic and indeces
+                return basic and chiral_ids and chains
+            return basic and chiral_ids
         if by_chain:
             return basic and chains
         return basic
 
     @property
     def id(self):
-        """ID of a residue as a tuple, not including index. Might be ambiguous"""
-        return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid, self.index
+        """ID of a residue as a tuple, not including chiral_id. Might be ambiguous"""
+        return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
+
+    @property
+    def full_id(self):
+        """ID of a residue as a tuple, including chiral_id. Always unique"""
+        return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid, self.chiral_id
 
     @property
     def corrected_auth_resid(self):
+        """Correction of auth_resid for PDB files where identical assembly chains are
+        identified by incrementing the auth_resid by 1000,2000 etc."""
         if not self.auth_resid:
             return
         if self.auth_resid < 1000 or len(self.chain) > 1:
@@ -145,14 +152,31 @@ class PdbResidue:
                 return True
         return False
 
+    @property
+    def is_standard(self):
+        """Checks if residue is one of the 20 standard ones"""
+        return self.resname.upper() in STANDARD_RESIDUES
+
+    @property
+    def has_double_funcloc(self):
+        """Checks if residue has two function locations"""
+        return len(self.funclocs) > 1
+
+    @property
+    def has_main_chain_function(self):
+        """Checks if residue has main chain function"""
+        for funcloc in self.funclocs:
+            if 'main' in funcloc.lower():
+                return True
+        return False
+
     @classmethod
-    def from_json(cls, residue, index=None):
+    def from_json(cls, residue, chiral_id=None):
         """Constructs a list of PdbResidue objects using information directly from
         the M-CSA homologues json file. Input is a top-level residue entry in the json.
         """
         try:
             for pdb_res in residue['residue_chains']:
-
                 mcsa_id = residue['mcsa_id']
                 pdb_id = pdb_res['pdb_id']
                 resname = pdb_res['code']
@@ -161,10 +185,10 @@ class PdbResidue:
                 is_reference = pdb_res['is_reference']
                 chain = pdb_res['assembly_chain_name'] if is_reference \
                     else pdb_res['chain_name']
-                funcloc = residue['function_location_abv']
+                funclocs = [residue['function_location_abv']]
 
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                          chain, funcloc, is_reference, index)
+                          chain, funclocs, is_reference, chiral_id)
         except KeyError:
             return
 

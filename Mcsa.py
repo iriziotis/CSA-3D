@@ -46,12 +46,12 @@ class Mcsa:
         if type(entries) != list:
             entries = [entries]
         for entry in entries:
-            try:
+            if entry in self.json_residues.keys():
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
                 self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry)
-            except (KeyError, TypeError):
+            else:
                 return False
         return True
 
@@ -76,8 +76,9 @@ class Mcsa:
         all equivalent residues from identical chains in biological assemblies,
         and creates individual instances for them"""
         reference_residue = None
-        for index, json_res in enumerate(self.json_residues[entry]):
-            for residue in PdbResidue.from_json(json_res, index):
+        seen = set()
+        for chiral_id, json_res in enumerate(self.json_residues[entry]):
+            for residue in PdbResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
                     self.ref_pdb_residues[residue.mcsa_id].append(residue)
@@ -89,8 +90,8 @@ class Mcsa:
         """Builds UniResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json)"""
         reference_residue = None
-        for index, json_res in enumerate(self.json_residues[entry]):
-            for residue in UniResidue.from_json(json_res):
+        for chiral_id, json_res in enumerate(self.json_residues[entry]):
+            for residue in UniResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
                     self.ref_uni_residues[residue.mcsa_id].append(residue)

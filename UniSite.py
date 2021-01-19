@@ -1,5 +1,3 @@
-# !/usr/bin/env python3
-
 from .residue_definitions import AA_3TO1
 from .UniResidue import UniResidue
 
@@ -16,19 +14,49 @@ class UniSite:
 
     def __str__(self):
         """Print as pseudo-sequence in one-letter code"""
-        return ''.join([AA_3TO1[res.resname] for res in self.residues])
+        return self.sequence
 
     def __iter__(self):
         """Iterate over residues"""
         yield from self.residues
 
-    def __contains__(self, _id):
+    def __contains__(self, residue):
         """Check if residue of specific ID is there"""
-        return id in self.residues_dict
+        return residue.full_id in self.residues_dict
 
-    def __getitem__(self, _id):
+    def __getitem__(self, full_id):
         """Return the child with given ID."""
-        return self.residues_dict[id]
+        return self.residues_dict[full_id]
+
+    # Alternative constructors
+
+    @classmethod
+    def build_reference(cls, reslist):
+        """Builds reference active site from a list of UniProt catalytic residues."""
+        ref = UniSite.from_list(reslist)
+        ref.reference_site = ref
+        return ref
+
+    @classmethod
+    def build(cls, reslist, reference_site=None):
+        """Build UniProt site from a list of residues, and map reference residues"""
+        site = cls.from_list(reslist)
+        if site.is_reference:
+            site.reference_site = site
+        else:
+            site.reference_site = reference_site
+            site._map_reference_residues()
+        print(site.id, site)
+        return site
+
+    @classmethod
+    def from_list(cls, reslist):
+        """Construct UniSite object directly from residue list"""
+        site = cls()
+        reslist = UniSite._cleanup_list(reslist)
+        for res in reslist:
+            site.add(res)
+        return site
 
     # Properties
 
@@ -49,6 +77,11 @@ class UniSite:
     def id(self):
         """UniProt site ID is the UniProt id of the sequence"""
         return self.uniprot_id
+
+    @property
+    def sequence(self):
+        """Show as pseudo-sequence in one-letter code"""
+        return ''.join([AA_3TO1[res.resname] for res in self.residues])
 
     @property
     def size(self):
@@ -74,7 +107,7 @@ class UniSite:
         result = False
         for res in self.residues:
             if ignore_funcloc_main:
-                if 'main' in res.funcloc:
+                if 'main' in res.funclocs:
                     result = True
                     continue
             if not res.is_conserved and not res.is_conservative_mutation:
@@ -87,36 +120,23 @@ class UniSite:
         """Iterate over residues"""
         yield from self.residues
 
+    def get_gaps(self):
+        """Returns an index of the gap positions (non-aligned residues)"""
+        gaps = []
+        for i, res in enumerate(self.residues):
+            if res.is_gap:
+                gaps.append(i)
+        return gaps
+
     def add(self, residue):
         """Add UniProt residue to list"""
         if type(residue) == UniResidue:
             self.residues.append(residue)
-            self.residues_dict[residue.id] = residue
+            self.residues_dict[residue.full_id] = residue
         else:
             print('Attempted to add non-UniRes object in UniSite')
             return
         return True
-
-    # Alternative constructors
-
-    @classmethod
-    def build(cls, reslist, reference_site=None):
-        """Build UniProt site from a list of residues, and map reference residues"""
-        site = cls.from_list(reslist)
-        if site.is_reference:
-            site.reference_site = site
-        else:
-            site.reference_site = reference_site
-            site._map_reference_residues()
-        return site
-
-    @classmethod
-    def from_list(cls, reslist):
-        """Construct UniSite object directly from residue list"""
-        site = cls()
-        for res in reslist:
-            site.add(res)
-        return site
 
     # Private methods
 
@@ -152,3 +172,27 @@ class UniSite:
                     reorder.append(j)
         self.residues = [self.residues[i] for i in reorder]
         return
+
+    @staticmethod
+    def _cleanup_list(reslist):
+        """Finds duplicate residues of different funclocs and makes a single
+        one with two funclocs. Returns a new list without redundant residues"""
+        new_reslist = []
+        seen = set()
+        ignore = set()
+        for p in reslist:
+            for q in reslist:
+                if p==q or (q.id, p.id) in seen:
+                    continue
+                if p.is_equivalent(q, by_chiral_id=False):
+                    if p.funclocs != q.funclocs:
+                        new_res = p.copy()
+                        new_res.funclocs = [p.funclocs[0], q.funclocs[0]]
+                        new_reslist.append(new_res)
+                        ignore.add(p.id)
+                        ignore.add(q.id)
+                seen.add((p.id, q.id))
+        for p in reslist:
+            if p.id not in ignore and p not in new_reslist:
+                new_reslist.append(p)
+        return new_reslist

@@ -5,7 +5,7 @@ from Bio.PDB.Chain import Chain
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from rmsd import reorder_hungarian
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES,  RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
+from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 
@@ -32,8 +32,8 @@ class PdbSite:
         self.mmcif_dict = dict()
 
     def __str__(self):
-        """Print as pseudo-sequence in one-letter code"""
-        return ''.join([AA_3TO1[res.resname] for res in self.residues])
+        """Show as pseudo-sequence in one-letter code"""
+        return self.sequence
 
     def __len__(self):
         """Return size of site (residue count)"""
@@ -54,11 +54,11 @@ class PdbSite:
 
     def __contains__(self, residue):
         """Check if residue is there"""
-        return residue.id in self.residues_dict
+        return residue.full_id in self.residues_dict
 
-    def __getitem__(self, _id):
+    def __getitem__(self, full_id):
         """Return the residue with given ID."""
-        return self.residues_dict[_id]
+        return self.residues_dict[full_id]
 
     # Alternative constructors
 
@@ -67,21 +67,17 @@ class PdbSite:
         """Construct PdbSite object directly from residue list"""
         # If we have duplicate residues, each one with a different function
         # location annotation, keep only the one with the side chain
-        seen = set()
         mmcif_dict = dict()
-        to_del = []
-        for i, res in enumerate(reslist):
-            if res.id[:-1] in seen:
-                to_del.append(i)
-            seen.add(res.id[:-1])
-        for i in (sorted(to_del, reverse=True)):
-            if reslist[i].funcloc == '':
-                del reslist[i]
+        # First reduce redundant residues with multiple function locations
+        reslist = PdbSite._cleanup_list(reslist)
         site = cls()
         if annotate:
-            parser = MMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path)
-            mmcif_dict = parser._mmcif_dict
+            try:
+                parser = MMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+                mmcif_dict = parser._mmcif_dict
+            except TypeError:
+                return
         else:
             parser = FastMMCIFParser(QUIET=True)
             structure = parser.get_structure('', cif_path)
@@ -95,11 +91,11 @@ class PdbSite:
         return site
 
     @classmethod
-    def build_reference(cls, cat_residues, cif_path, annotate=True):
+    def build_reference(cls, reslist, cif_path, annotate=True):
         """Builds reference active site from a list of PDB catalytic residues.
         Assumes that the list only contains one active site, so use it only
         if it is a list of manually annotated catalytic residues"""
-        ref = PdbSite.from_list(cat_residues, cif_path, annotate)
+        ref = PdbSite.from_list(reslist, cif_path, annotate)
         ref.reference_site = ref
         return ref
 
@@ -140,15 +136,18 @@ class PdbSite:
                 structure = parser.get_structure('', cif_path)
         except TypeError:
             return sites
+        # First reduce redundant residues with multiple function locations
+        reslist = PdbSite._cleanup_list(reslist)
         # We want all equivalent residues from identical assembly chains
         reslist = PdbSite._get_assembly_residues(reslist, structure)
-        # Set a reference residue to make seeds
+        # Get seeds to build active sites
         seeds = PdbSite._get_seeds(reslist)
         # Build a site from each seed
         for seed in seeds:
             site = cls.build(seed, reslist, reference_site)
             if site.has_missing_functional_atoms:
                 continue
+            # Reduce redundancy
             if len(sites) > 0:
                 if site.has_identical_residues(sites[-1]):
                     continue
@@ -156,6 +155,7 @@ class PdbSite:
                     _, _, _, rms_all = site.fit(sites[-1])
                     if rms_all < redundancy_cutoff:
                         continue
+            # Add ligands and annotations
             if annotate and structure:
                 site.parent_structure = structure
                 site.mmcif_dict = mmcif_dict
@@ -202,6 +202,11 @@ class PdbSite:
                 except KeyError:
                     continue
         return
+
+    @property
+    def sequence(self):
+        """Show as pseudo-sequence in one-letter code"""
+        return ''.join([AA_3TO1[res.resname] for res in self.residues])
 
     @property
     def title(self):
@@ -300,7 +305,7 @@ class PdbSite:
         result = False
         for res in self.residues:
             if ignore_funcloc_main:
-                if 'main' in res.funcloc:
+                if res.has_main_chain_function or res.has_double_funcloc:
                     result = True
                     continue
             if not res.is_conserved and not res.is_conservative_mutation:
@@ -324,8 +329,7 @@ class PdbSite:
         """Add PdbResidue object to site (in the residues list and dict)"""
         if type(residue) == PdbResidue:
             self.residues.append(residue)
-            self.residues_dict[residue.id] = residue
-            # Add residue structure to site structure
+            self.residues_dict[residue.full_id] = residue
             if residue.structure:
                 # Initialize structure if empty
                 if self.structure is None:
@@ -334,10 +338,11 @@ class PdbSite:
                 chain_id = residue.structure.get_parent().get_id()
                 if chain_id not in self.structure[0]:
                     self.structure[0].add(Chain(chain_id))
+                # Add residue structure to site structure
                 self.structure[0][chain_id].add(residue.structure)
         else:
             print('Attempted to add non-PdbResidue object in PdbSite')
-            return
+            return False
         return True
 
     def get_distances(self):
@@ -367,15 +372,15 @@ class PdbSite:
 
     def contains_equivalent(self, res):
         """Checks if the site contains a catalytic residue of the basic info
-        (name, resid, auth_resid), and either the same index or chain"""
+        (name, resid, auth_resid), and either the same chiral_id or chain"""
         for sres in self:
-            if sres.is_equivalent(res, by_index=True) or \
-               sres.is_equivalent(res, by_index=False, by_chain=True):
+            if sres.is_equivalent(res, by_chiral_id=True) or \
+               sres.is_equivalent(res, by_chiral_id=False, by_chain=True):
                 return True
         return False
 
     def has_identical_residues(self, other):
-        """Checks if two sites have the same, although their order might be
+        """Checks if two sites have the same residues, although their order might be
         different. Used to cleanup redundant symmetrical active sites like
         HIV-protease"""
         for res in other:
@@ -387,14 +392,13 @@ class PdbSite:
         """Gets chiral residues from the site if there are any (residues that have
         the same resname, resid, auth_resid but different chains)"""
         identicals = set()
-        seen = set()
         for i in self:
             for j in self:
                 if i==j or i.is_gap or j.is_gap:
                     continue
-                if i.is_equivalent(j, by_index=False, by_chain=False):
-                    if (j.index, i.index) not in identicals:
-                        identicals.add((i.index, j.index))
+                if i.is_equivalent(j, by_chiral_id=False, by_chain=False):
+                    if (j.chiral_id, i.chiral_id) not in identicals:
+                        identicals.add((i.chiral_id, j.chiral_id))
         return identicals
 
     def find_ligands(self, headroom=1):
@@ -497,7 +501,7 @@ class PdbSite:
                     for atom in res.structure:
                         if func_atoms_only and type(res) == PdbResidue:
                             resname = res.resname.upper()
-                            if 'main' in res.funcloc.lower() or resname not in STANDARD_RESIDUES:
+                            if res.has_main_chain_function or not res.is_standard:
                                 resname = 'ANY'
                             if '{}.{}'.format(resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
                                 continue
@@ -590,25 +594,22 @@ class PdbSite:
                 if reference_residue == res.reference_residue:
                     found = True
             if not found:
-                gap = PdbResidue(index=reference_residue.index)
+                gap = PdbResidue(chiral_id=reference_residue.chiral_id)
                 gap.reference_residue = reference_residue
                 self.add(gap)
         self._reorder()
         return
 
-    def _get_atom_strings_and_coords(self, functional_atoms=True, ca_only=False, allow_symmetrics=True, omit=None):
+    def _get_atom_strings_and_coords(self, allow_symmetrics=True, omit=None):
         """Gets atoms and coordinates for superposition and atom reordering
         calculations
 
         Args:
-            functional_atoms: #TODO
-
-            ca_only: #TODO
-
             allow_symmetrics: If True, equivalent residues and atoms
                               get the same id string, according to the
                               definitions in residue_definitions.py
                               (EQUIVALENT_ATOMS)
+            omit: Residues to exclude
         Returns:
             atoms: A NumPy array of atom identifier strings of type
                    'N.RES.AT' where N is the residue serial number
@@ -627,8 +628,10 @@ class PdbSite:
             for atom in res.structure:
                 resname = res.resname.upper()
                 if allow_symmetrics:
-                    if 'main' in res.funcloc:
+                    if res.has_main_chain_function:
                         resname = 'ANY'
+                    if not res.is_standard:
+                        resname = 'PTM'
                 atmid = '{}.{}'.format(resname, atom.name)
                 if atmid in RESIDUE_DEFINITIONS:
                     if allow_symmetrics:
@@ -665,6 +668,30 @@ class PdbSite:
         return
 
     @staticmethod
+    def _cleanup_list(reslist):
+        """Finds duplicate residues of different funclocs and makes a single
+        one with two funclocs. Returns a new list without redundant residues"""
+        new_reslist = []
+        seen = set()
+        ignore = set()
+        for p in reslist:
+            for q in reslist:
+                if p==q or (q.id, p.id) in seen:
+                    continue
+                if p.is_equivalent(q, by_chiral_id=False, by_chain=True):
+                    if p.funclocs != q.funclocs:
+                        new_res = p.copy()
+                        new_res.funclocs = [p.funclocs[0], q.funclocs[0]]
+                        new_reslist.append(new_res)
+                        ignore.add(p.id)
+                        ignore.add(q.id)
+                seen.add((p.id, q.id))
+        for p in reslist:
+            if p.id not in ignore and p not in new_reslist:
+                new_reslist.append(p)
+        return new_reslist
+
+    @staticmethod
     def _get_assembly_residues(reslist, parent_structure):
         """
         Makes a new residue list of all equivalent residues found in identical assembly
@@ -679,21 +706,29 @@ class PdbSite:
         """
         new_reslist = []
         for res in reslist:
+            res_structure = None
             for chain in parent_structure[0]:
                 if res.chain != chain.get_id()[0]:
                     continue
-                try:
-                    res_structure = chain[res.auth_resid]
-                except KeyError:
+                # If we have a standard residue
+                if res.is_standard:
                     try:
-                        res_structure = chain[res.corrected_auth_resid]
+                        res_structure = chain[res.auth_resid]
                     except KeyError:
                         try:
-                            res_structure = chain[res.resid]
+                            res_structure = chain[res.corrected_auth_resid]
                         except KeyError:
+                            try:
+                                res_structure = chain[res.resid]
+                            except KeyError:
+                                continue
+                        if res_structure.resname != res.resname.upper():
                             continue
-                    if res_structure.resname != res.resname.upper():
-                        continue
+                # If we have a modified residue
+                else:
+                    for _res in chain:
+                        if _res.get_id()[1] == res.auth_resid:
+                            res_structure = _res
                 new_res = res.copy()
                 new_res.chain = chain.get_id()
                 new_res.structure = res_structure
@@ -705,6 +740,7 @@ class PdbSite:
         """Finds residues in a list of that can be used as seeds when
         building multiple active sites"""
         seeds = []
+        # Set a residue as reference
         ref = None
         for res in reslist:
             if res.auth_resid is not None and res.structure is not None:
