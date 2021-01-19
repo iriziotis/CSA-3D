@@ -26,7 +26,7 @@ def main(mcsa_id, outdir):
     # Serialiaze in a pickle obj and dump it in a file
     print('Serializing')
     i = time()
-    with open('{}/entry_{}.ent'.format(outdir, mcsa_id), 'wb') as o:
+    with open('{}/csa3d_{}.ent'.format(outdir, str(mcsa_id).zfill(4)), 'wb') as o:
         pickle.dump(db.entries[mcsa_id], o)
     f = time()
     serialization_time = f-i
