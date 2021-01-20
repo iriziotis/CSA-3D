@@ -18,7 +18,7 @@ def main(mcsa_id, outdir):
     i = time()
     build = db.build(mcsa_id, annotate=True, redundancy_cutoff=0.3, verbose=True)
     if not build:
-        print('No entry {}'.format(mcsa_id))
+        print('No entry {}, or has multiple references'.format(mcsa_id))
         exit()
     f = time()
     build_time = f-i
