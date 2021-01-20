@@ -137,7 +137,8 @@ class PdbResidue:
     @property
     def is_gap(self):
         """Check if residue is empty (no alignment with reference)"""
-        return self.mcsa_id is None and self.pdb_id is None and self.resid is None
+        return self.resname == '' and self.chain == '' and \
+               self.resid is None and self.auth_resid is None
 
     @property
     def is_conserved(self):

@@ -57,7 +57,7 @@ class UniResidue:
     @property
     def is_gap(self):
         """Check if residue is empty (no alignment with reference)"""
-        return self.mcsa_id is None and self.uniprot_id is None and self.resid is None
+        return self.resname == '' and self.resid is None
 
     @property
     def is_conserved(self):
