@@ -46,7 +46,7 @@ class Mcsa:
         if type(entries) != list:
             entries = [entries]
         for entry in entries:
-            if entry in self.json_residues.keys():
+            if str(entry) in self.json_residues.keys():
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
                 self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
@@ -111,7 +111,11 @@ class Mcsa:
             verbose: Output the active site under process
         """
         self.entries[entry] = Entry(entry)
-        ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
+        try:
+            ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
+        except (IndexError, KeyError):
+            print('No reference PDB structure')
+            return
         reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry],
                                                  self._get_cif_path(ref_pdb_id), annotate)
         self.entries[entry].add(reference_site)

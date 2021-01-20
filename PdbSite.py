@@ -395,13 +395,13 @@ class PdbSite:
         """Gets chiral residues from the site if there are any (residues that have
         the same resname, resid, auth_resid but different chains)"""
         identicals = set()
-        for i in self:
-            for j in self:
-                if i==j or i.is_gap or j.is_gap:
+        for i, p in enumerate(self):
+            for j, q in enumerate(self):
+                if p==q or q.is_gap or q.is_gap:
                     continue
-                if i.is_equivalent(j, by_chiral_id=False, by_chain=False):
-                    if (j.chiral_id, i.chiral_id) not in identicals:
-                        identicals.add((i.chiral_id, j.chiral_id))
+                if p.is_equivalent(q, by_chiral_id=False, by_chain=False):
+                    if (j, i) not in identicals:
+                        identicals.add((i, j))
         return identicals
 
     def find_ligands(self, headroom=1):
@@ -597,8 +597,8 @@ class PdbSite:
                 if reference_residue == res.reference_residue:
                     found = True
             if not found:
-                gap = PdbResidue(mcsa_id=reference_residue.mcsa_id, 
-                                 pdb_id=reference_residue.pdb_id, 
+                gap = PdbResidue(mcsa_id=self.mcsa_id, 
+                                 pdb_id=self.pdb_id, 
                                  chiral_id=reference_residue.chiral_id)
                 gap.reference_residue = reference_residue
                 self.add(gap)
