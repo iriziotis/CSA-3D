@@ -46,9 +46,20 @@ class Mcsa:
         if type(entries) != list:
             entries = [entries]
         for entry in entries:
-            if str(entry) in self.json_residues.keys():
+            if entry in self.json_residues.keys():
                 self._build_pdb_residues(entry)
                 self._build_uniprot_residues(entry)
+
+                # TODO check cases with two pdb references
+                if len(set([r.pdb_id for r in self.ref_pdb_residues[entry]]))>1:
+                    print('Has multiple PDB references. Not yet implemented')
+                    return False
+                # Temporary, until I implement treating of multiple references
+                # TODO see cases like mcsa 212 - Multiple uniprot reference seqs
+                if len(set([r.uniprot_id for r in self.ref_uni_residues[entry]]))>1:
+                    print('Has multiple UniProt references. Not yet implemented')
+                    return False
+
                 self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry)
             else:
@@ -125,7 +136,6 @@ class Mcsa:
                 if verbose:
                     print(site.id, site)
                 self.entries[entry].add(site)
-        # TODO check cases with two pdb references
 
     def _build_uniprot_sites(self, entry):
         """Builds UniSite objects from UniResidue lists and adds them
@@ -137,7 +147,6 @@ class Mcsa:
         for uniprot_id, uniprot in self.uni_residues[entry].items():
             site = UniSite.build(uniprot, reference_site)
             self.entries[entry].add(site)
-        # TODO see cases like mcsa 212 - Multiple uniprot reference seqs
 
     # Static methods
 

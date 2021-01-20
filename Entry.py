@@ -15,6 +15,24 @@ class Entry:
         self.pdbsites_dict = {}
         self.pdb_ids = set()
 
+    @property
+    def has_multiple_pdb_refs(self):
+        """Checks if entry has more than one PDB reference structures"""
+        refs = set()
+        for site in self.pdbsites:
+            if site.is_reference:
+                refs.add(site.pdb_id)
+        return len(refs)>1
+
+    @property
+    def has_multiple_uniprot_refs(self):
+        """Checks if entry has more than one PDB reference structures"""
+        refs = set()
+        for site in self.unisites:
+            if site.is_reference:
+                refs.add(site.uniprot_id)
+        return len(refs)>1
+
     def add(self, site):
         """Adds catalytic site in the appropriate list depending on its
         type (PdbSite or UniSite)"""
