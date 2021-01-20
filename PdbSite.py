@@ -569,7 +569,7 @@ class PdbSite:
         if mutate:
             for i, (p_atom, q_atom) in enumerate(zip(p_atoms, q_atoms)):
                 if p_atom != q_atom:
-                    q_atoms[i] = p_atoms[i]
+                    q_atoms[i] = p_atom 
         # Reorder atoms using the Hungarian algorithm from rmsd package
         if reorder:
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
@@ -644,7 +644,7 @@ class PdbSite:
                             atmid = EQUIVALENT_ATOMS[atmid]
                     atoms.append('{}.{}'.format(i, atmid))
                     coords.append(atom.get_coord())
-        atoms = np.array(atoms)
+        atoms = np.array(atoms, dtype=object)
         coords = np.stack(coords, axis=0)
         return atoms, coords
 
