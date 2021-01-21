@@ -1,6 +1,6 @@
 # !/usr/bin/env python3
 
-from .residue_definitions import AA_3TO1
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
 
 
 class UniResidue:

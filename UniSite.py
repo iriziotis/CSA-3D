@@ -80,8 +80,7 @@ class UniSite:
     @property
     def sequence(self):
         """Show as pseudo-sequence in one-letter code"""
-        return ''.join([AA_3TO1[res.resname] for res in self.residues if
-                        res.is_standard else 'X'])
+        return ''.join([AA_3TO1[res.resname] if (res.is_standard or res.is_gap) else 'X' for res in self])
 
     @property
     def size(self):

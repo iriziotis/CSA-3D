@@ -16,7 +16,7 @@ def main(mcsa_id):
     for pdbsite in entry.pdbsites:
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
         print(pdbsite.id, pdbsite.sequence, rms, rms_all, ','.join(str(i) for i in pdbsite.mapped_unisites))
-        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
+        #pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
     
 if __name__ == '__main__':
     main(int(sys.argv[1]))
