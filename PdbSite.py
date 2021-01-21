@@ -47,7 +47,7 @@ class PdbSite:
         """Check if sites contain the same residues (same IDs)"""
         if len(self) == len(other):
             for res in other:
-                if res.id not in self.residues_dict:
+                if res.full_id not in self.residues_dict:
                     return False
             return True
         return False
