@@ -560,7 +560,7 @@ class PdbSite:
         # Get atom identifier strings and coords as numpy arrays
         p_atoms, p_coords = self._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
         q_atoms, q_coords = other._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
-        if not np.all((p_atoms, q_atoms)):
+        if p_atoms is None or q_atoms is None:
             return None, None, None, None
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
