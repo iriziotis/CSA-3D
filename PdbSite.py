@@ -323,7 +323,7 @@ class PdbSite:
             self_atoms, _ = self._get_atom_strings_and_coords(omit=gaps)
             ref_atoms, _ = self.reference_site._get_atom_strings_and_coords(omit=gaps)
             return len(self_atoms) != len(ref_atoms)
-        except ValueError:
+        except (TypeError, ValueError):
             return True
 
     # Methods
