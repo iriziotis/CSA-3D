@@ -560,6 +560,8 @@ class PdbSite:
         # Get atom identifier strings and coords as numpy arrays
         p_atoms, p_coords = self._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
         q_atoms, q_coords = other._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
+        if not np.all((p_atoms, q_atoms)):
+            return None, None, None, None
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
         # Initial crude superposition
@@ -644,8 +646,11 @@ class PdbSite:
                             atmid = EQUIVALENT_ATOMS[atmid]
                     atoms.append('{}.{}'.format(i, atmid))
                     coords.append(atom.get_coord())
-        atoms = np.array(atoms, dtype=object)
-        coords = np.stack(coords, axis=0)
+        try:
+            atoms = np.array(atoms, dtype=object)
+            coords = np.stack(coords, axis=0)
+        except ValueError:
+            return None, None
         return atoms, coords
 
     def _reorder(self):
