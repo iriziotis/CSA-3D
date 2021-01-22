@@ -131,8 +131,6 @@ class Mcsa:
                                                  self._get_cif_path(ref_pdb_id), annotate)
         self.entries[entry].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry].items():
-            if pdb_id not in ('4a65', '4ylf'):
-                continue
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id),
                                           annotate, redundancy_cutoff):
                 if verbose:
