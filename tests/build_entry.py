@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-import pickle
 import sys
-sys.path.append('/Users/riziotis/ebi/phd/src')
-sys.path.append('/nfs/research1/thornton/riziotis/research/phd/src')
+import pickle
 from time import time
-from mcsa3d import Mcsa
+from csa3d import Mcsa
 
 def main(mcsa_id, outdir):
     start = time()
