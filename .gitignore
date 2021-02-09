@@ -8,6 +8,7 @@ __pycache__/
 *.swp
 *.cif
 *.pdb
+*.ent
 tt
 aa
 yy
