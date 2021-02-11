@@ -86,6 +86,7 @@ class PdbSite:
                 res.add_structure(structure)
             site.add(res)
         if annotate:
+            site.parent_structure = structure
             site.mmcif_dict = mmcif_dict
             site.find_ligands()
         return site
@@ -479,8 +480,8 @@ class PdbSite:
                                                        'reference' if self.is_reference else 'cat_site', conservation, atms)
         with open(outfile, 'w') as o:
             if bool(self.mmcif_dict):
-                all_hets = ','.join('{0.resname};{0.resid};{0.parity_score};{0.centrality}'.format(h) for h in self.structure_hets)
-                nearby_hets = ','.join('{0.resname};{0.resid};{0.parity_score};{0.centrality}'.format(h) for h in self.nearby_hets)
+                all_hets = ','.join('{0.resname};{0.resid};{0.chain}'.format(h) for h in self.structure_hets)
+                nearby_hets = ','.join('{0.resname};{0.resid};{0.chain};{0.parity_score};{0.centrality}'.format(h) for h in self.nearby_hets)
                 remarks = ('REMARK CATALYTIC SITE\n'
                            'REMARK ID {0.id}\n'
                            'REMARK PDB_ID {0.pdb_id}\n'

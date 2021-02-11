@@ -227,6 +227,6 @@ class Het(PdbResidue):
     """
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
                  chain='', parity_score=None, centrality=None):
-        super().__init__(mcsa_id, pdb_id, resname, resid, chain)
+        super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
         self.parity_score = parity_score
         self.centrality = centrality
