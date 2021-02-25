@@ -12,7 +12,8 @@ INFO_JSON = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
 uniprot_pdb_mapping_csv = '{}/datasets/sifts/uniprot_pdb.csv'.format(WORKING_DIR)
 pdb_uniprot_mapping_csv = '{}/datasets/sifts/pdb_chain_uniprot.csv'.format(WORKING_DIR)
 pdb_ec_mapping_csv = '{}/datasets/sifts/pdb_chain_enzyme.csv'.format(WORKING_DIR)
-compound_similarities_json = '{}/datasets/bound_ligands/bound_cognate_similarities/compound_similarities.json'.format(WORKING_DIR)
+compound_similarities_json = '{}/datasets/bound_ligands/parity_data/compound_similarities.json'.format(WORKING_DIR)
+cofactors_csv = '{}/datasets/bound_ligands/pdbe-kb_data/pdb_cofactors.csv'.format(WORKING_DIR)
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:

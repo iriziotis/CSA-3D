@@ -1,7 +1,9 @@
 import numpy as np
+from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
+from Bio.PDB.Residue import Residue
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from rmsd import reorder_hungarian
@@ -435,20 +437,27 @@ class PdbSite:
             return False, False
         # Search for ligands in a box around catalytic residues
         box = Box(residue_list, headroom)
+        site_chains = set([res.chain for res in self])
         for residue in self.parent_structure[0].get_residues():
             residue_id = residue.get_id()
             hetfield = residue_id[0]
-            # Capture all HETs in the structure
-            if hetfield[0] == 'H' and 'HOH' not in hetfield:
-                het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
-                          resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-                het.structure = residue
-                all_hets.append(het)
-                # Capture HETs in the box
-                if het in box:
+            # Ignore waters
+            if hetfield == 'W':
+                continue
+            if residue in box:
+                if hetfield[0] == 'H' or residue.get_parent().get_id() not in site_chains:
+                    het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
+                              resid=residue.get_id()[1], chain=residue.get_parent().get_id())
+                    het.structure = residue
                     het.parity_score = box.similarity_with_cognate(het)
                     het.centrality = box.mean_distance_from_residues(het)
                     nearby_hets.append(het)
+            else:
+                if hetfield[0] == 'H':
+                    het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
+                              resid=residue.get_id()[1], chain=residue.get_parent().get_id())
+                    het.structure = residue
+                    all_hets.append(het)
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
@@ -494,8 +503,8 @@ class PdbSite:
                            'REMARK RESOLUTION {0.resolution}\n'
                            'REMARK ORGANISM_NAME {0.organism_name}\n'
                            'REMARK ORGANISM_ID {0.organism_id}\n'
-                           'REMARK ALL_HETS {1}\n'
-                           'REMARK NEARBY_HETS {2}'.format(self, all_hets, nearby_hets))
+                           'REMARK ALL_HETERO {1}\n'
+                           'REMARK NEARBY_LIGANDS {2}'.format(self, all_hets, nearby_hets))
                 print(remarks, file=o)
             residues = self.residues.copy()
             if write_hets:
@@ -511,7 +520,7 @@ class PdbSite:
                                 continue
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
                                    '{:>8.3f}{:>8.3f} {:6}'.format(
-                            'ATOM' if atom.get_parent().get_id()[0] == ' ' else 'HETATM',
+                            'HETATM' if (atom.get_parent().get_id()[0] != ' ' or type(res) == Het) else 'ATOM',
                             atom.get_serial_number() if atom.get_serial_number() else 0,
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name),
                             atom.get_altloc(),
@@ -854,9 +863,13 @@ class Box:
         self.headroom = float(headroom)
         self.points = self._get_boundaries(self.headroom)
 
-    def __contains__(self, residue):
-        """Checks if the provided het (or residue) is in the box"""
-        for atom in residue.structure.get_atoms():
+    def __contains__(self, entity):
+        """Checks if the provided het (or residue, or atom) is in the box"""
+        if type(entity) == Het:
+            atom_list = entity.structure.get_atoms()
+        elif type(entity) == Residue:
+            atom_list = entity.get_atoms()
+        for atom in atom_list:
             x,y,z = atom.get_coord()
             if self.points['min_x'] <= x <= self.points['max_x'] and \
                     self.points['min_y'] <= y <= self.points['max_y'] and \
