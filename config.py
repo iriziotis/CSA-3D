@@ -2,6 +2,7 @@ import os
 import csv
 import json
 from ast import literal_eval
+from collections import defaultdict
 
 WORKING_DIR = '/Users/riziotis/ebi/phd'
 if not os.path.isdir(WORKING_DIR):
@@ -13,7 +14,8 @@ uniprot_pdb_mapping_csv = '{}/datasets/sifts/uniprot_pdb.csv'.format(WORKING_DIR
 pdb_uniprot_mapping_csv = '{}/datasets/sifts/pdb_chain_uniprot.csv'.format(WORKING_DIR)
 pdb_ec_mapping_csv = '{}/datasets/sifts/pdb_chain_enzyme.csv'.format(WORKING_DIR)
 compound_similarities_json = '{}/datasets/bound_ligands/parity_data/compound_similarities.json'.format(WORKING_DIR)
-cofactors_csv = '{}/datasets/bound_ligands/pdbe-kb_data/pdb_cofactors.csv'.format(WORKING_DIR)
+pdbe_cofactors_csv = '{}/datasets/bound_ligands/pdbe-kb_data/pdb_cofactors.csv'.format(WORKING_DIR)
+mcsa_cofactors_csv = '{}/datasets/bound_ligands/mcsa_data/mcsa_cofactors.csv'.format(WORKING_DIR)
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:
@@ -34,4 +36,27 @@ with open(compound_similarities_json, 'r') as f:
 with open(pdb_ec_mapping_csv, 'r') as f:
     next(f)
     PDB2EC = {(line[0], line[1]): line[3] for line in csv.reader(f)}
+
+# PDB ID - co-factors mapping
+PDBID_COFACTORS = defaultdict(set)
+with open(pdbe_cofactors_csv, 'r') as f:
+    next(f)
+    for line in csv.reader(f, quotechar='"'):
+        PDBID_COFACTORS[line[0]].add(line[4])
+
+# Metal co-factor set
+with open(mcsa_cofactors_csv, 'r') as f:
+    next(f)
+    METAL_COFACTORS = {line[1] for line in csv.reader(f, quotechar='"') if line[3]=="True"}
+
+
+
+
+
+
+
+
+
+
+
 

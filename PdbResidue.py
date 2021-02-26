@@ -1,6 +1,7 @@
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
+from .config import PDBID_COFACTORS, METAL_COFACTORS
 
 
 class PdbResidue:
@@ -230,3 +231,34 @@ class Het(PdbResidue):
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
         self.parity_score = parity_score
         self.centrality = centrality
+
+    @property
+    def is_peptide(self):
+        """Check if component is from a peptide moiety"""
+        if self.structure:
+            return self.structure.get_id()[0] == ' '
+        return
+
+    @property
+    def is_cofactor(self):
+        """Check if component is annotated as cofactor for this pdb in PDBe"""
+        return self.resname in PDBID_COFACTORS[self.pdb_id]
+
+    @property
+    def is_metal(self):
+        """Check if component is a metal or a metallic cofactor"""
+        return self.resname in METAL_COFACTORS
+
+    @property
+    def flag(self):
+        """An identifier to tell if component is a peptide, a cofactor or a metallic
+        compound"""
+        if self.is_metal:
+            return 'M'
+        if self.is_cofactor:
+            return 'C'
+        if self.is_peptide:
+            return 'P'
+        else:
+            return 'H'
+

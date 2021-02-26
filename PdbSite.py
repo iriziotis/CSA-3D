@@ -417,26 +417,10 @@ class PdbSite:
             headroom: the extra search space (in Å) around the catalytic residues
         """
         if type(self.parent_structure) != Structure:
-            return False, False
+            return
         all_hets = []
         nearby_hets = []
-        residue_list = []
-        for residue in self.structure.get_residues():
-            chain = residue.get_parent().get_id()
-            resid = residue.get_id()[1]
-            try:
-                residue_list.append(self.parent_structure[0][chain][resid])
-            except (IndexError, KeyError):
-                try:
-                    for res in self.parent_structure[0][chain]:
-                        if res.get_id()[1] == resid:
-                            residue_list.append(res)
-                except (IndexError, KeyError):
-                    continue
-        if len(residue_list) == 0:
-            return False, False
-        # Search for ligands in a box around catalytic residues
-        box = Box(residue_list, headroom)
+        box = Box(self, headroom)
         site_chains = set([res.chain for res in self])
         for residue in self.parent_structure[0].get_residues():
             residue_id = residue.get_id()
@@ -489,8 +473,8 @@ class PdbSite:
                                                        'reference' if self.is_reference else 'cat_site', conservation, atms)
         with open(outfile, 'w') as o:
             if bool(self.mmcif_dict):
-                all_hets = ','.join('{0.resname};{0.resid};{0.chain}'.format(h) for h in self.structure_hets)
-                nearby_hets = ','.join('{0.resname};{0.resid};{0.chain};{0.parity_score};{0.centrality}'.format(h) for h in self.nearby_hets)
+                all_hets = ','.join('{0.resname};{0.resid};{0.chain}{0.flag}'.format(h) for h in self.structure_hets)
+                nearby_hets = ','.join('{0.resname};{0.resid};{0.chain};{0.parity_score};{0.centrality};{0.flag}'.format(h) for h in self.nearby_hets)
                 remarks = ('REMARK CATALYTIC SITE\n'
                            'REMARK ID {0.id}\n'
                            'REMARK PDB_ID {0.pdb_id}\n'
@@ -856,12 +840,20 @@ class PdbSite:
 
 class Box:
 
-    def __init__(self, residue_list, headroom=1):
-        """Define a box using the provided residues coordinates adding
-        some safe distance around (headroom)"""
-        self.residue_list = residue_list
+    def __init__(self, site, headroom=1):
+        """Define a box-like area using the functional atoms of the site, 
+        plus some safe distance around (headroom)"""
+        self.site = site
         self.headroom = float(headroom)
+        self.parent_residues = self._get_parent_residues()
         self.points = self._get_boundaries(self.headroom)
+
+    #def __init__(self, residue_list, headroom=1):
+    #    """Define a box using the provided residues coordinates adding
+    #    some safe distance around (headroom)"""
+    #    self.residue_list = residue_list
+    #    self.headroom = float(headroom)
+    #    self.points = self._get_boundaries(self.headroom)
 
     def __contains__(self, entity):
         """Checks if the provided het (or residue, or atom) is in the box"""
@@ -881,8 +873,8 @@ class Box:
         """Calculates the mean distance of an arbitrary residue (protein or HET)
         from the residues that define the box"""
         dist_sum = 0
-        nofres = len(self.residue_list)
-        for residue in self.residue_list:
+        nofres = len(self.parent_residues)
+        for residue in self.parent_residues:
             dist_sum += Box.min_distance(residue, het.structure)
         return round(dist_sum / nofres, 3)
 
@@ -912,6 +904,31 @@ class Box:
                 distances.append(atom_i - atom_j)
         return min(distances)
 
+    def _get_parent_residues(self):
+        """Populates the list of the corresponding residues from parent structure (untransformed)"""
+        parent_residues = []
+        for residue in self.site:
+            try:
+                chain = residue.structure.get_parent().get_id()
+                resid = residue.structure.get_id()[1]
+            except AttributeError:
+                continue
+            try:
+                parent_residue = self.site.parent_structure[0][chain][resid]
+            except (IndexError, KeyError):
+                try:
+                    for res in self.site.parent_structure[0][chain]:
+                        if res.get_id()[1] == resid:
+                            parent_residue = res
+                except (IndexError, KeyError):
+                    continue
+            resname = residue.resname.upper()
+            if residue.has_main_chain_function or not residue.is_standard:
+                resname = 'ANY'
+            parent_residue.functional_resname = resname
+            parent_residues.append(parent_residue)
+        return parent_residues
+
     def _get_boundaries(self, headroom):
         """Parse residues (BioPython objects) and get the coordinates
         to make the box"""
@@ -919,8 +936,11 @@ class Box:
         self.coords_y = []
         self.coords_z = []
         try:
-            for residue in self.residue_list:
-                for atom in residue:
+            for res in self.parent_residues:
+                # Define boundaries based on functional atoms of residue
+                for atom in res.get_atoms():
+                    if '{}.{}'.format(res.functional_resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
+                        continue
                     self.coords_x.append(atom.get_coord()[0])
                     self.coords_y.append(atom.get_coord()[1])
                     self.coords_z.append(atom.get_coord()[2])
