@@ -806,7 +806,7 @@ class PdbSite:
         for i in range(cycles):
             try:
                 if p_coords.size == 0:
-                break
+                    break
             except AttributeError:
                 break
             sup.set(p_coords, q_coords)
