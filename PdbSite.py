@@ -804,7 +804,10 @@ class PdbSite:
         # Initialize Biopython SVDSuperimposer
         sup = SVDSuperimposer()
         for i in range(cycles):
-            if p_coords.size == 0:
+            try:
+                if p_coords.size == 0:
+                break
+            except AttributeError:
                 break
             sup.set(p_coords, q_coords)
             sup.run()
