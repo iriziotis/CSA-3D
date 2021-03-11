@@ -625,7 +625,7 @@ class PdbSite:
                 if i in omit:
                     continue
             if not res.structure:
-                return atoms, coords
+                return np.array(atoms), np.array(coords)
             for atom in res.structure:
                 resname = res.resname.upper()
                 if allow_symmetrics:
@@ -804,10 +804,7 @@ class PdbSite:
         # Initialize Biopython SVDSuperimposer
         sup = SVDSuperimposer()
         for i in range(cycles):
-            try:
-                if p_coords.size == 0:
-                    break
-            except AttributeError:
+            if p_coords.size == 0:
                 break
             sup.set(p_coords, q_coords)
             sup.run()
