@@ -573,11 +573,29 @@ class PdbSite:
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
         rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff)
+        q_temp = PdbSite._transform(q_coords, rot, tran)
         if transform:
             other.structure.transform(rot, tran)
             for het in other.nearby_hets:
                 het.structure.transform(rot, tran)
         return rot, tran, rms, rms_all
+
+    def per_residue_rms(self, other, rot=None, tran=None):
+        """Calculates the RMSD of each residue in two superimposed sites.
+        If superposition rotation matrix and translation vector are not given,
+        RMSD is calculated without transformation."""
+        rmsds = []
+        if np.all(rot):
+            other = copy(other)
+            other.structure.transform(rot, tran)
+        for p, q in zip(self, other):
+            if p.is_gap or q.is_gap:
+                rmsds.append(np.nan)
+                continue
+            rms = PdbSite._rmsd(p.get_coords(func_atoms_only=True),
+                                q.get_coords(func_atoms_only=True))
+            rmsds.append(rms)
+        return np.array(rmsds)
 
     # Private methods
 

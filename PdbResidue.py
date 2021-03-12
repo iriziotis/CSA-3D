@@ -1,7 +1,8 @@
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS
+import numpy as np
 
 
 class PdbResidue:
@@ -114,6 +115,19 @@ class PdbResidue:
         if by_chain:
             return basic and chains
         return basic
+
+    def get_coords(self, func_atoms_only=False):
+        """Returns a NumPy array of the atomic coordinates"""
+        coords = []
+        for atom in self.structure:
+            if func_atoms_only and not type(self) == Het:
+                resname = self.resname.upper()
+                if self.has_main_chain_function or not self.is_standard:
+                    resname = 'ANY'
+                if '{}.{}'.format(resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
+                    continue
+            coords.append(atom.get_coord())
+        return np.array(coords)
 
     @property
     def id(self):
