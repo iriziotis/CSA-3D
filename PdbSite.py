@@ -153,9 +153,10 @@ class PdbSite:
             # Reduce redundancy
             if len(sites) > 0:
                 if site.has_identical_residues(sites[-1]):
-                    continue
-                if redundancy_cutoff:
                     _, _, _, rms_all = site.fit(sites[-1])
+                    if rms_all == 0:
+                        continue
+                if redundancy_cutoff:
                     if rms_all < redundancy_cutoff:
                         continue
             # Add ligands and annotations
