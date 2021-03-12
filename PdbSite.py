@@ -594,7 +594,7 @@ class PdbSite:
                 continue
             rms = PdbSite._rmsd(p.get_coords(func_atoms_only=True),
                                 q.get_coords(func_atoms_only=True))
-            rmsds.append(rms)
+            rmsds.append(np.rouns(rms, 3))
         return np.array(rmsds)
 
     # Private methods
