@@ -519,7 +519,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, reorder=True, allow_symmetrics=True):
+    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, reorder=True, allow_symmetrics=True, exclude=None):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -552,6 +552,12 @@ class PdbSite:
         """
         # In case gaps are present, exclude those positions
         gaps = set(self.get_gaps() + other.get_gaps())
+        # If we want to exclude residues from fitting
+        if exclude is not None:
+            if type(exclude) not in (list, tuple, set):
+                exclude = [exclude]
+            for i in exclude:
+                gaps.add(i)
         # Get atom identifier strings and coords as numpy arrays
         p_atoms, p_coords = self._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
         q_atoms, q_coords = other._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
@@ -580,15 +586,21 @@ class PdbSite:
                 het.structure.transform(rot, tran)
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other, rot=None, tran=None):
+    def per_residue_rms(self, other, rot=None, tran=None, isolate_residue=False):
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
-        RMSD is calculated without transformation."""
+        RMSD is calculated without transformation. If isolate_residue is True,
+        then the residue for which the RMSD is calculated is excluded from the
+        fitting process, to achieve best fit over the rest of the residues
+        (This makes the function to run iterative fitting for each residue
+        excluded, which might slow things down a bit)"""
         rmsds = []
+        other = copy(other)
         if np.all(rot):
-            other = copy(other)
             other.structure.transform(rot, tran)
-        for p, q in zip(self, other):
+        for i, (p, q) in enumerate(zip(self, other)):
+            if isolate_residue:
+                rot, tran, _, _ = self.fit(other, transform=True, exclude=i)
             if p.is_gap or q.is_gap:
                 rmsds.append(np.nan)
                 continue
