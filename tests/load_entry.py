@@ -12,12 +12,13 @@ def main(mcsa_id):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
+    
     for pdbsite in entry.pdbsites:
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
         per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, isolate_residue=True)
         print(pdbsite.id, per_res_rms)
         #print(pdbsite.id, pdbsite.sequence, rms, rms_all, ','.join(str(i) for i in pdbsite.mapped_unisites))
-        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
+        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
     
 if __name__ == '__main__':
     main(int(sys.argv[1]))

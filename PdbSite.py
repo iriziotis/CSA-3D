@@ -332,6 +332,14 @@ class PdbSite:
 
     # Methods
 
+    def copy(self, include_structure=True):
+        """Returns a copy of the site. If include_structure is False,
+        then the structure is not copied"""
+        site = copy(self)
+        if include_structure:
+            site.structure = self.structure.copy()
+        return site
+
     def add(self, residue):
         """Add PdbResidue object to site (in the residues list and dict)"""
         if type(residue) == PdbResidue:
@@ -579,7 +587,6 @@ class PdbSite:
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
         rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff)
-        q_temp = PdbSite._transform(q_coords, rot, tran)
         if transform:
             other.structure.transform(rot, tran)
             for het in other.nearby_hets:
@@ -595,7 +602,7 @@ class PdbSite:
         (This makes the function to run iterative fitting for each residue
         excluded, which might slow things down a bit)"""
         rmsds = []
-        other = copy(other)
+        other = other.copy()
         if np.all(rot):
             other.structure.transform(rot, tran)
         for i, (p, q) in enumerate(zip(self, other)):
@@ -772,15 +779,29 @@ class PdbSite:
 
     @staticmethod
     def _get_seeds(reslist):
-        """Finds residues in a list of that can be used as seeds when
+        """Finds residues in a list that can be used as seeds when
         building multiple active sites"""
         seeds = []
         # Set a residue as reference
         ref = None
         for res in reslist:
-            if res.auth_resid is not None and res.structure is not None:
-                ref = res
-                break
+            if res.auth_resid is None or res.structure is None:
+                continue
+            # Check if residue has any close neighbours -- If not, skip it
+            skip = True
+            for other in reslist:
+                if res == other:
+                    continue
+                try:
+                    if res.get_distance(other) < 5:
+                        skip = False
+                        break
+                except TypeError:
+                    continue
+            if skip:
+                continue
+            ref = res
+            break
         if ref is None:
             return seeds
         # Get all equivalents of ref residue and make them seeds

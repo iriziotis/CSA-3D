@@ -39,11 +39,14 @@ class PdbResidue:
         """Returns an approximate distance of self to other PdbResidue"""
         return self.get_distance(other)
 
-    def copy(self):
-        """Returns a copy of the object without the structure mapping"""
+    def copy(self, include_structure=False):
+        """Returns a copy of the residue. If include_structure is False,
+        then structure is not copied."""
         res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
                          self.auth_resid, self.chain, self.funclocs, self.is_reference, self.chiral_id)
         res.reference_residue = self.reference_residue
+        if include_structure:
+            res.structure = self.structure.copy()
         return res
 
     def add_structure(self, structure):
