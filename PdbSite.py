@@ -165,6 +165,8 @@ class PdbSite:
                 site.mmcif_dict = mmcif_dict
                 site.find_ligands()
             sites.append(site)
+        # Final clean up of unclustered sites
+        sites = PdbSite._remove_unclustered(sites)
         return sites
 
     # Properties
@@ -342,6 +344,7 @@ class PdbSite:
 
     def add(self, residue):
         """Add PdbResidue object to site (in the residues list and dict)"""
+        residue = residue.copy(include_structure=True)
         if type(residue) == PdbResidue:
             self.residues.append(residue)
             self.residues_dict[residue.full_id] = residue
@@ -464,7 +467,7 @@ class PdbSite:
                      chain of each catalytic residue, annotation if the site is a
                      reference site and an annotation about the conservation, relatively
                      to the reference (c: conserved, m: mutated, cm: has only conservative
-                     mutations)
+                     mutation)
         """
         if not outdir:
             outdir = '.'
@@ -527,7 +530,8 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, reorder=True, allow_symmetrics=True, exclude=None):
+    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, 
+            reorder=True, allow_symmetrics=True, exclude=None):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -588,7 +592,9 @@ class PdbSite:
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
         rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff)
         if transform:
-            other.structure.transform(rot, tran)
+            #other.structure.transform(rot, tran)
+            for o in other.structure.get_list():
+                o.transform(rot, tran)
             for het in other.nearby_hets:
                 het.structure.transform(rot, tran)
         return rot, tran, rms, rms_all
@@ -602,7 +608,7 @@ class PdbSite:
         (This makes the function to run iterative fitting for each residue
         excluded, which might slow things down a bit)"""
         rmsds = []
-        other = other.copy()
+        other = other.copy(include_structure=True)
         if np.all(rot):
             other.structure.transform(rot, tran)
         for i, (p, q) in enumerate(zip(self, other)):
@@ -722,7 +728,7 @@ class PdbSite:
                     continue
                 if p.is_equivalent(q, by_chiral_id=False, by_chain=True):
                     if p.funclocs != q.funclocs:
-                        new_res = p.copy()
+                        new_res = p.copy(include_structure=True)
                         new_res.funclocs = [p.funclocs[0], q.funclocs[0]]
                         new_reslist.append(new_res)
                         ignore.add(p.id)
@@ -771,7 +777,7 @@ class PdbSite:
                     for _res in chain:
                         if _res.get_id()[1] == res.auth_resid:
                             res_structure = _res
-                new_res = res.copy()
+                new_res = res.copy(include_structure=False)
                 new_res.chain = chain.get_id()
                 new_res.structure = res_structure
                 new_reslist.append(new_res)
@@ -793,7 +799,7 @@ class PdbSite:
                 if res == other:
                     continue
                 try:
-                    if res.get_distance(other) < 5:
+                    if res.get_distance(other) < 8:
                         skip = False
                         break
                 except TypeError:
@@ -814,6 +820,8 @@ class PdbSite:
 
     @staticmethod
     def _get_nearest_equivalent(self, other, reslist, site):
+        """Gets the closest equivalent of 'other' to 'self', if there
+        are multiple equivalents in the residue list"""
         equivalents = []
         for res in reslist:
             if res.structure is None:
@@ -832,6 +840,27 @@ class PdbSite:
                 min_dist = dist
         return result
     
+    @staticmethod
+    def _remove_unclustered(sitelist):
+        """Returns a clean list of catalytic sites from the same PDB
+        by rejecting sites that might have insanely outlying residues"""
+        clean = []
+        reject = set()
+        try:
+            ref_max_dist = sitelist[0].reference_site.get_distances().max()
+        except IndexError:
+            return clean
+        for p in sitelist:
+            p_max_dist = p.get_distances().max()
+            for i,q in enumerate(sitelist):
+                q_max_dist = q.get_distances().max()
+                if q_max_dist > 1.5*p_max_dist or q_max_dist > 1.5*ref_max_dist:
+                    reject.add(i)
+        for i, site in enumerate(sitelist):
+            if i not in reject:
+                clean.append(site)
+        return clean
+
     @staticmethod
     def _super(p_coords, q_coords, cycles=10, cutoff=6):
         """
@@ -899,13 +928,6 @@ class Box:
         self.headroom = float(headroom)
         self.parent_residues = self._get_parent_residues()
         self.points = self._get_boundaries(self.headroom)
-
-    #def __init__(self, residue_list, headroom=1):
-    #    """Define a box using the provided residues coordinates adding
-    #    some safe distance around (headroom)"""
-    #    self.residue_list = residue_list
-    #    self.headroom = float(headroom)
-    #    self.points = self._get_boundaries(self.headroom)
 
     def __contains__(self, entity):
         """Checks if the provided het (or residue, or atom) is in the box"""
