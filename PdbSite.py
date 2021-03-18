@@ -32,6 +32,7 @@ class PdbSite:
         self.structure_hets = []
         self.nearby_hets = []
         self.mmcif_dict = dict()
+        self.is_sane = None
 
     def __str__(self):
         """Show as pseudo-sequence in one-letter code"""
@@ -100,6 +101,7 @@ class PdbSite:
         if it is a list of manually annotated catalytic residues"""
         ref = PdbSite.from_list(reslist, cif_path, annotate)
         ref.reference_site = ref
+        ref.is_sane = True
         return ref
 
     @classmethod
@@ -166,7 +168,7 @@ class PdbSite:
                 site.find_ligands()
             sites.append(site)
         # Final clean up of unclustered sites
-        sites = PdbSite._remove_unclustered(sites)
+        PdbSite._mark_unclustered(sites)
         return sites
 
     # Properties
@@ -363,16 +365,19 @@ class PdbSite:
             return False
         return True
 
-    def get_distances(self):
+    def get_distances(self, minimum=True):
         """Calculates all intra-site residue distances and returns a
         numpy array"""
         dists = []
         seen = set()
         for p in self.residues:
             for q in self.residues:
-                if p == q or (q.id, p.id) in seen or p.is_gap or q.is_gap:
+                if p == q or (q.id, p.id) in seen:
                     continue
-                dists.append(p - q)
+                if p.is_gap or q.is_gap:
+                    dists.append(np.nan)
+                else:
+                    dists.append(p.get_distance(q, minimum))
                 seen.add((p.id, q.id))
         return np.array(dists)
 
@@ -481,8 +486,14 @@ class PdbSite:
                 atms = 'func'
             else:
                 atms = 'all'
-            outfile = '{}/mcsa_{}.{}.{}.{}.{}.pdb'.format(outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
-                                                       'reference' if self.is_reference else 'cat_site', conservation, atms)
+            if self.is_sane:
+                sanity = 'sane'
+            else:
+                sanity = 'insane'
+            outfile = '{}/mcsa_{}.{}.{}.{}.{}.{}.pdb'.format(
+                      outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
+                      'reference' if self.is_reference else 'cat_site', 
+                      conservation, atms, sanity)
         with open(outfile, 'w') as o:
             if bool(self.mmcif_dict):
                 all_hets = ','.join('{0.resname};{0.resid};{0.chain}{0.flag}'.format(h) for h in self.structure_hets)
@@ -841,25 +852,30 @@ class PdbSite:
         return result
     
     @staticmethod
-    def _remove_unclustered(sitelist):
+    def _mark_unclustered(sitelist):
         """Returns a clean list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
-        clean = []
-        reject = set()
+
         try:
-            ref_max_dist = sitelist[0].reference_site.get_distances().max()
+            ref_dists = sitelist[0].reference_site.get_distances(minimum=False)
+            ref_dists = np.nan_to_num(ref_dists, nan=999)
         except IndexError:
-            return clean
+            return False
+
         for p in sitelist:
-            p_max_dist = p.get_distances().max()
-            for i,q in enumerate(sitelist):
-                q_max_dist = q.get_distances().max()
-                if q_max_dist > 1.5*p_max_dist or q_max_dist > 1.5*ref_max_dist:
-                    reject.add(i)
-        for i, site in enumerate(sitelist):
-            if i not in reject:
-                clean.append(site)
-        return clean
+            p.is_sane = True
+            p_dists = np.nan_to_num(p.get_distances(minimum=False))
+            if not np.all((p_dists < 2.5*ref_dists)):
+                p.is_sane = False
+                continue
+            else:
+                for q in sitelist:
+                    if p.id == q.id:
+                        continue
+                    q_dists = np.nan_to_num(q.get_distances(minimum=False), nan=999)
+                    if not np.all((p_dists < 2*q_dists)):
+                        p.is_sane = False
+        return True
 
     @staticmethod
     def _super(p_coords, q_coords, cycles=10, cutoff=6):

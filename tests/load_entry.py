@@ -18,7 +18,7 @@ def main(mcsa_id):
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
         per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, isolate_residue=True)
         print(pdbsite.id, per_res_rms)
-        #pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
+        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
 
     
 if __name__ == '__main__':
