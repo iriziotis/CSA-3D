@@ -3,6 +3,7 @@ from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS
 import numpy as np
+from copy import copy
 
 
 class PdbResidue:
@@ -42,11 +43,19 @@ class PdbResidue:
     def copy(self, include_structure=False):
         """Returns a copy of the residue. If include_structure is False,
         then structure is not copied."""
-        res = PdbResidue(self.mcsa_id, self.pdb_id, self.resname, self.resid,
-                         self.auth_resid, self.chain, self.funclocs, self.is_reference, self.chiral_id)
-        res.reference_residue = self.reference_residue
+        res = copy(self)
         if include_structure:
-            res.structure = self.structure.copy()
+            try:
+                res.structure = self.structure.copy()
+                # This is to override an obscure biopython bug on disordered atoms
+                res.structure.child_list = []
+                res.structure.child_dict = {}
+                for atom in self.structure.get_unpacked_list():
+                    if atom.get_altloc() in (' ', 'A'):
+                        res.structure.add(atom.copy())
+                res.structure.set_parent(self.structure.get_parent())
+            except AttributeError:
+                res.structure = None
         return res
 
     def add_structure(self, structure):
@@ -74,7 +83,8 @@ class PdbResidue:
             try:
                 residue = structure[0][self.chain][self.auth_resid]
                 if residue.get_resname().capitalize() == self.resname:
-                    self.structure = residue
+                    self.structure = residue.copy()
+                    self.structure.set_parent(residue.get_parent())
                     return True
             except KeyError:
                 return False
