@@ -216,6 +216,7 @@ class PdbResidue:
                     else pdb_res['chain_name']
                 funclocs = [residue['function_location_abv']]
 
+
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
                           chain, funclocs, is_reference, chiral_id)
         except KeyError:

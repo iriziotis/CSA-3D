@@ -6,6 +6,7 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
+from Bio.PDB.PDBExceptions import PDBConstructionException
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
@@ -14,7 +15,7 @@ from .PdbResidue import PdbResidue, Het
 
 class PdbSite:
     """M-CSA PDB catalytic site. Contains lists of PdbResidues and mapped UniProt
-    catalytic sites (UniSite objects), a 3D structure (Biopython Structure) build
+    catalytic sites (UniSite objects), a 3D structure (Biopython Structure) built
     from individual PdbResidue structures (Biopython Residue), a parent structure
     (Biopython Structure), all and close to the site hetero components (possible
     ligands according to their chemical similarity to the cognate ligand and their
@@ -68,8 +69,6 @@ class PdbSite:
     @classmethod
     def from_list(cls, reslist, cif_path, annotate=True):
         """Construct PdbSite object directly from residue list"""
-        # If we have duplicate residues, each one with a different function
-        # location annotation, keep only the one with the side chain
         mmcif_dict = dict()
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)
@@ -79,7 +78,7 @@ class PdbSite:
                 parser = MMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
                 mmcif_dict = parser._mmcif_dict
-            except TypeError:
+            except (TypeError, PDBConstructionException):
                 return
         else:
             parser = FastMMCIFParser(QUIET=True)
@@ -139,7 +138,7 @@ class PdbSite:
             else:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
-        except TypeError:
+        except (TypeError, PDBConstructionException):
             return sites
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)
@@ -150,14 +149,13 @@ class PdbSite:
         # Build a site from each seed
         for seed in seeds:
             site = cls.build(seed, reslist, reference_site)
-            if site.has_missing_functional_atoms:
+            if site.has_missing_functional_atoms or len(site) != len(reference_site):
                 continue
             # Reduce redundancy
             if len(sites) > 0:
-                if site.has_identical_residues(sites[-1]):
-                    _, _, _, rms_all = site.fit(sites[-1])
-                    if rms_all == 0:
-                        continue
+                _, _, _, rms_all = site.fit(sites[-1])
+                if site.has_identical_residues(sites[-1]) and rms_all == 0:
+                    continue
                 if redundancy_cutoff:
                     if rms_all < redundancy_cutoff:
                         continue
@@ -304,7 +302,9 @@ class PdbSite:
     @property
     def is_conserved(self):
         """Check if all residues are conserved by comparing to the reference"""
-        return str(self) == str(self.reference_site) or self.is_reference
+        if self.is_reference:
+            return True
+        return str(self) == str(self.reference_site)
 
     @property
     def is_conservative_mutation(self, ignore_funcloc_main=True):
@@ -372,13 +372,13 @@ class PdbSite:
         seen = set()
         for p in self.residues:
             for q in self.residues:
-                if p == q or (q.id, p.id) in seen:
+                if p == q or (q.full_id, p.full_id) in seen:
                     continue
                 if p.is_gap or q.is_gap:
                     dists.append(np.nan)
-                else:
+                else:   
                     dists.append(p.get_distance(q, minimum))
-                seen.add((p.id, q.id))
+                seen.add((p.full_id, q.full_id))
         return np.array(dists)
 
     def get_residues(self):
@@ -453,6 +453,7 @@ class PdbSite:
                     het.parity_score = box.similarity_with_cognate(het)
                     het.centrality = box.mean_distance_from_residues(het)
                     nearby_hets.append(het)
+                    all_hets.append(het)
             else:
                 if hetfield[0] == 'H':
                     het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
@@ -528,7 +529,7 @@ class PdbSite:
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
                                    '{:>8.3f}{:>8.3f} {:6}'.format(
                             'HETATM' if (atom.get_parent().get_id()[0] != ' ' or type(res) == Het) else 'ATOM',
-                            atom.get_serial_number() if atom.get_serial_number() else 0,
+                            int(atom.get_serial_number()) if atom.get_serial_number() else 0,
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name),
                             atom.get_altloc(),
                             atom.get_parent().get_resname(),
@@ -622,9 +623,11 @@ class PdbSite:
         other = other.copy(include_structure=True)
         if np.all(rot):
             other.structure.transform(rot, tran)
+        else:
+            self.fit(other, transform=True)
         for i, (p, q) in enumerate(zip(self, other)):
             if isolate_residue:
-                rot, tran, _, _ = self.fit(other, transform=True, exclude=i)
+                self.fit(other, transform=True, exclude=i)
             if p.is_gap or q.is_gap:
                 rmsds.append(np.nan)
                 continue
@@ -735,18 +738,18 @@ class PdbSite:
         ignore = set()
         for p in reslist:
             for q in reslist:
-                if p==q or (q.id, p.id) in seen:
+                if p==q or (q.full_id, p.full_id) in seen:
                     continue
                 if p.is_equivalent(q, by_chiral_id=False, by_chain=True):
                     if p.funclocs != q.funclocs:
                         new_res = p.copy(include_structure=True)
                         new_res.funclocs = [p.funclocs[0], q.funclocs[0]]
                         new_reslist.append(new_res)
-                        ignore.add(p.id)
-                        ignore.add(q.id)
-                seen.add((p.id, q.id))
+                        ignore.add(p.full_id)
+                        ignore.add(q.full_id)
+                seen.add((p.full_id, q.full_id))
         for p in reslist:
-            if p.id not in ignore and p not in new_reslist:
+            if p.full_id not in ignore and p not in new_reslist:
                 new_reslist.append(p)
         return new_reslist
 
@@ -855,25 +858,25 @@ class PdbSite:
     def _mark_unclustered(sitelist):
         """Returns a clean list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
-
         try:
             ref_dists = sitelist[0].reference_site.get_distances(minimum=False)
             ref_dists = np.nan_to_num(ref_dists, nan=999)
+            ref_dists = np.where(ref_dists < 8, 8, ref_dists)
         except IndexError:
             return False
-
         for p in sitelist:
             p.is_sane = True
-            p_dists = np.nan_to_num(p.get_distances(minimum=False))
-            if not np.all((p_dists < 2.5*ref_dists)):
+            p_dists = np.nan_to_num(p.get_distances(minimum=False), nan=0)
+            if not np.all((p_dists < 3*ref_dists)):
                 p.is_sane = False
                 continue
             else:
                 for q in sitelist:
-                    if p.id == q.id:
+                    if p.id == q.id or q.is_sane == False:
                         continue
                     q_dists = np.nan_to_num(q.get_distances(minimum=False), nan=999)
-                    if not np.all((p_dists < 2*q_dists)):
+                    q_dists = np.where(q_dists < 8, 8, q_dists)
+                    if not np.all((p_dists < 1.3*q_dists)):
                         p.is_sane = False
         return True
 
