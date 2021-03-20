@@ -73,16 +73,16 @@ class PdbSite:
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)
         site = cls()
-        if annotate:
-            try:
+        try:
+            if annotate:
                 parser = MMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
                 mmcif_dict = parser._mmcif_dict
-            except (TypeError, PDBConstructionException):
-                return
-        else:
-            parser = FastMMCIFParser(QUIET=True)
-            structure = parser.get_structure('', cif_path)
+            else:
+                parser = FastMMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+        except (TypeError, PDBConstructionException):
+            return
         for res in reslist:
             if structure:
                 res.add_structure(structure)
@@ -449,7 +449,7 @@ class PdbSite:
                 if hetfield[0] == 'H' or residue.get_parent().get_id() not in site_chains:
                     het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
                               resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-                    het.structure = residue
+                    het.structure = residue.copy()
                     het.parity_score = box.similarity_with_cognate(het)
                     het.centrality = box.mean_distance_from_residues(het)
                     nearby_hets.append(het)

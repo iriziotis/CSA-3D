@@ -86,7 +86,7 @@ class PdbResidue:
                     self.structure = residue.copy()
                     self.structure.set_parent(residue.get_parent())
                     return True
-            except KeyError:
+            except KeyError as e:
                 return False
         else:
             return False
