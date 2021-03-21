@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
@@ -82,7 +83,7 @@ class PdbSite:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
         except (TypeError, PDBConstructionException):
-            print('Could not build site from residue list. Check entry')
+            warnings.warn('Could not build site from residue list. Check entry', RuntimeWarning)
             return
         for res in reslist:
             if structure:
@@ -140,6 +141,7 @@ class PdbSite:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
         except (TypeError, PDBConstructionException):
+            warnings.warn('Could not parse structure {}'.format(cif_path.split('/')[-1], RuntimeWarning))
             return sites
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)
