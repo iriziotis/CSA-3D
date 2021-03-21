@@ -82,6 +82,7 @@ class PdbSite:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
         except (TypeError, PDBConstructionException):
+            print('Could not build site from residue list. Check entry')
             return
         for res in reslist:
             if structure:

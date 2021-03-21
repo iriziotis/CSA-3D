@@ -98,7 +98,7 @@ class PdbResidue:
         x = None
         y = None
         if self.structure is None or other.structure is None:
-            return
+            return np.nan
         if minimum:
             min_dist = 999
             for i in self.structure.get_atoms():
