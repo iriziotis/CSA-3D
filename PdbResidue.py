@@ -1,8 +1,9 @@
+import numpy as np
+import warnings
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS
-import numpy as np
 from copy import copy
 
 
@@ -87,6 +88,8 @@ class PdbResidue:
                     self.structure.set_parent(residue.get_parent())
                     return True
             except KeyError as e:
+                if self.is_reference:
+                    warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
                 return False
         else:
             return False
