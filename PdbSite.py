@@ -141,7 +141,7 @@ class PdbSite:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
         except (TypeError, PDBConstructionException):
-            warnings.warn('Could not parse structure {}'.format(cif_path.split('/')[-1], RuntimeWarning))
+            warnings.warn('Could not parse structure {}'.format(cif_path, RuntimeWarning))
             return sites
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)

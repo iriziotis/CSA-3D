@@ -1,4 +1,5 @@
 import json
+import warnings
 from collections import defaultdict
 from glob import glob
 from .config import INFO_JSON, ASSEMBLIES_DIR
@@ -169,4 +170,5 @@ class Mcsa:
         path = '{0}/{1}-assembly-*.cif'.format(ASSEMBLIES_DIR, pdb_id)
         if len(glob(path)) > 0:
             return glob(path)[0]
+        warnings.warn('Could not find mmCIF file for {}'.format(pdb_id), RuntimeWarning)
         return
