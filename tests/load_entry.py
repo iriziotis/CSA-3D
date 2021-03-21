@@ -14,11 +14,15 @@ def main(mcsa_id):
         os.makedirs(outdir)
 
     
-    for pdbsite in entry.pdbsites:
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
-        per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, isolate_residue=True)
-        print(pdbsite.id, per_res_rms)
-        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
+    #for pdbsite in entry.pdbsites:
+    #    rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, transform=True)
+    #    per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, isolate_residue=True)
+    #    print(pdbsite.id, per_res_rms)
+    #    pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
+
+    for i in entry.pdbsites:
+        for j in entry.pdbsites:
+            print(i.per_residue_rms(j, isolate_residue=True))
 
     
 if __name__ == '__main__':

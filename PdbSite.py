@@ -623,7 +623,7 @@ class PdbSite:
         (This makes the function to run iterative fitting for each residue
         excluded, which might slow things down a bit)"""
         rmsds = []
-        other = other.copy(include_structure=True)
+        #other = other.copy(include_structure=False)
         if np.all(rot):
             other.structure.transform(rot, tran)
         else:
