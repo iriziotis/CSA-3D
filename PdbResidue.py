@@ -1,5 +1,5 @@
-import numpy as np
 import warnings
+import numpy as np 
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, RESIDUE_DEFINITIONS
@@ -49,6 +49,7 @@ class PdbResidue:
             try:
                 res.structure = self.structure.copy()
                 # This is to override an obscure biopython bug on disordered atoms
+                # TODO Remove when they update Biopython
                 res.structure.child_list = []
                 res.structure.child_dict = {}
                 for atom in self.structure.get_unpacked_list():

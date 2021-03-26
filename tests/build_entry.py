@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import pickle
 from time import time
@@ -24,7 +25,8 @@ def main(mcsa_id, outdir):
     # Serialiaze in a pickle obj and dump it in a file
     print('Serializing')
     i = time()
-    with open('{}/csa3d_{}.ent'.format(outdir, str(mcsa_id).zfill(4)), 'wb') as o:
+    os.makedirs('./entries', exist_ok=True)
+    with open('entries/{}/csa3d_{}.ent'.format(outdir, str(mcsa_id).zfill(4)), 'wb') as o:
         pickle.dump(db.entries[mcsa_id], o)
     f = time()
     serialization_time = f-i

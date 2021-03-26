@@ -613,7 +613,9 @@ class PdbSite:
         if mutate:
             for i, (p_atom, q_atom) in enumerate(zip(p_atoms, q_atoms)):
                 if p_atom != q_atom:
-                    q_atoms[i] = p_atom 
+                    #q_atoms[i] = p_atom 
+                    q_atoms[i] = '{}.MUT'.format(q_atoms[i].split('.')[0])
+                    p_atoms[i] = '{}.MUT'.format(p_atoms[i].split('.')[0])
         # Reorder atoms using the Hungarian algorithm from rmsd package
         if reorder:
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
@@ -701,7 +703,8 @@ class PdbSite:
                     continue
             if not res.structure:
                 return np.array(atoms), np.array(coords)
-            for atom in res.structure:
+            for atom in res.structure: 
+                add_backbone = (omit and self.size in (3,4) and atom.name=='N')
                 resname = res.resname.upper()
                 if allow_symmetrics:
                     if res.has_main_chain_function:
@@ -709,7 +712,7 @@ class PdbSite:
                     if not res.is_standard:
                         resname = 'PTM'
                 atmid = '{}.{}'.format(resname, atom.name)
-                if atmid in RESIDUE_DEFINITIONS:
+                if atmid in RESIDUE_DEFINITIONS or add_backbone:
                     if allow_symmetrics:
                         if atmid in EQUIVALENT_ATOMS:
                             atmid = EQUIVALENT_ATOMS[atmid]
