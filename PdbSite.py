@@ -5,13 +5,13 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
-from Bio.SVDSuperimposer import SVDSuperimposer
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
+from .Superimposer import Superimposer
 
 
 class PdbSite:
@@ -559,7 +559,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, cycles=10, cutoff=6, transform=False, mutate=True, 
+    def fit(self, other, weighted=False, cycles=10, cutoff=6, transform=False, mutate=True, 
             reorder=True, allow_symmetrics=True, exclude=None):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
@@ -569,6 +569,7 @@ class PdbSite:
 
         Args:
             other: mobile active site to fit
+            weighted: to perform weighted superposition in the last iteration
             cycles: Number of fitting iterations to exclude outlying atoms
             transform: Also transforms the mobile site's coordinates
             mutate: If the two active sites do not have the same residues,
@@ -621,7 +622,7 @@ class PdbSite:
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
-        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff)
+        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff, weighted, scaling_factor=1)
         if transform:
             #other.structure.transform(rot, tran)
             for o in other.structure.get_list():
@@ -630,23 +631,19 @@ class PdbSite:
                 het.structure.transform(rot, tran)
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other, rot=None, tran=None, isolate_residue=False):
+    def per_residue_rms(self, other, rot=None, tran=None):
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
-        RMSD is calculated without transformation. If isolate_residue is True,
-        then the residue for which the RMSD is calculated is excluded from the
-        fitting process, to achieve best fit over the rest of the residues
-        (This makes the function to run iterative fitting for each residue
-        excluded, which might slow things down a bit)"""
+        RMSD is calculated without transformation. Otherwise, fitting is performed
+        automatically, using weighted superposition to compensate for bias caused
+        by slightly outlying residues."""
         rmsds = []
         #other = other.copy(include_structure=False)
         if np.all(rot):
             other.structure.transform(rot, tran)
         else:
-            self.fit(other, transform=True)
+            self.fit(other, weighted=True, transform=True)
         for i, (p, q) in enumerate(zip(self, other)):
-            if isolate_residue:
-                self.fit(other, transform=True, exclude=i)
             if p.is_gap or q.is_gap:
                 rmsds.append(np.nan)
                 continue
@@ -901,49 +898,14 @@ class PdbSite:
         return True
 
     @staticmethod
-    def _super(p_coords, q_coords, cycles=10, cutoff=6):
-        """
-        Iterative superposition of two coordinate sets (NumPy arrays)
-
-        Args:
-            p_coords: Fixed coord set
-            q_coords: Mobiles coord set
-            cycles: Number of outlier rejection iterations
-            cutoff: Pairwise atom distance threshold to reject outliers
-
-        Returns: rot, tran, rms, rms_all
-            rot: Rotation matrix
-            tran: Translation vector
-            rms: RMSD after fitting, not including outliers
-            rms_all: RMSD over all atoms, including outliers
-        """
-        min_rms = 999
-        result_rot, result_tran, result_rms, result_rms_all = None, None, None, None
-        p_all = np.array(p_coords, copy=True)
-        q_all = np.array(q_coords, copy=True)
-        # Initialize Biopython SVDSuperimposer
-        sup = SVDSuperimposer()
-        for i in range(cycles):
-            if p_coords.size == 0:
-                break
-            sup.set(p_coords, q_coords)
-            sup.run()
-            rms = sup.get_rms()
-            rot, tran = sup.get_rotran()
-            if rms < min_rms:
-                result_rot, result_tran, result_rms = rot, tran, rms
-            # Transform coordinates
-            q_trans = np.dot(q_coords, rot) + tran
-            # Find outliers
-            diff = np.linalg.norm(p_coords - q_trans, axis=1)
-            to_keep = np.where(diff < cutoff)
-            # Reject outliers
-            p_coords = p_coords[to_keep]
-            q_coords = q_coords[to_keep]
-        # Also compute RMSD over all atoms
-        q_all = np.dot(q_all, result_rot) + result_tran
-        result_rms_all = PdbSite._rmsd(p_all, q_all)
-        return result_rot, result_tran, np.round(result_rms, 3), np.round(result_rms_all, 3)
+    def _super(p_coords, q_coords, cycles=10, cutoff=6, weighted=False, scaling_factor=1):
+        sup = Superimposer()
+        sup.set(p_coords, q_coords, cycles, cutoff, scaling_factor)
+        if weighted:
+            sup.run_weighted()
+        else:
+            sup.run_unweighted()
+        return sup.rot, sup.tran, sup.rms, sup.rms_all
 
     @staticmethod
     def _rmsd(p_coords, q_coords):
