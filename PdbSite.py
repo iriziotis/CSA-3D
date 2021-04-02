@@ -460,9 +460,9 @@ class PdbSite:
                     # TODO Remove when they update Biopython
                     het.structure.child_list = []
                     het.structure.child_dict = {}
-                    for altloc in ['A','B','C','D','E','F','G','H','I','J']:
+                    for altloc in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890':
                         for atom in residue.get_unpacked_list():
-                            if atom.get_altloc() in (' ', altloc):
+                            if atom.get_altloc()[0] in (' ', altloc):
                                 het.structure.add(atom.copy())
                         if len(het.structure.child_list) > 0:
                             break

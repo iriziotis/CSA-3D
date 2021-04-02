@@ -62,7 +62,7 @@ class LigandBox:
         for atom_i in residue_i:
             for atom_j in residue_j:
                 distances.append(atom_i - atom_j)
-        return np.nanmin(np.array(distances))
+        return min(distances)
 
     def _get_parent_residues(self):
         """Populates the list of the corresponding residues from parent structure (untransformed)"""
