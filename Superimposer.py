@@ -11,7 +11,7 @@ class Superimposer:
 
     # Public methods
 
-    def set(self, reference_coords, coords, cycles=None, cutoff=None, scaling_factor=2):
+    def set(self, reference_coords, coords, cycles=1, cutoff=999, scaling_factor=2):
         """Set coordinates and parameters for superposition.
             - reference_coords: NxD NumPy array (N: num of points, D: dimensions)
             - coords:  NxD array
@@ -37,8 +37,8 @@ class Superimposer:
             raise Exception("Coordinate sets do not have the same dimensions.")
         self.n = n[0]
         # Set superposition parameters
-        self.cycles = cycles if cycles else 1
-        self.cutoff = cutoff if cutoff else 999
+        self.cycles = cycles 
+        self.cutoff = cutoff
         self.scaling_factor = scaling_factor
 
     def run_unweighted(self):
@@ -68,6 +68,8 @@ class Superimposer:
                 min_rms = rms
             diff = np.linalg.norm(reference_coords-coords, axis=1)
             to_keep = np.where(diff < self.cutoff)
+            if to_keep[0].size == 0:
+                break
             coords = coords[to_keep]
             reference_coords = reference_coords[to_keep]
             untransformed_coords = untransformed_coords[to_keep]

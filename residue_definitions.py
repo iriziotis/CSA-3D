@@ -12,11 +12,9 @@ STANDARD_RESIDUES = {
     }
 
 RESIDUE_DEFINITIONS = { 
-    #'ANY.CA', 'ANY.C', 'ANY.O',
-    'ANY.CA', 'ANY.N', 'ANY.O',
+    'ANY.CA', 'ANY.C', 'ANY.O',
     'PTM.CA', 'PTM.C', 'PTM.CB',
-    #'GLY.CA', 'GLY.C', 'GLY.O',
-    'GLY.CA', 'GLY.C', 'GLY.N',
+    'GLY.CA', 'GLY.C', 'GLY.O',
     'ALA.CA', 'ALA.C', 'ALA.CB',
     'PRO.CA', 'PRO.C', 'PRO.O',
     'CYS.CA', 'CYS.CB', 'CYS.SG',

@@ -155,7 +155,7 @@ class PdbSite:
             if site.has_missing_functional_atoms or len(site) != len(reference_site):
                 continue
             # Reduce redundancy
-            if len(sites) > 0:
+            if len(sites) > 1:
                 _, _, _, rms_all = site.fit(sites[-1])
                 if site.has_identical_residues(sites[-1]) and rms_all == 0:
                     continue
@@ -559,8 +559,8 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, weighted=False, cycles=10, cutoff=6, transform=False, mutate=True, 
-            reorder=True, allow_symmetrics=True, exclude=None):
+    def fit(self, other, weighted=False, cycles=10, cutoff=6, scaling_factor=1, transform=False, 
+            mutate=True, reorder=True, allow_symmetrics=True, exclude=None):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -608,7 +608,7 @@ class PdbSite:
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
         # Initial crude superposition
-        rot, tran, rms, _ = PdbSite._super(p_coords, q_coords, cycles=1)
+        rot, tran, rms, _ = PdbSite._super(p_coords, q_coords, cycles=1, cutoff=999)
         q_trans = PdbSite._transform(q_coords, rot, tran)
         # In case of non-conservative mutations, make pseudo-mutations to facilitate superposition
         if mutate:
@@ -622,7 +622,7 @@ class PdbSite:
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
             q_coords = q_coords[q_review]
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
-        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff, weighted, scaling_factor=1)
+        rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff, weighted, scaling_factor)
         if transform:
             #other.structure.transform(rot, tran)
             for o in other.structure.get_list():
