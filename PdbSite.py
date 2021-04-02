@@ -559,7 +559,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, weighted=False, cycles=10, cutoff=6, scaling_factor=1, transform=False, 
+    def fit(self, other, weighted=False, cycles=10, cutoff=6, scaling_factor=None, transform=False, 
             mutate=True, reorder=True, allow_symmetrics=True, exclude=None):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).

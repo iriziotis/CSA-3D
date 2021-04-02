@@ -11,7 +11,7 @@ class Superimposer:
 
     # Public methods
 
-    def set(self, reference_coords, coords, cycles=1, cutoff=999, scaling_factor=2):
+    def set(self, reference_coords, coords, cycles=1, cutoff=999, scaling_factor=None):
         """Set coordinates and parameters for superposition.
             - reference_coords: NxD NumPy array (N: num of points, D: dimensions)
             - coords:  NxD array
@@ -39,7 +39,10 @@ class Superimposer:
         # Set superposition parameters
         self.cycles = cycles 
         self.cutoff = cutoff
-        self.scaling_factor = scaling_factor
+        if scaling_factor:
+            self.scaling_factor = scaling_factor
+        else:
+            self.scaling_factor = self._auto_scaling_factor()
 
     def run_unweighted(self):
         """Classic iterative superposition. After each iteration, point pairs
@@ -167,6 +170,21 @@ class Superimposer:
         weights = np.exp((-sq_diff/c))
         weights = weights.reshape(-1,1)
         return weights
+
+    def _auto_scaling_factor(self):
+        self.run_unweighted()
+        rms = self.rms
+        if 0.0 <= rms <= 2.5:
+            scaling_factor = 1
+        elif 2.5 < rms <= 3.5:
+            scaling_factor = rms/3
+        elif 3.5 < rms <= 4.5:
+            scaling_factor = rms/2
+        elif rms >= 10:
+            scaling_factor = 10
+        else:
+            scaling_factor = rms
+        return scaling_factor
 
     def _fit(self, coords, reference_coords, weights=None):
         """Weighted superposition of two coordinate sets."""
