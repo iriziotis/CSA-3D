@@ -2,7 +2,7 @@ import warnings
 import numpy as np 
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, RESIDUE_DEFINITIONS
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS
 from copy import copy
 
@@ -102,7 +102,7 @@ class PdbResidue:
         x = None
         y = None
         if self.structure is None or other.structure is None:
-            return np.nan
+            return np.nan 
         if minimum:
             min_dist = 999
             for i in self.structure.get_atoms():
@@ -133,18 +133,47 @@ class PdbResidue:
             return basic and chains
         return basic
 
-    def get_coords(self, func_atoms_only=False):
-        """Returns a NumPy array of the atomic coordinates"""
+
+    def get_func_atoms(self, allow_symmetrics=True):
+        """Gets atoms and coordinates for superposition and atom reordering
+        calculations
+
+        Args:
+            allow_symmetrics: If True, equivalent residues and atoms
+                              get the same id string, according to the
+                              definitions in residue_definitions.py
+                              (EQUIVALENT_ATOMS)
+        Returns:
+            atoms: A NumPy array of atom identifier strings of type
+                   'N.RES.AT' where N is the residue serial number
+                   in the .pdb file (consistent among all sites),
+                   RES is the residue name and AT is the atom name
+            coords: A NumPy array of the atomic coordinates
+        """
+        atoms = []
         coords = []
-        for atom in self.structure:
-            if func_atoms_only and not type(self) == Het:
-                resname = self.resname.upper()
-                if self.has_main_chain_function or not self.is_standard:
+        if not self.structure:
+            return np.array(atoms), np.array(coords)
+        for atom in self.structure: 
+            resname = self.resname.upper()
+            if allow_symmetrics:
+                if self.has_main_chain_function:
                     resname = 'ANY'
-                if '{}.{}'.format(resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
-                    continue
-            coords.append(atom.get_coord())
-        return np.array(coords)
+                if not self.is_standard:
+                    resname = 'PTM'
+            atmid = '{}.{}'.format(resname, atom.name)
+            if atmid in RESIDUE_DEFINITIONS:
+                if allow_symmetrics:
+                    if atmid in EQUIVALENT_ATOMS:
+                        atmid = EQUIVALENT_ATOMS[atmid]
+                atoms.append(atmid)
+                coords.append(atom.get_coord())
+        try:
+            atoms = np.array(atoms, dtype=object)
+            coords = np.stack(coords, axis=0)
+        except ValueError:
+            return None, None
+        return atoms, coords
 
     @property
     def id(self):
@@ -250,6 +279,7 @@ class PdbResidue:
                 return "{}{}".format(chain.split("-")[0], letters[int(chain.split("-")[1])-2])
             else:
                 return chain
+
 
 
 class Het(PdbResidue):

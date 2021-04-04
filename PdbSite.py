@@ -332,8 +332,8 @@ class PdbSite:
         structures or site is empty"""
         try:
             gaps = set(self.get_gaps())
-            self_atoms, _ = self._get_atom_strings_and_coords(omit=gaps)
-            ref_atoms, _ = self.reference_site._get_atom_strings_and_coords(omit=gaps)
+            self_atoms, _ = self._get_func_atoms(omit=gaps)
+            ref_atoms, _ = self.reference_site._get_func_atoms(omit=gaps)
             return len(self_atoms) != len(ref_atoms)
         except (TypeError, ValueError):
             return True
@@ -602,8 +602,8 @@ class PdbSite:
             for i in exclude:
                 gaps.add(i)
         # Get atom identifier strings and coords as numpy arrays
-        p_atoms, p_coords = self._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
-        q_atoms, q_coords = other._get_atom_strings_and_coords(allow_symmetrics, omit=gaps)
+        p_atoms, p_coords = self._get_func_atoms(allow_symmetrics, omit=gaps)
+        q_atoms, q_coords = other._get_func_atoms(allow_symmetrics, omit=gaps)
         if p_atoms is None or q_atoms is None:
             return None, None, None, None
         if len(p_atoms) != len(q_atoms):
@@ -635,7 +635,37 @@ class PdbSite:
             return rot, tran, rms, rms_all, p_coords, q_trans
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other, rot=None, tran=None):
+    def per_residue_rms(self, other):
+        """Calculates the RMSD of each residue in two superimposed sites.
+        If superposition rotation matrix and translation vector are not given,
+        RMSD is calculated without transformation. Otherwise, fitting is performed
+        automatically, using weighted superposition to compensate for bias caused
+        by slightly outlying residues."""
+        rmsds = []
+        rot, tran, _, _ = self.fit(other, weighted=True, transform=False)
+        for i, (p, q) in enumerate(zip(self, other)):
+            if p.is_gap or q.is_gap:
+                rmsds.append(np.nan)
+                continue
+            # Get functional atoms
+            p_atoms, p_coords = p.get_func_atoms()  
+            q_atoms, q_coords = q.get_func_atoms()  
+            # Mutate if there are mismatches
+            for i, (p_atom, q_atom) in enumerate(zip(p_atoms, q_atoms)):
+                if p_atom != q_atom:
+                    p_atoms[i] = 'MUT'
+                    q_atoms[i] = 'MUT'
+            # Transform functional atoms
+            q_trans = PdbSite._transform(q_coords, rot, tran)
+            # Reorder
+            q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
+            q_coords = q_coords[q_review]
+            # Calculate RMSD
+            rms = PdbSite._rmsd(p_coords, q_coords)
+            rmsds.append(np.round(rms, 3))
+        return np.array(rmsds)
+
+    def per_residue_rmsss(self, other, rot=None, tran=None):
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
         RMSD is calculated without transformation. Otherwise, fitting is performed
@@ -651,8 +681,9 @@ class PdbSite:
             if p.is_gap or q.is_gap:
                 rmsds.append(np.nan)
                 continue
-            rms = PdbSite._rmsd(p.get_coords(func_atoms_only=True),
-                                q.get_coords(func_atoms_only=True))
+            _, p_coords = p.get_func_atoms()
+            _, q_coords = q.get_func_atoms()
+            rms = PdbSite._rmsd(p_coords, q_coords)
             rmsds.append(np.round(rms, 3))
         return np.array(rmsds)
 
@@ -679,7 +710,7 @@ class PdbSite:
         self._reorder()
         return
 
-    def _get_atom_strings_and_coords(self, allow_symmetrics=True, omit=None):
+    def _get_func_atoms(self, allow_symmetrics=True, omit=None):
         """Gets atoms and coordinates for superposition and atom reordering
         calculations
 
