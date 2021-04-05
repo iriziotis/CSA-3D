@@ -45,8 +45,8 @@ class Superimposer:
             self.scaling_factor = self._auto_scaling_factor()
 
     def run_unweighted(self):
-        """Classic iterative superposition. After each iteration, point pairs
-        with a distance higher than the specified 'cutoff' are rejected. Number
+        """Classic iterative superposition. After each iteration, residues
+        with an average distance higher than the specified 'cutoff' are rejected. Number
         of iterations is defined in 'cycles'.
         """
 
@@ -71,7 +71,8 @@ class Superimposer:
                 min_rms = rms
             diff = np.linalg.norm(reference_coords-coords, axis=1)
             to_keep = np.where(diff < self.cutoff)
-            if to_keep[0].size == 0:
+            # We always want at least three residues to be superimposed
+            if to_keep[0].size < 3:
                 break
             coords = coords[to_keep]
             reference_coords = reference_coords[to_keep]
@@ -166,24 +167,18 @@ class Superimposer:
         return np.round(np.sqrt(np.sum(diff) / diff.size), 3)
 
     def _weights(self, p_coords, q_coords, c):
+        """Calculate weights for each atom pair"""
         sq_diff = np.square(np.linalg.norm(p_coords - q_coords, axis=1))
         weights = np.exp((-sq_diff/c))
         weights = weights.reshape(-1,1)
         return weights
 
     def _auto_scaling_factor(self):
+        """Automatic calculation of Gaussian scaling factor by getting the
+        unweighted RMSD first, and feeding it in a sigmoid function"""
         self.run_unweighted()
         rms = self.rms
-        if 0.0 <= rms <= 2.5:
-            scaling_factor = 1
-        elif 2.5 < rms <= 3.5:
-            scaling_factor = rms/3
-        elif 3.5 < rms <= 4.5:
-            scaling_factor = rms/2
-        elif rms >= 10:
-            scaling_factor = 10
-        else:
-            scaling_factor = rms
+        scaling_factor = 9/(1+np.exp(-(1.2*rms-8)))+1
         return scaling_factor
 
     def _fit(self, coords, reference_coords, weights=None):
@@ -205,4 +200,8 @@ class Superimposer:
             rot = transpose(dot(transpose(vt), transpose(u)))
         tran = av2 - dot(av1, rot)
         return rot, tran
+
+def grouped(iterable):
+    a = iter(iterable)
+    return zip(a, a, a)
 

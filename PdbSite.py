@@ -560,7 +560,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, weighted=False, cycles=10, cutoff=6, scaling_factor=None, transform=False, 
+    def fit(self, other, weighted=False, cycles=10, cutoff=5, scaling_factor=None, transform=False, 
             mutate=True, reorder=True, allow_symmetrics=True, exclude=None, get_array=False):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
@@ -609,7 +609,7 @@ class PdbSite:
         if len(p_atoms) != len(q_atoms):
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
         # Initial crude superposition
-        rot, tran, rms, _ = PdbSite._super(p_coords, q_coords, cycles=1, cutoff=999)
+        rot, tran, rms, _ = PdbSite._super(p_coords, q_coords, cycles=1)
         q_trans = PdbSite._transform(q_coords, rot, tran)
         # In case of non-conservative mutations, make pseudo-mutations to facilitate superposition
         if mutate:
@@ -665,28 +665,6 @@ class PdbSite:
             rmsds.append(np.round(rms, 3))
         return np.array(rmsds)
 
-    def per_residue_rmsss(self, other, rot=None, tran=None):
-        """Calculates the RMSD of each residue in two superimposed sites.
-        If superposition rotation matrix and translation vector are not given,
-        RMSD is calculated without transformation. Otherwise, fitting is performed
-        automatically, using weighted superposition to compensate for bias caused
-        by slightly outlying residues."""
-        rmsds = []
-        #other = other.copy(include_structure=False)
-        if np.all(rot):
-            other.structure.transform(rot, tran)
-        else:
-            self.fit(other, weighted=True, transform=True)
-        for i, (p, q) in enumerate(zip(self, other)):
-            if p.is_gap or q.is_gap:
-                rmsds.append(np.nan)
-                continue
-            _, p_coords = p.get_func_atoms()
-            _, q_coords = q.get_func_atoms()
-            rms = PdbSite._rmsd(p_coords, q_coords)
-            rmsds.append(np.round(rms, 3))
-        return np.array(rmsds)
-
     # Private methods
 
     def _map_reference_residues(self):
@@ -736,7 +714,8 @@ class PdbSite:
             if not res.structure:
                 return np.array(atoms), np.array(coords)
             for atom in res.structure: 
-                add_backbone = (omit and self.size in (3,4) and atom.name=='N')
+                #add_backbone = (omit and self.size in (3,4) and atom.name=='N')
+                add_backbone=False
                 resname = res.resname.upper()
                 if allow_symmetrics:
                     if res.has_main_chain_function:
