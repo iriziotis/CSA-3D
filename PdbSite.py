@@ -656,9 +656,9 @@ class PdbSite:
                     p_atoms[i] = 'MUT'
                     q_atoms[i] = 'MUT'
             # Transform functional atoms
-            q_trans = PdbSite._transform(q_coords, rot, tran)
+            q_coords = PdbSite._transform(q_coords, rot, tran)
             # Reorder
-            q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_trans)
+            q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_coords)
             q_coords = q_coords[q_review]
             # Calculate RMSD
             rms = PdbSite._rmsd(p_coords, q_coords)
