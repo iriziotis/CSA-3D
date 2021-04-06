@@ -89,3 +89,20 @@ class Entry:
                             if pdbsite not in unisite.mapped_pdbsites:
                                 unisite.mapped_pdbsites.append(pdbsite)
         return True
+
+    def all_vs_all(self, sane_only=True):
+        """Returns a generator with all combinations of PDB sites in the entry.
+        If sane_only, insane sites are excuded."""
+        seen = set()
+        for p in self.get_pdbsites():
+            if sane_only:
+                if not p.is_sane:
+                    continue
+            for q in self.get_pdbsites():
+                if sane_only:
+                    if not p.is_sane:
+                        continue
+                if p==q or (q.id, p.id) in seen:
+                    continue
+                seen.add((p.id, q.id))
+                yield p, q
