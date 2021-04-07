@@ -82,9 +82,9 @@ class Superimposer:
         self.rot, self.tran = self._fit(untransformed_coords, coords)
         self.rms = min_rms
         self.rms_all = rms_all
-        self.temp_coords = coords 
-        self.temp_reference_coords = reference_coords
-        self.temp_untransformed_coords = untransformed_coords
+        self.temp_coords = coords.copy() 
+        self.temp_reference_coords = reference_coords.copy()
+        self.temp_untransformed_coords = untransformed_coords.copy()
 
     def run_weighted(self):
         """Hybrid iterative/weighted superposition. First coordinates are superimposed
@@ -99,9 +99,9 @@ class Superimposer:
 
         # Initial superposition
         self.run_unweighted()
-        coords = self.temp_coords
-        reference_coords = self.temp_reference_coords
-        untransformed_coords = self.temp_untransformed_coords
+        coords = self.temp_coords.copy()
+        reference_coords = self.temp_reference_coords.copy()
+        untransformed_coords = self.temp_untransformed_coords.copy()
         coords_all = np.dot(coords_all, self.rot) + self.tran
 
         # Weighted iterative superposition
