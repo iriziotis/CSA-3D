@@ -22,6 +22,13 @@ def main(mcsa_id):
     #a.write_pdb(outfile='a.pdb', func_atoms_only=True)
     #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
 
+    # Entry 1
+    #a = entry.get_pdbsite('2jfv_AA-AA-AA-AA-AA-AA')
+    #b = entry.get_pdbsite('2jfp_A-A-A-A-A-A')
+    #_,_,_, rb = a.fit(b, weighted=True, scaling_factor=None, transform=True)
+    #a.write_pdb(outfile='a.pdb', func_atoms_only=True)
+    #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
+
     for i, pdbsite in enumerate(entry.pdbsites):
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, cycles=1, cutoff=999, scaling_factor=None, transform=True)
         per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran)

@@ -106,8 +106,8 @@ class Superimposer:
         coords_all = self._transform(coords_all, self.rot, self.tran)
 
         # Weighted iterative superposition
-        prev_rms = self.rms
-        for i in range(5000):
+        prev_rms = 999
+        for i in range(6000):
             # Get weights
             weights = self._weights(coords, reference_coords, c)
             # Weighted fit
@@ -120,12 +120,12 @@ class Superimposer:
             # RMSD over all atoms, unweighted
             rms_all = self._rms(self.reference_coords, coords_all)
             # Check for convergence
-            if 0 <= prev_rms - rms <= 0.000001:
+            if 0 <= prev_rms - rms <= 0.0001:
                 break
             prev_rms = rms
 
-        if i == 4999:
-            raise Exception("Could not reach convergence after 5000 cycles. Maybe try unweighted fit.")
+        if i == 5999:
+            raise Exception("Could not reach convergence after 6000 cycles. Maybe try unweighted fit.")
         else:
             # Final rotation matrix, translation vector and RMSD
             self.rot, self.tran = self._fit(untransformed_coords, coords)
@@ -163,9 +163,12 @@ class Superimposer:
         diff = np.square(norm(p_coords - q_coords, axis=1))
         if weights is None:
             weights = 1
+            n = diff.size
+        else:
+            n = np.sum(weights)
         diff = diff.reshape(-1,1)
         diff = weights*diff
-        return np.sqrt(np.sum(diff) / diff.size)
+        return np.sqrt(np.sum(diff) / n)
 
     def _weights(self, p_coords, q_coords, c):
         """Calculate weights for each atom pair"""
@@ -179,7 +182,7 @@ class Superimposer:
         unweighted RMSD first, and feeding it in a sigmoid function"""
         self.run_unweighted()
         rms = self.rms
-        scaling_factor = 8/(1+np.exp(-(1.7*rms-5.3)))+2
+        scaling_factor = 9/(1+np.exp(-(1.7*rms-5.3)))+1
         return scaling_factor
 
     def _transform(self, coords, rot, tran):

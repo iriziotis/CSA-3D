@@ -635,7 +635,7 @@ class PdbSite:
             return rot, tran, rms, rms_all, p_coords, q_trans
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other, rot=None, tran=None):
+    def per_residue_rms(self, other, rot=None, tran=None, transform=False):
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
         RMSD is calculated without transformation. Otherwise, fitting is performed
@@ -657,7 +657,8 @@ class PdbSite:
                     p_atoms[i] = 'MUT'
                     q_atoms[i] = 'MUT'
             # Transform functional atoms
-            q_coords = PdbSite._transform(q_coords, rot, tran)
+            if transform:
+                q_coords = PdbSite._transform(q_coords, rot, tran)
             # Reorder
             q_review = reorder_hungarian(p_atoms, q_atoms, p_coords, q_coords)
             q_coords = q_coords[q_review]
