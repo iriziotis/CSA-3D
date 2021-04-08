@@ -86,6 +86,7 @@ class Superimposer:
         self.temp_reference_coords = reference_coords.copy()
         self.temp_untransformed_coords = untransformed_coords.copy()
 
+
     def run_weighted(self):
         """Hybrid iterative/weighted superposition. First coordinates are superimposed
         iteratively with outlier rejection (user specified cycles and distance cutoff),
@@ -114,7 +115,7 @@ class Superimposer:
             # Transform
             coords = self._transform(coords, rot, tran)
             coords_all = self._transform(coords_all, rot, tran)
-            # Weighted RMSD
+            # Weighted RMSD 
             rms = self._rms(coords, reference_coords, weights)
             # RMSD over all atoms, unweighted
             rms_all = self._rms(self.reference_coords, coords_all)
@@ -191,13 +192,13 @@ class Superimposer:
         if weights is None:
             weights = np.ones((n, 1))
         # Calculated weighted centroids
-        centroid1 = sum(weights*coords) / n
-        centroid2 = sum(weights*reference_coords) / n
+        centroid1 = np.sum(weights*coords, axis=0) / n
+        centroid2 = np.sum(weights*reference_coords, axis=0) / n
         # Translate origin of both coordinates to centroid
         coords = coords - centroid1
         reference_coords = reference_coords - centroid2
         # Calculate weighted correlation matrix
-        a = dot(transpose(coords)*weights.reshape(1,-1)[0], reference_coords)
+        a = dot(transpose(coords)*weights.flatten(), reference_coords)
         # Singular value decomposition
         u, d, vt = svd(a)
         # Calculate rotation matrix

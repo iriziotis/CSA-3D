@@ -23,8 +23,8 @@ def main(mcsa_id):
     #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
 
     for i, pdbsite in enumerate(entry.pdbsites):
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, cycles=10, cutoff=6, scaling_factor=None, transform=True)
-        per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite)
+        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, cycles=1, cutoff=999, scaling_factor=None, transform=True)
+        per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran)
         print(pdbsite.id, rms, rms_all, per_res_rms)
         pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
 

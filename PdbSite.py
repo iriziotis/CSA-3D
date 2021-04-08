@@ -635,14 +635,15 @@ class PdbSite:
             return rot, tran, rms, rms_all, p_coords, q_trans
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other):
+    def per_residue_rms(self, other, rot=None, tran=None):
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
         RMSD is calculated without transformation. Otherwise, fitting is performed
         automatically, using weighted superposition to compensate for bias caused
         by slightly outlying residues."""
         rmsds = []
-        rot, tran, _, _ = self.fit(other, weighted=True, transform=False)
+        if rot is None or tran is None:
+            rot, tran, _, _ = self.fit(other, weighted=True, transform=False)
         for i, (p, q) in enumerate(zip(self, other)):
             if p.is_gap or q.is_gap:
                 rmsds.append(np.nan)
