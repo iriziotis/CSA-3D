@@ -560,7 +560,7 @@ class PdbSite:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def fit(self, other, weighted=False, cycles=10, cutoff=5, scaling_factor=None, transform=False, 
+    def fit(self, other, weighted=False, cycles=1, cutoff=999, scaling_factor=None, transform=False, 
             mutate=True, reorder=True, allow_symmetrics=True, exclude=None, get_array=False):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
@@ -912,14 +912,14 @@ class PdbSite:
         return True
 
     @staticmethod
-    def _super(p_coords, q_coords, cycles=10, cutoff=6, weighted=False, scaling_factor=1):
+    def _super(p_coords, q_coords, cycles=1, cutoff=999, weighted=False, scaling_factor=None):
         sup = Superimposer()
         sup.set(p_coords, q_coords, cycles, cutoff, scaling_factor)
         if weighted:
             sup.run_weighted()
         else:
             sup.run_unweighted()
-        return sup.rot, sup.tran, sup.rms, sup.rms_all
+        return sup.rot, sup.tran, np.round(sup.rms, 3), np.round(sup.rms_all, 3)
 
     @staticmethod
     def _rmsd(p_coords, q_coords):

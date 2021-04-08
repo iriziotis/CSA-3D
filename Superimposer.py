@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import dot, transpose, sqrt
-from numpy.linalg import svd, det
+from numpy.linalg import svd, det, norm
 from copy import copy
 
 class Superimposer:
@@ -44,12 +44,12 @@ class Superimposer:
         else:
             self.scaling_factor = self._auto_scaling_factor()
 
+
     def run_unweighted(self):
         """Classic iterative superposition. After each iteration, residues
         with an average distance higher than the specified 'cutoff' are rejected. Number
         of iterations is defined in 'cycles'.
         """
-
         reference_coords = self.reference_coords.copy()
         coords = self.coords.copy()
         coords_all = self.coords.copy()
@@ -61,17 +61,17 @@ class Superimposer:
             # Fit
             rot, tran = self._fit(coords, reference_coords)
             # Transform coords
-            coords = np.dot(coords, rot) + tran
-            coords_all = np.dot(coords_all, rot) + tran
+            coords = self._transform(coords, rot, tran)
+            coords_all = self._transform(coords_all, rot, tran)
             # Calculate RMSDs
             rms = self._rms(reference_coords, coords)
             rms_all = self._rms(self.reference_coords, coords_all)
             # Reject outliers
             if rms < min_rms:
                 min_rms = rms
-            diff = np.linalg.norm(reference_coords-coords, axis=1)
+            diff = norm(reference_coords-coords, axis=1)
             to_keep = np.where(diff < self.cutoff)
-            # We always want at least three residues to be superimposed
+            # We always want at least three atoms to be superimposed
             if to_keep[0].size < 3:
                 break
             coords = coords[to_keep]
@@ -102,18 +102,18 @@ class Superimposer:
         coords = self.temp_coords.copy()
         reference_coords = self.temp_reference_coords.copy()
         untransformed_coords = self.temp_untransformed_coords.copy()
-        coords_all = np.dot(coords_all, self.rot) + self.tran
+        coords_all = self._transform(coords_all, self.rot, self.tran)
 
         # Weighted iterative superposition
-        prev_rms = 999
+        prev_rms = self.rms
         for i in range(5000):
             # Get weights
             weights = self._weights(coords, reference_coords, c)
             # Weighted fit
             rot, tran = self._fit(coords, reference_coords, weights)
             # Transform
-            coords = np.dot(coords, rot) + tran
-            coords_all = np.dot(coords_all, rot) + tran
+            coords = self._transform(coords, rot, tran)
+            coords_all = self._transform(coords_all, rot, tran)
             # Weighted RMSD
             rms = self._rms(coords, reference_coords, weights)
             # RMSD over all atoms, unweighted
@@ -124,14 +124,13 @@ class Superimposer:
             prev_rms = rms
 
         if i == 4999:
-            print('Could not reach convergence after 5000 cycles')
-            return
+            raise Exception("Could not reach convergence after 5000 cycles. Maybe try unweighted fit.")
         else:
             # Final rotation matrix, translation vector and RMSD
             self.rot, self.tran = self._fit(untransformed_coords, coords)
             self.rms = rms
             self.rms_all = rms_all
-            return
+        return
     
     def get_rotran(self):
         """Right multiplying rotation matrix and translation."""
@@ -143,7 +142,7 @@ class Superimposer:
         """Root mean square deviation of superimposed coordinates."""
         if self.rot is None:
             raise Exception("Nothing superimposed yet.")
-        return self.rms
+        return self.rms, self.rms_all
 
     # Private methods
 
@@ -160,15 +159,16 @@ class Superimposer:
     def _rms(self, p_coords, q_coords, weights=None):
         """RMSD between p_coords and q_coords. If weights are provided,
         RMSD is weighted."""
-        diff = np.square(np.linalg.norm(p_coords - q_coords, axis=1))
+        diff = np.square(norm(p_coords - q_coords, axis=1))
         if weights is None:
             weights = 1
+        diff = diff.reshape(-1,1)
         diff = weights*diff
-        return np.round(np.sqrt(np.sum(diff) / diff.size), 3)
+        return np.sqrt(np.sum(diff) / diff.size)
 
     def _weights(self, p_coords, q_coords, c):
         """Calculate weights for each atom pair"""
-        sq_diff = np.square(np.linalg.norm(p_coords - q_coords, axis=1))
+        sq_diff = np.square(norm(p_coords - q_coords, axis=1))
         weights = np.exp((-sq_diff/c))
         weights = weights.reshape(-1,1)
         return weights
@@ -178,30 +178,35 @@ class Superimposer:
         unweighted RMSD first, and feeding it in a sigmoid function"""
         self.run_unweighted()
         rms = self.rms
-        scaling_factor = 9/(1+np.exp(-(1.2*rms-8)))+1
+        scaling_factor = 8/(1+np.exp(-(1.7*rms-5.3)))+2
         return scaling_factor
+
+    def _transform(self, coords, rot, tran):
+        """Apply rotation matrix and translation vector to coordinates"""
+        return dot(coords, rot) + tran
 
     def _fit(self, coords, reference_coords, weights=None):
         """Weighted superposition of two coordinate sets."""
-        if weights is None:
-            weights = 1
         n = reference_coords.shape[0]
-        av1 = sum(weights*coords) / n
-        av2 = sum(weights*reference_coords) / n
-        coords = coords - av1
-        reference_coords = reference_coords - av2
-        # correlation matrix
-        a = dot(transpose(coords), reference_coords)
+        if weights is None:
+            weights = np.ones((n, 1))
+        # Calculated weighted centroids
+        centroid1 = sum(weights*coords) / n
+        centroid2 = sum(weights*reference_coords) / n
+        # Translate origin of both coordinates to centroid
+        coords = coords - centroid1
+        reference_coords = reference_coords - centroid2
+        # Calculate weighted correlation matrix
+        a = dot(transpose(coords)*weights.reshape(1,-1)[0], reference_coords)
+        # Singular value decomposition
         u, d, vt = svd(a)
+        # Calculate rotation matrix
         rot = transpose(dot(transpose(vt), transpose(u)))
-        # check if we have found a reflection
+        # Check if matrix is a reflection
         if det(rot) < 0:
             vt[2] = -vt[2]
             rot = transpose(dot(transpose(vt), transpose(u)))
-        tran = av2 - dot(av1, rot)
+        # Calculate translation vector
+        tran = centroid2 - dot(centroid1, rot)
         return rot, tran
-
-def grouped(iterable):
-    a = iter(iterable)
-    return zip(a, a, a)
 
