@@ -76,8 +76,8 @@ class PdbSite:
         reslist = PdbSite._cleanup_list(reslist)
         site = cls()
         try:
-            if annotate:
-                parser = MMCIFParser(QUIET=True)
+            if annotate: 
+                parser = MMCIFParser(QUIET=True) 
                 structure = parser.get_structure('', cif_path)
                 mmcif_dict = parser._mmcif_dict
             else:

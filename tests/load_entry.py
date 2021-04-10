@@ -19,8 +19,9 @@ def main(mcsa_id):
     #b = entry.get_pdbsite('5chv_A-A-A-A')
     #_,_,_, rb = b.fit(a, weighted=True, scaling_factor=None, transform=True)
     #print(rb)
-    #a.write_pdb(outfile='a.pdb', func_atoms_only=True)
-    #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
+    ## TODO fix bug in parent detachment in het atoms
+    #a.write_pdb(outfile='a.pdb', func_atoms_only=False, write_hets=True)
+    #b.write_pdb(outfile='b.pdb', func_atoms_only=False, write_hets=True)
 
     # Entry 1
     #a = entry.get_pdbsite('2jfv_AA-AA-AA-AA-AA-AA')
@@ -30,10 +31,10 @@ def main(mcsa_id):
     #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
 
     for i, pdbsite in enumerate(entry.pdbsites):
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, cycles=1, cutoff=999, scaling_factor=None, transform=True)
-        per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran)
+        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+        per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
         print(pdbsite.id, rms, rms_all, per_res_rms)
-        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=True)
+        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False)
 
 
 if __name__ == '__main__':
