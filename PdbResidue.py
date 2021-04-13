@@ -2,6 +2,8 @@ import warnings
 import numpy as np 
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
+from Bio.PDB.Atom import Atom
+from Bio.PDB.Chain import Chain
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS
 from copy import copy
@@ -13,7 +15,8 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None):
+                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None, 
+                 dummy_structure=False):
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
         self.resname = resname
@@ -25,6 +28,9 @@ class PdbResidue:
         self.chiral_id = chiral_id
         self.reference_residue = None
         self.structure = None
+        self.dummy_structure = None
+        if dummy_structure:
+            self.add_dummy_structure()
 
     def __str__(self):
         """Returns one-letter representation"""
@@ -94,6 +100,17 @@ class PdbResidue:
                 return False
         else:
             return False
+
+    def add_dummy_structure(self):
+        """Adds a dummy atom of zero coordinates to mark a gap in visualisation
+        software"""
+        dummy_atom = Atom('DUM', np.zeros(3), 0, 1, ' ', 'DUM' , -999)
+        dummy_residue = Residue((' ', -1*self.chiral_id, ' '), 'DUM', '?')
+        dummy_residue.add(dummy_atom)
+        dummy_chain = Chain('?')
+        dummy_chain.add(dummy_residue)
+        self.dummy_structure = dummy_residue
+        return True
 
     def get_distance(self, other, minimum=True):
         """Get distance of two residues. If minimum=True, minimum distance

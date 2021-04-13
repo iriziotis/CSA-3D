@@ -481,7 +481,7 @@ class PdbSite:
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
 
-    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False):
+    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
         """
         Writes site coordinates in PDB format
         Args:
@@ -536,8 +536,13 @@ class PdbSite:
             if write_hets:
                 residues += self.nearby_hets
             for res in residues:
-                if res.structure is not None:
-                    for atom in res.structure:
+                if not include_dummy_atoms and res.is_gap:
+                    continue
+                structure = res.structure
+                if res.dummy_structure:
+                    structure = res.dummy_structure
+                if structure is not None:
+                    for atom in structure:
                         if func_atoms_only and type(res) == PdbResidue:
                             resname = res.resname.upper()
                             if res.has_main_chain_function or not res.is_standard:
@@ -684,7 +689,8 @@ class PdbSite:
             if not found:
                 gap = PdbResidue(mcsa_id=self.mcsa_id, 
                                  pdb_id=self.pdb_id, 
-                                 chiral_id=reference_residue.chiral_id)
+                                 chiral_id=reference_residue.chiral_id,
+                                 dummy_structure=True)
                 gap.reference_residue = reference_residue
                 self.add(gap)
         self._reorder()
@@ -692,7 +698,7 @@ class PdbSite:
 
     def _get_func_atoms(self, allow_symmetrics=True, omit=None):
         """Gets atoms and coordinates for superposition and atom reordering
-        calculations
+        calculations        
 
         Args:
             allow_symmetrics: If True, equivalent residues and atoms
@@ -888,6 +894,31 @@ class PdbSite:
         return result
     
     @staticmethod
+    def _confidence_score(site):
+        from scipy import stats
+        # Calculate mean distance from other residues, for each residue
+
+        meandists = np.zeros(site.size)
+        for i,p in enumerate(site):
+            if p.is_gap:
+                meandists[i] = np.nan
+                continue
+            dists = np.zeros(site.size)
+            for j,q in enumerate(site):
+                if p == q:
+                    continue
+                if q.is_gap:
+                    dists[j] = np.nan
+                    continue
+                dists[j] = p.get_distance(q, minimum=True)
+            meandists[i] = np.nanmean(dists)
+        meandists = meandists[~np.isnan(meandists)]
+        z = 0.6745*(meandists - np.median(meandists))/stats.median_absolute_deviation(meandists)
+        z = z[z>3]
+
+        print(site.id, np.round(meandists,2), np.round(z, 2))
+
+    @staticmethod
     def _mark_unclustered(sitelist):
         """Returns a clean list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
@@ -898,6 +929,7 @@ class PdbSite:
         except IndexError:
             return False
         for p in sitelist:
+            PdbSite._confidence_score(p)
             p.is_sane = True
             p_dists = np.nan_to_num(p.get_distances(minimum=False), nan=0)
             if not np.all((p_dists < 3*ref_dists)):
