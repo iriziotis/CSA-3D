@@ -894,31 +894,6 @@ class PdbSite:
         return result
     
     @staticmethod
-    def _confidence_score(site):
-        from scipy import stats
-        # Calculate mean distance from other residues, for each residue
-
-        meandists = np.zeros(site.size)
-        for i,p in enumerate(site):
-            if p.is_gap:
-                meandists[i] = np.nan
-                continue
-            dists = np.zeros(site.size)
-            for j,q in enumerate(site):
-                if p == q:
-                    continue
-                if q.is_gap:
-                    dists[j] = np.nan
-                    continue
-                dists[j] = p.get_distance(q, minimum=True)
-            meandists[i] = np.nanmean(dists)
-        meandists = meandists[~np.isnan(meandists)]
-        z = 0.6745*(meandists - np.median(meandists))/stats.median_absolute_deviation(meandists)
-        z = z[z>3]
-
-        print(site.id, np.round(meandists,2), np.round(z, 2))
-
-    @staticmethod
     def _mark_unclustered(sitelist):
         """Returns a clean list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
@@ -929,7 +904,6 @@ class PdbSite:
         except IndexError:
             return False
         for p in sitelist:
-            PdbSite._confidence_score(p)
             p.is_sane = True
             p_dists = np.nan_to_num(p.get_distances(minimum=False), nan=0)
             if not np.all((p_dists < 3*ref_dists)):
