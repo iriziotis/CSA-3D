@@ -34,4 +34,3 @@ def color_catres(selection, palette=None):
         # Color residues
         for c, sele in zip(colors, residues):
             cmd.color(c, sele)  
-

@@ -1,5 +1,5 @@
 import warnings
-import numpy as np 
+import numpy as np
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
@@ -15,7 +15,7 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None, 
+                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None,
                  dummy_structure=False):
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
@@ -83,8 +83,8 @@ class PdbResidue:
             return True
         if type(structure) == Residue:
             if structure.get_resname().capitalize() == self.resname and \
-               structure.get_parent().get_id() == self.chain and \
-               structure.get_id()[1] == self.auth_resid:
+                    structure.get_parent().get_id() == self.chain and \
+                    structure.get_id()[1] == self.auth_resid:
                 self.structure = structure
                 return True
         if type(structure) == Structure:
@@ -94,7 +94,7 @@ class PdbResidue:
                     self.structure = residue.copy()
                     self.structure.set_parent(residue.get_parent())
                     return True
-            except KeyError as e:
+            except KeyError:
                 if self.is_reference:
                     warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
                 return False
@@ -104,8 +104,8 @@ class PdbResidue:
     def add_dummy_structure(self):
         """Adds a dummy atom of zero coordinates to mark a gap in visualisation
         software"""
-        dummy_atom = Atom('DUM', np.zeros(3), 0, 1, ' ', 'DUM' , -999)
-        dummy_residue = Residue((' ', -1*self.chiral_id, ' '), 'DUM', '?')
+        dummy_atom = Atom('DUM', np.zeros(3), 0, 1, ' ', 'DUM', -999)
+        dummy_residue = Residue((' ', -1 * self.chiral_id, ' '), 'DUM', '?')
         dummy_residue.add(dummy_atom)
         dummy_chain = Chain('?')
         dummy_chain.add(dummy_residue)
@@ -116,15 +116,13 @@ class PdbResidue:
         """Get distance of two residues. If minimum=True, minimum distance
         is calculated. If False, distance of CAs is returned"""
         # TODO make it use either CAs or minimum distance
-        x = None
-        y = None
         if self.structure is None or other.structure is None:
-            return np.nan 
+            return np.nan
         if minimum:
             min_dist = 999
             for i in self.structure.get_atoms():
                 for j in other.structure.get_atoms():
-                    dist = i-j
+                    dist = i - j
                     if dist < min_dist:
                         min_dist = dist
             return min_dist
@@ -138,7 +136,7 @@ class PdbResidue:
         """Check if residues share the same pdb_id, chiral_id, name, resid
         and auth_resid"""
         basic = self.pdb_id == other.pdb_id and self.resname == other.resname and \
-                (self.resid == other.resid or self.auth_resid == other.auth_resid) 
+                (self.resid == other.resid or self.auth_resid == other.auth_resid)
         chiral_ids = self.chiral_id == other.chiral_id
         chains = self.chain == other.chain
 
@@ -149,7 +147,6 @@ class PdbResidue:
         if by_chain:
             return basic and chains
         return basic
-
 
     def get_func_atoms(self, allow_symmetrics=True):
         """Gets atoms and coordinates for superposition and atom reordering
@@ -171,7 +168,7 @@ class PdbResidue:
         coords = []
         if not self.structure:
             return np.array(atoms), np.array(coords)
-        for atom in self.structure: 
+        for atom in self.structure:
             resname = self.resname.upper()
             if allow_symmetrics:
                 if self.has_main_chain_function:
@@ -210,7 +207,7 @@ class PdbResidue:
             return
         if self.auth_resid < 1000 or len(self.chain) > 1:
             return self.auth_resid
-        return int(str(self.auth_resid)[1:]) + (ord(self.chain)-65)*1000
+        return int(str(self.auth_resid)[1:]) + (ord(self.chain) - 65) * 1000
 
     @property
     def is_gap(self):
@@ -266,7 +263,6 @@ class PdbResidue:
                     else pdb_res['chain_name']
                 funclocs = [residue['function_location_abv']]
 
-
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
                           chain, funclocs, is_reference, chiral_id)
         except KeyError:
@@ -288,15 +284,14 @@ class PdbResidue:
         letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         if to_dash:
             if len(chain) == 2 and all(c.isalpha for c in chain):
-                return "{}-{}".format(chain[0], letters.find(chain[1])+2)
+                return "{}-{}".format(chain[0], letters.find(chain[1]) + 2)
             else:
                 return chain
         else:
             if '-' in chain:
-                return "{}{}".format(chain.split("-")[0], letters[int(chain.split("-")[1])-2])
+                return "{}{}".format(chain.split("-")[0], letters[int(chain.split("-")[1]) - 2])
             else:
                 return chain
-
 
 
 class Het(PdbResidue):
@@ -305,6 +300,7 @@ class Het(PdbResidue):
                       from a pre-compiled dataset)
         centrality: the mean minimum distance of the het to the catalytic
     """
+
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
                  chain='', parity_score=None, centrality=None):
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
@@ -340,4 +336,3 @@ class Het(PdbResidue):
             return 'P'
         else:
             return 'H'
-

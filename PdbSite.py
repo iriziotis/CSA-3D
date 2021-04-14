@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from copy import copy
 from Bio.PDB.Structure import Structure
@@ -5,7 +6,7 @@ from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
-from Bio.PDB.PDBExceptions import PDBConstructionException
+from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import PDB2EC, PDB2UNI
@@ -13,8 +14,6 @@ from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
 from .LigandBox import LigandBox
 
-import warnings
-from Bio import PDBConstructionWarning
 warnings.simplefilter('ignore', PDBConstructionWarning)
 
 class PdbSite:
