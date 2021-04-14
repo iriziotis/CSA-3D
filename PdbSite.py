@@ -1,5 +1,4 @@
 import numpy as np
-import warnings
 from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
@@ -14,6 +13,9 @@ from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
 from .LigandBox import LigandBox
 
+import warnings
+from Bio import PDBConstructionWarning
+warnings.simplefilter('ignore', PDBConstructionWarning)
 
 class PdbSite:
     """M-CSA PDB catalytic site. Contains lists of PdbResidues and mapped UniProt
@@ -543,18 +545,18 @@ class PdbSite:
                     structure = res.dummy_structure
                 if structure is not None:
                     for atom in structure:
-                        if func_atoms_only and type(res) == PdbResidue:
-                            resname = res.resname.upper()
-                            if res.has_main_chain_function or not res.is_standard:
-                                resname = 'ANY'
-                            if '{}.{}'.format(resname, atom.get_id().upper()) not in RESIDUE_DEFINITIONS:
-                                continue
+                        resname = res.resname.upper()
+                        if res.has_main_chain_function or not res.is_standard:
+                            resname = 'ANY'
+                        funcstring = '{}.{}'.format(resname, atom.get_id().upper())
+                        if func_atoms_only and type(res) == PdbResidue and funcstring not in RESIDUE_DEFINITIONS:
+                            continue
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}' \
                                    '{:>8.3f}{:>8.3f} {:6}'.format(
                             'HETATM' if (atom.get_parent().get_id()[0] != ' ' or type(res) == Het) else 'ATOM',
                             int(atom.get_serial_number()) if atom.get_serial_number() else 0,
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name),
-                            atom.get_altloc(),
+                            'Z' if funcstring in RESIDUE_DEFINITIONS else atom.get_altloc(),
                             atom.get_parent().get_resname(),
                             atom.get_parent().get_parent().get_id(),
                             atom.get_parent().get_id()[1],
