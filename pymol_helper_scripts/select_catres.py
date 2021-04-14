@@ -9,13 +9,15 @@ def select_catres(selection):
     groups = defaultdict(list)
     for obj in cmd.get_object_list(f'{selection}'):
         stored.ranked_atoms = {}
-        cmd.iterate(obj, "stored.ranked_atoms[rank] = f'/{model}//{chain}/{resi}'")
+        cmd.iterate(obj, "stored.ranked_atoms[rank] = (f'/{model}//{chain}/{resi}', type)")
 
         # Make a list of residue selections, in the same order as in the PDB
         residues = []
         for k,v in sorted(stored.ranked_atoms.items()):
-            if v not in residues:
-                residues.append(v)
+            if v[1] == 'HETATM':
+                continue
+            if v[0] not in residues:
+                residues.append(v[0])
 
         for i, sele in enumerate(residues):
             groups[i].append(sele)
