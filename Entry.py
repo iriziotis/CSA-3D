@@ -65,15 +65,21 @@ class Entry:
         """Return a generator of all UniProt sites"""
         yield from self.unisites
 
-    def get_pdbsites(self, pdb_id=None):
+    def get_pdbsites(self, pdb_id=None, sane_only=False):
         """Return a generator of PDB active sites that have the same PDB ID,
         or a generator of all PdbSites"""
         result = []
         if not pdb_id:
-            yield from self.pdbsites
+            for site in self.pdbsites:
+                if sane_only and not site.is_sane:
+                    continue
+                yield site
         else:
             result = [val for key, val in self.pdbsites_dict.items() if pdb_id in key]
-        yield from result
+        for site in result:
+            if sane_only and not site.is_sane:
+                continue
+            yield site
 
     def update_mapped_sites(self):
         """Updates the mapping of all UniProt catalytic sites to their
@@ -90,7 +96,7 @@ class Entry:
                                 unisite.mapped_pdbsites.append(pdbsite)
         return True
 
-    def all_vs_all(self, sane_only=True):
+    def all_vs_all(self, sane_only=False):
         """Returns a generator with all combinations of PDB sites in the entry.
         If sane_only, insane sites are excuded."""
         seen = set()
