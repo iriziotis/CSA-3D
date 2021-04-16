@@ -1,3 +1,8 @@
+import numpy as np
+import pandas as pd
+from scipy.spatial.distance import squareform, pdist
+from scipy.cluster.hierarchy import linkage, cut_tree
+from collections import defaultdict
 from .config import UNI2PDB
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -112,3 +117,42 @@ class Entry:
                     continue
                 seen.add((p.id, q.id))
                 yield p, q
+
+    def rmsd_matrix(self, sitelist):
+        """Contstructs RMSD matrix for the sites provided in sitelist"""
+        rmsds = []
+        ids = []
+        seen = set()
+        for p in sitelist:
+            ids.append(p.id)
+            for q in sitelist:
+                if p.id == q.id or (q.id, p.id) in seen:
+                    continue
+                seen.add((p.id, q.id))
+                try:
+                    _, _, _, rms_all = p.fit(q, weighted=True)
+                except Exception:
+                    _, _, _, rms_all = p.fit(q, weighted=False, cycles=10, cutoff=5)
+                rmsds.append(rms_all)
+        rmsds = np.array(rmsds, dtype='float32')
+        matrix = pd.DataFrame(squareform(rmsds), columns=ids, index=ids)
+        return matrix
+
+    def clustering(self, matrix, outdir=None, height=None):
+        """Performs hierarchical clustering on the provided RMSD matrix."""
+        ids = list(matrix.index)
+        # Compute linkage matrix
+        Z = linkage(matrix, method='average')
+        # Cut tree at automatic height
+        if not height:
+            height = 0.7 * max(Z[:, 2])
+        # Get clusters index
+        clusters = cut_tree(Z, height=height).flatten()
+        # Group sites to clusters
+        cluster_dict = defaultdict(list)
+        for cluster in np.unique(clusters):
+            for i, id in zip(clusters, ids):
+                if i == cluster:
+                    cluster_dict[cluster].append(self.get_pdbsite(id))
+        return Z, cluster_dict
+

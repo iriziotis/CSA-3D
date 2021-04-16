@@ -14,27 +14,24 @@ def main(mcsa_id):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    ## Entry 789
-    #a = entry.get_pdbsite('5j7t_A-A-A-A')
-    #b = entry.get_pdbsite('5chv_A-A-A-A')
-    #_,_,_, rb = b.fit(a, weighted=True, scaling_factor=None, transform=True)
-    #print(rb)
-    ## TODO fix bug in parent detachment in het atoms
-    #a.write_pdb(outfile='a.pdb', func_atoms_only=False, write_hets=True)
-    #b.write_pdb(outfile='b.pdb', func_atoms_only=False, write_hets=True)
+    sitelist = [s for s in entry.get_pdbsites(sane_only=True) if  (s.is_conserved or s.is_conservative_mutation)]
+    matrix = entry.rmsd_matrix(sitelist)
+    Z, clusters = entry.clustering(matrix)
+    import matplotlib.pyplot as plt
+    from scipy.cluster.hierarchy import dendrogram
+    fig, ax = plt.subplots()
+    dendrogram(Z, labels=matrix.index, ax=ax)
 
-    # Entry 1
-    #a = entry.get_pdbsite('2jfv_AA-AA-AA-AA-AA-AA')
-    #b = entry.get_pdbsite('2jfp_A-A-A-A-A-A')
-    #_,_,_, rb = a.fit(b, weighted=True, scaling_factor=None, transform=True)
-    #a.write_pdb(outfile='a.pdb', func_atoms_only=True)
-    #b.write_pdb(outfile='b.pdb', func_atoms_only=True)
+    print(clusters)
+    plt.show()
 
-    for i, pdbsite in enumerate(entry.pdbsites):
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
-        #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
-        #print(pdbsite.id, rms, rms_all, per_res_rms)
-        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
+
+
+    #for i, pdbsite in enumerate(entry.pdbsites):
+    #    rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+    #    #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
+    #    #print(pdbsite.id, rms, rms_all, per_res_rms)
+    #    pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
 
 
 if __name__ == '__main__':
