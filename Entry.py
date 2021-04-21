@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import squareform, pdist
@@ -14,6 +15,7 @@ class Entry:
 
     def __init__(self, mcsa_id=None):
         self.mcsa_id = mcsa_id
+        self.info = None
         self.unisites = []
         self.unisites_dict = {}
         self.pdbsites = []
@@ -117,6 +119,7 @@ class Entry:
                     continue
                 seen.add((p.id, q.id))
                 yield p, q
+
 
     def rmsd_matrix(self, sitelist):
         """Contstructs RMSD matrix for the sites provided in sitelist"""

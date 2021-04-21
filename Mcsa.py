@@ -2,7 +2,8 @@ import json
 import warnings
 from collections import defaultdict
 from glob import glob
-from .config import INFO_JSON, ASSEMBLIES_DIR
+from natsort import natsorted
+from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR
 from .Entry import Entry
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -18,9 +19,9 @@ class Mcsa:
     the residue_definitions.py module."""
 
     def __init__(self):
-        self.info_json = INFO_JSON
         self.entries = dict()
-        self.json_residues = self._get_residue_info(self.info_json)
+        self.mcsa_entry_info = self._get_mcsa_entry_info(MCSA_ENTRY_INFO)
+        self.catalytic_residue_info = self._get_residue_info(CAT_RES_INFO)
         self.pdb_residues = defaultdict(lambda: defaultdict(list))
         self.uni_residues = defaultdict(lambda: defaultdict(list))
         self.ref_pdb_residues = defaultdict(list)
@@ -29,7 +30,7 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entries=None, annotate=True, redundancy_cutoff=None, verbose=False):
+    def build(self, entry_ids=None, annotate=True, redundancy_cutoff=None, verbose=False):
         """
         Builds M-CSA entries (Entry objects) containing PDB and UniProt
         catalytic sites (PdbSite and UniSite objects respectively
@@ -42,27 +43,29 @@ class Mcsa:
                       cost in execution time.
             verbose: Output the active site under process
         """
-        if not entries:
-            entries = self.json_residues.keys()
-        if type(entries) != list:
-            entries = [entries]
-        for entry in entries:
-            if entry in self.json_residues.keys():
-                self._build_pdb_residues(entry)
-                self._build_uniprot_residues(entry)
+        if not entry_ids:
+            entry_ids = self.catalytic_residue_info.keys()
+        if type(entry_ids) != list:
+            entry_ids = [entry_ids]
+        for entry_id in entry_ids:
+            if entry_id in self.catalytic_residue_info.keys():
+                self.entries[entry_id] = Entry(entry_id)
+                self._build_pdb_residues(entry_id)
+                self._build_uniprot_residues(entry_id)
 
                 # TODO check cases with two pdb references
-                if len(set([r.pdb_id for r in self.ref_pdb_residues[entry]]))>1:
+                if len(set([r.pdb_id for r in self.ref_pdb_residues[entry_id]]))>1:
                     print('Has multiple PDB references. Not yet implemented')
                     return False
                 # Temporary, until I implement treating of multiple references
                 # TODO see cases like mcsa 212 - Multiple uniprot reference seqs
-                if len(set([r.uniprot_id for r in self.ref_uni_residues[entry]]))>1:
+                if len(set([r.uniprot_id for r in self.ref_uni_residues[entry_id]]))>1:
                     print('Has multiple UniProt references. Not yet implemented')
                     return False
 
-                self._build_pdb_sites(entry, annotate, redundancy_cutoff, verbose)
-                self._build_uniprot_sites(entry)
+                self._build_pdb_sites(entry_id, annotate, redundancy_cutoff, verbose)
+                self._build_uniprot_sites(entry_id)
+                self.entries[entry_id].info = self.mcsa_entry_info[entry_id]
             else:
                 return False
         return True
@@ -76,7 +79,7 @@ class Mcsa:
 
     # Properties
 
-    @property
+    @property 
     def nofentries(self):
         return len(self.entries.keys())
 
@@ -89,7 +92,7 @@ class Mcsa:
         and creates individual instances for them"""
         reference_residue = None
         seen = set()
-        for chiral_id, json_res in enumerate(self.json_residues[entry]):
+        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry]):
             for residue in PdbResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
@@ -102,7 +105,7 @@ class Mcsa:
         """Builds UniResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json)"""
         reference_residue = None
-        for chiral_id, json_res in enumerate(self.json_residues[entry]):
+        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry]):
             for residue in UniResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
@@ -122,7 +125,6 @@ class Mcsa:
                       cost in execution time.
             verbose: Output the active site under process
         """
-        self.entries[entry] = Entry(entry)
         try:
             ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
         except (IndexError, KeyError):
@@ -131,7 +133,7 @@ class Mcsa:
         reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry],
                                                  self._get_cif_path(ref_pdb_id), annotate)
         self.entries[entry].add(reference_site)
-        for pdb_id, pdb in self.pdb_residues[entry].items():
+        for pdb_id, pdb in enumerate(self.pdb_residues[entry].items()):
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id),
                                           annotate, redundancy_cutoff):
                 if verbose:
@@ -141,8 +143,6 @@ class Mcsa:
     def _build_uniprot_sites(self, entry):
         """Builds UniSite objects from UniResidue lists and adds them
         to Entry objects"""
-        if entry not in self.entries:
-            self.entries[entry] = Entry(entry)
         reference_site = UniSite.build(self.ref_uni_residues[entry])
         self.entries[entry].add(reference_site)
         for uniprot_id, uniprot in self.uni_residues[entry].items():
@@ -150,6 +150,19 @@ class Mcsa:
             self.entries[entry].add(site)
 
     # Static methods
+
+    @staticmethod
+    def _get_mcsa_entry_info(jsons_wildcard):
+        """
+        Get all basic info for an entry from the Json
+        """
+        # Make dict with entry info
+        entry_info = {}
+        for chunk in natsorted(glob(jsons_wildcard)):
+            with open(chunk, 'r') as f:
+                for result in json.load(f)['results']:
+                    entry_info[result['mcsa_id']] = result
+        return entry_info
 
     @staticmethod
     def _get_residue_info(json_file):
