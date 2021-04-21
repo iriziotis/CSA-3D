@@ -14,24 +14,13 @@ def main(mcsa_id):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    sitelist = [s for s in entry.get_pdbsites(sane_only=True) if  (s.is_conserved or s.is_conservative_mutation)]
-    matrix = entry.rmsd_matrix(sitelist)
-    Z, clusters = entry.clustering(matrix)
-    import matplotlib.pyplot as plt
-    from scipy.cluster.hierarchy import dendrogram
-    fig, ax = plt.subplots()
-    dendrogram(Z, labels=matrix.index, ax=ax)
+    for i, pdbsite in enumerate(entry.pdbsites):
+        print(pdbsite.acts_on_polymer)
 
-    print(clusters)
-    plt.show()
-
-
-
-    #for i, pdbsite in enumerate(entry.pdbsites):
-    #    rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
-    #    #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
-    #    #print(pdbsite.id, rms, rms_all, per_res_rms)
-    #    pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
+        #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+        ##per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
+        ##print(pdbsite.id, rms, rms_all, per_res_rms)
+        #pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
 
 
 if __name__ == '__main__':

@@ -89,6 +89,12 @@ class UniSite:
         return len(self.residues)
 
     @property
+    def acts_on_polymer(self):
+        """Check if it belongs to a family of enzymes whose substrate is a polymer
+        (protein or nucleic)"""
+        return self.parent_entry.info['reaction']['is_polymeric']
+
+    @property
     def is_reference(self):
         """Check if site is reference site"""
         if self.size > 0:

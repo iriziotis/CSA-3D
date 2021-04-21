@@ -132,8 +132,9 @@ class Mcsa:
             return
         reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry_id],
                                                  self._get_cif_path(ref_pdb_id), annotate)
+        reference_site.parent_entry = self.entries[entry_id]
         self.entries[entry_id].add(reference_site)
-        for pdb_id, pdb in enumerate(self.pdb_residues[entry_id].items()):
+        for pdb_id, pdb in self.pdb_residues[entry_id].items():
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id),
                                           annotate, redundancy_cutoff):
                 if verbose:
@@ -145,6 +146,7 @@ class Mcsa:
         """Builds UniSite objects from UniResidue lists and adds them
         to Entry objects"""
         reference_site = UniSite.build(self.ref_uni_residues[entry_id])
+        reference_site.parent_entry = self.entries[entry_id]
         self.entries[entry_id].add(reference_site)
         for uniprot_id, uniprot in self.uni_residues[entry_id].items():
             site = UniSite.build(uniprot, reference_site)
