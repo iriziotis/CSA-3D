@@ -8,7 +8,8 @@ WORKING_DIR = '/Users/riziotis/ebi/phd'
 if not os.path.isdir(WORKING_DIR):
     WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd'
 ASSEMBLIES_DIR = '{}/datasets/assembly_cif'.format(WORKING_DIR)
-INFO_JSON = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
+CAT_RES_INFO = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
+MCSA_ENTRY_INFO = '{}/datasets/mcsa_entry_info/mcsa_entry_info.*.json'.format(WORKING_DIR)
 
 uniprot_pdb_mapping_csv = '{}/datasets/sifts/uniprot_pdb.csv'.format(WORKING_DIR)
 pdb_uniprot_mapping_csv = '{}/datasets/sifts/pdb_chain_uniprot.csv'.format(WORKING_DIR)
@@ -16,6 +17,7 @@ pdb_ec_mapping_csv = '{}/datasets/sifts/pdb_chain_enzyme.csv'.format(WORKING_DIR
 compound_similarities_json = '{}/datasets/bound_ligands/parity_data/compound_similarities.json'.format(WORKING_DIR)
 pdbe_cofactors_csv = '{}/datasets/bound_ligands/pdbe-kb_data/pdb_cofactors.csv'.format(WORKING_DIR)
 mcsa_cofactors_csv = '{}/datasets/bound_ligands/mcsa_data/mcsa_cofactors.csv'.format(WORKING_DIR)
+crystallization_hets = '{}/datasets/crystallization_hets.csv'.format(WORKING_DIR)
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:
@@ -49,14 +51,7 @@ with open(mcsa_cofactors_csv, 'r') as f:
     next(f)
     METAL_COFACTORS = {line[1] for line in csv.reader(f, quotechar='"') if line[3]=="True"}
 
-
-
-
-
-
-
-
-
-
-
+# Crystallization artefact HETs set
+with open(crystallization_hets, 'r') as f:
+    CRYSTALLIZATION_HETS = {line.strip() for line in f}
 
