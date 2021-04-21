@@ -85,14 +85,14 @@ class Mcsa:
 
     # Private methods
 
-    def _build_pdb_residues(self, entry):
+    def _build_pdb_residues(self, entry_id):
         """Builds PdbResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json). Extracts
         all equivalent residues from identical chains in biological assemblies,
         and creates individual instances for them"""
         reference_residue = None
         seen = set()
-        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry]):
+        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry_id]):
             for residue in PdbResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
@@ -101,11 +101,11 @@ class Mcsa:
                     self.pdb_residues[residue.mcsa_id][residue.pdb_id].append(residue)
                 residue.reference_residue = reference_residue
 
-    def _build_uniprot_residues(self, entry):
+    def _build_uniprot_residues(self, entry_id):
         """Builds UniResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json)"""
         reference_residue = None
-        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry]):
+        for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry_id]):
             for residue in UniResidue.from_json(json_res, chiral_id):
                 if residue.is_reference:
                     reference_residue = residue
@@ -114,7 +114,7 @@ class Mcsa:
                     self.uni_residues[residue.mcsa_id][residue.uniprot_id].append(residue)
                 residue.reference_residue = reference_residue
 
-    def _build_pdb_sites(self, entry, annotate=True, redundancy_cutoff=None, verbose=False):
+    def _build_pdb_sites(self, entry_id, annotate=True, redundancy_cutoff=None, verbose=False):
         """
         Builds PdbSite objects from PdbResidue lists using distance
         criteria and adds them to Entry objects.
@@ -126,28 +126,30 @@ class Mcsa:
             verbose: Output the active site under process
         """
         try:
-            ref_pdb_id = self.ref_pdb_residues[entry][0].pdb_id
+            ref_pdb_id = self.ref_pdb_residues[entry_id][0].pdb_id
         except (IndexError, KeyError):
             print('No reference PDB structure')
             return
-        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry],
+        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry_id],
                                                  self._get_cif_path(ref_pdb_id), annotate)
-        self.entries[entry].add(reference_site)
-        for pdb_id, pdb in enumerate(self.pdb_residues[entry].items()):
+        self.entries[entry_id].add(reference_site)
+        for pdb_id, pdb in enumerate(self.pdb_residues[entry_id].items()):
             for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id),
                                           annotate, redundancy_cutoff):
                 if verbose:
                     print(site.id, site)
-                self.entries[entry].add(site)
+                site.parent_entry = self.entries[entry_id]
+                self.entries[entry_id].add(site)
 
-    def _build_uniprot_sites(self, entry):
+    def _build_uniprot_sites(self, entry_id):
         """Builds UniSite objects from UniResidue lists and adds them
         to Entry objects"""
-        reference_site = UniSite.build(self.ref_uni_residues[entry])
-        self.entries[entry].add(reference_site)
-        for uniprot_id, uniprot in self.uni_residues[entry].items():
+        reference_site = UniSite.build(self.ref_uni_residues[entry_id])
+        self.entries[entry_id].add(reference_site)
+        for uniprot_id, uniprot in self.uni_residues[entry_id].items():
             site = UniSite.build(uniprot, reference_site)
-            self.entries[entry].add(site)
+            site.parent_entry = self.entries[entry_id]
+            self.entries[entry_id].add(site)
 
     # Static methods
 

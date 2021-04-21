@@ -27,6 +27,7 @@ class PdbSite:
     mmCIF assembly structure file and SIFTS"""
 
     def __init__(self):
+        self.parent_entry = None
         self.residues = []
         self.residues_dict = {}
         self.mapped_unisites = []

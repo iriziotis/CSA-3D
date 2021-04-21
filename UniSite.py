@@ -7,6 +7,7 @@ class UniSite:
     catalytic sites (UniSite objects)."""
 
     def __init__(self):
+        self.parent_entry = None
         self.residues = []
         self.residues_dict = {}
         self.mapped_pdbsites = []
