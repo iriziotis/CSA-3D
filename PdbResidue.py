@@ -5,7 +5,7 @@ from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Chain import Chain
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
-from .config import PDBID_COFACTORS, METAL_COFACTORS
+from .config import PDBID_COFACTORS, METAL_COFACTORS, CRYSTALLIZATION_HETS
 from copy import copy
 
 
@@ -308,6 +308,10 @@ class Het(PdbResidue):
         self.centrality = centrality
 
     @property
+    def is_artefact(self):
+        """Check if component is known to be used in protein crystallization media"""
+        return self.resname in CRYSTALLIZATION_HETS
+    @property
     def is_peptide(self):
         """Check if component is from a peptide moiety"""
         if self.structure:
@@ -326,13 +330,15 @@ class Het(PdbResidue):
 
     @property
     def flag(self):
-        """An identifier to tell if component is a peptide, a cofactor or a metallic
-        compound"""
+        """An identifier to tell if component is an artefact, a peptide, a cofactor or a metallic
+        compound (in priority order)."""
+        flag = 'H'
+        if self.is_artefact:
+            flag = 'A'
         if self.is_metal:
-            return 'M'
-        if self.is_cofactor:
-            return 'C'
+            flag = 'M'
         if self.is_peptide:
-            return 'P'
-        else:
-            return 'H'
+            flag = 'P'
+        if self.is_cofactor:
+            flag = 'C'
+        return flag

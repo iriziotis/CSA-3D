@@ -475,7 +475,6 @@ class PdbSite:
                         if len(het.structure.child_list) > 0:
                             break
                     het.structure.set_parent(residue.get_parent())
-
                     het.parity_score = box.similarity_with_cognate(het)
                     het.centrality = box.mean_distance_from_residues(het)
                     nearby_hets.append(het)

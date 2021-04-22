@@ -15,7 +15,8 @@ def main(mcsa_id):
         os.makedirs(outdir)
 
     for i, pdbsite in enumerate(entry.pdbsites):
-        print(pdbsite.acts_on_polymer)
+        for h in pdbsite.nearby_hets:
+            print(pdbsite.id, h.resname, h.chain, h.resid, h.flag, h.parity_score)
 
         #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
         ##per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
