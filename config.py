@@ -4,20 +4,27 @@ import json
 from ast import literal_eval
 from collections import defaultdict
 
-WORKING_DIR = '/Users/riziotis/ebi/phd'
+WORKING_DIR = '/Users/riziotis/ebi/phd/datasets/'
 if not os.path.isdir(WORKING_DIR):
-    WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd'
-ASSEMBLIES_DIR = '{}/datasets/assembly_cif'.format(WORKING_DIR)
-CAT_RES_INFO = '{}/datasets/catalytic_residues_homologues.json'.format(WORKING_DIR)
-MCSA_ENTRY_INFO = '{}/datasets/mcsa_entry_info/mcsa_entry_info.*.json'.format(WORKING_DIR)
+    WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd/datasets/'
+ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif'
+REACTION_MOLS_DIR = WORKING_DIR + 'kegg/mols'
+HET_MOLS_DIR = WORKING_DIR + 'pdbe/het_sdf'
+CAT_RES_INFO = WORKING_DIR + 'mcsa/catalytic_residues_homologues.json'
+MCSA_ENTRY_INFO = WORKING_DIR + 'mcsa/entry_info/mcsa_entry_info.*.json'
 
-uniprot_pdb_mapping_csv = '{}/datasets/sifts/uniprot_pdb.csv'.format(WORKING_DIR)
-pdb_uniprot_mapping_csv = '{}/datasets/sifts/pdb_chain_uniprot.csv'.format(WORKING_DIR)
-pdb_ec_mapping_csv = '{}/datasets/sifts/pdb_chain_enzyme.csv'.format(WORKING_DIR)
-compound_similarities_json = '{}/datasets/bound_ligands/parity_data/compound_similarities.json'.format(WORKING_DIR)
-pdbe_cofactors_csv = '{}/datasets/bound_ligands/pdbe-kb_data/pdb_cofactors.csv'.format(WORKING_DIR)
-mcsa_cofactors_csv = '{}/datasets/bound_ligands/mcsa_data/mcsa_cofactors.csv'.format(WORKING_DIR)
-crystallization_hets = '{}/datasets/crystallization_hets.csv'.format(WORKING_DIR)
+# SIFTS
+uniprot_pdb_mapping_csv = WORKING_DIR + 'sifts/uniprot_pdb.csv'
+pdb_uniprot_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_uniprot.csv'
+pdb_ec_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_enzyme.csv'
+# KEGG
+ec_reaction_mapping_csv = WORKING_DIR + 'kegg/ec_reaction.csv'
+# Ligands
+compound_similarities_json = WORKING_DIR + 'bound_ligands/parity_data/compound_similarities.json'
+pdbe_cofactors_csv = WORKING_DIR + 'bound_ligands/pdb_cofactors.csv'
+mcsa_cofactors_csv = WORKING_DIR + 'bound_ligands/mcsa_cofactors.csv'
+crystallization_hets = WORKING_DIR + 'pdbe/crystallization_hets.csv'
+het_info_csv = WORKING_DIR + 'pdbe/het_all_info.csv'
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:
@@ -55,3 +62,10 @@ with open(mcsa_cofactors_csv, 'r') as f:
 with open(crystallization_hets, 'r') as f:
     CRYSTALLIZATION_HETS = {line.strip() for line in f}
 
+# EC - reaction components mapping
+with open(ec_reaction_mapping_csv, 'r') as f:
+    EC_REACTION = {line[0]: ([line[1].split(';'), line[2].split(';')]) for line in csv.reader(f, quotechar='"')}
+
+# HET to SMILES mapping
+with open(het_info_csv, 'r') as f:
+    HET2SMILES = {line[0]: line[3] for line in csv.reader(f, quotechar='"')}
