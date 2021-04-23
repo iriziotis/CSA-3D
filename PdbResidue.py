@@ -311,6 +311,7 @@ class Het(PdbResidue):
     def is_artefact(self):
         """Check if component is known to be used in protein crystallization media"""
         return self.resname in CRYSTALLIZATION_HETS
+
     @property
     def is_peptide(self):
         """Check if component is from a peptide moiety"""

@@ -1,8 +1,10 @@
+import os
 import numpy as np
+import parity_core
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Structure import Structure
 from .PdbResidue import PdbResidue, Het
-from .config import COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI
+from .config import REACTION_MOLS_DIR, HET_MOLS_DIR,  COMPOUND_SIMILARITIES, PDB2EC, PDB2UNI, HET2SMILES, EC_REACTION
 from .residue_definitions import RESIDUE_DEFINITIONS
 
 class LigandBox:
@@ -53,7 +55,48 @@ class LigandBox:
         elif p_key in COMPOUND_SIMILARITIES:
             return float(COMPOUND_SIMILARITIES[p_key])
         else:
-            return None
+            if het.flag != 'P':
+                try:
+                    return self.generate_parity(hetcode)
+                except Exception as e:
+                    return None
+
+    def generate_parity(self, hetcode):
+        ec = self.site.ec
+        try:
+            b_sdf = f'{HET_MOLS_DIR}/{hetcode}.sdf'
+            cognate_reactants, cognate_products = EC_REACTION[ec]
+        except KeyError:
+            return
+        max_score = 0.0
+        match = None
+        component_type = None
+        for components in (cognate_reactants, cognate_products):
+            for c in components:
+                c_sdf = f'{REACTION_MOLS_DIR}/{c}.mol'
+                if not os.path.exists(c_sdf) or not os.path.exists(b_sdf):
+                    continue
+                try:
+                    score = parity_core.generate_parity(b_sdf, c_sdf)
+                except Exception as e:
+                    print(e)
+                    continue
+                if score >= max_score:
+                    max_score = score
+                    match = c
+                    component_type = 'r' if components is cognate_reactants else 'p'
+
+        # Just to compile a dataset, will be removed afterwards
+        line = '{},{},{},{},{},{}'.format(self.site.pdb_id, ec, hetcode, match, component_type, np.round(max_score, 3))
+        os.makedirs('/Users/riziotis/ebi/phd/datasets/parity_missing', exist_ok=True)
+        outfile = '/Users/riziotis/ebi/phd/datasets/parity_missing/csa3d_{}.parity_missing.csv'.format(str(self.site.mcsa_id).zfill(4))
+        if os.path.exists(outfile):
+            if line in open(outfile).read():
+                return max_score
+        with open(outfile, 'a') as o:
+            print(line, file=o)
+
+        return max_score
 
     @staticmethod
     def min_distance(residue_i, residue_j):
