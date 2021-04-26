@@ -342,4 +342,6 @@ class Het(PdbResidue):
             flag = 'P'
         if self.is_cofactor:
             flag = 'C'
+        if self.is_cofactor and self.is_metal:
+            flag = 'CM'
         return flag
