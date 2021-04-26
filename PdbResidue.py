@@ -336,12 +336,12 @@ class Het(PdbResidue):
         flag = 'H'
         if self.is_artefact:
             flag = 'A'
+        if self.is_cofactor:
+            flag = 'C'
         if self.is_metal:
             flag = 'M'
         if self.is_peptide:
             flag = 'P'
-        if self.is_cofactor:
-            flag = 'C'
         if self.is_cofactor and self.is_metal:
             flag = 'CM'
         return flag
