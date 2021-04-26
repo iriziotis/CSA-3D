@@ -112,13 +112,33 @@ class PdbResidue:
         self.dummy_structure = dummy_residue
         return True
 
-    def get_distance(self, other, minimum=True):
-        """Get distance of two residues. If minimum=True, minimum distance
-        is calculated. If False, distance of CAs is returned"""
-        # TODO make it use either CAs or minimum distance
+    #def get_distance(self, other, minimum=True):
+    #    """Get distance of two residues. If minimum=True, minimum distance
+    #    is calculated. If False, distance of CAs is returned"""
+    #    if self.structure is None or other.structure is None:
+    #        return np.nan
+    #    if minimum:
+    #        min_dist = 999
+    #        for i in self.structure.get_atoms():
+    #            for j in other.structure.get_atoms():
+    #                dist = i - j
+    #                if dist < min_dist:
+    #                    min_dist = dist
+    #        return min_dist
+    #    else:
+    #        try:
+    #            return self.structure['CA'] - other.structure['CA']
+    #        except KeyError:
+    #            return self.get_distance(other, minimum=True)
+
+    def get_distance(self, other, kind='com'):
         if self.structure is None or other.structure is None:
             return np.nan
-        if minimum:
+        if kind == 'com':
+            return self._com_distance(other, geometric=False)
+        if kind == 'cog':
+            return self._com_distance(other, geometric=True)
+        if kind == 'min':
             min_dist = 999
             for i in self.structure.get_atoms():
                 for j in other.structure.get_atoms():
@@ -126,11 +146,21 @@ class PdbResidue:
                     if dist < min_dist:
                         min_dist = dist
             return min_dist
-        else:
+        if kind == 'ca':
             try:
                 return self.structure['CA'] - other.structure['CA']
             except KeyError:
-                return self.get_distance(other, minimum=True)
+                return self.get_distance(other, kind='com')
+
+    def _com_distance(self, other, geometric=True):
+        """Calculates average distance of two residues. If geometric=True, 
+        the distance is between the centers of geometry, otherwise it is between
+        the centers of mass."""
+        if self.structure is None or other.structure is None:
+            return np.nan
+        self_com = self.structure.center_of_mass(geometric)
+        other_com = other.structure.center_of_mass(geometric)
+        return np.linalg.norm(self_com-other_com)
 
     def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
         """Check if residues share the same pdb_id, chiral_id, name, resid

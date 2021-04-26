@@ -377,7 +377,7 @@ class PdbSite:
             return False
         return True
 
-    def get_distances(self, minimum=True):
+    def get_distances(self, kind='min'):
         """Calculates all intra-site residue distances and returns a
         numpy array"""
         dists = []
@@ -389,7 +389,7 @@ class PdbSite:
                 if p.is_gap or q.is_gap:
                     dists.append(np.nan)
                 else:   
-                    dists.append(p.get_distance(q, minimum))
+                    dists.append(p.get_distance(q, kind))
                 seen.add((p.full_id, q.full_id))
         return np.array(dists)
 
@@ -894,7 +894,7 @@ class PdbSite:
             #Check if the same residue is already in the site
             if site.contains_equivalent(eq):
                 continue
-            dist = eq.get_distance(other, minimum=True)
+            dist = eq.get_distance(other, kind='min')
             if dist<min_dist:
                 result = eq
                 min_dist = dist
@@ -905,14 +905,14 @@ class PdbSite:
         """Returns a clean list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
         try:
-            ref_dists = sitelist[0].reference_site.get_distances(minimum=False)
+            ref_dists = sitelist[0].reference_site.get_distances(kind='min')
             ref_dists = np.nan_to_num(ref_dists, nan=999)
             ref_dists = np.where(ref_dists < 8, 8, ref_dists)
         except IndexError:
             return False
         for p in sitelist:
             p.is_sane = True
-            p_dists = np.nan_to_num(p.get_distances(minimum=False), nan=0)
+            p_dists = np.nan_to_num(p.get_distances(kind='ca'), nan=0)
             if not np.all((p_dists < 3*ref_dists)):
                 p.is_sane = False
                 continue
@@ -920,7 +920,7 @@ class PdbSite:
                 for q in sitelist:
                     if p.id == q.id or q.is_sane == False:
                         continue
-                    q_dists = np.nan_to_num(q.get_distances(minimum=False), nan=999)
+                    q_dists = np.nan_to_num(q.get_distances(kind='ca'), nan=999)
                     q_dists = np.where(q_dists < 8, 8, q_dists)
                     if not np.all((p_dists < 1.3*q_dists)):
                         p.is_sane = False

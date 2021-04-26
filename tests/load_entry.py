@@ -16,12 +16,12 @@ def main(mcsa_id):
 
     for i, pdbsite in enumerate(entry.pdbsites):
         for h in pdbsite.nearby_hets:
-            print(pdbsite.id, h.resname, h.chain, h.resid, h.flag, h.parity_score)
+            print(pdbsite.id, h.resname, h.chain, h.resid, h.flag, h.parity_score, h.centrality) 
 
-        #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
         ##per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
         ##print(pdbsite.id, rms, rms_all, per_res_rms)
-        #pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
+        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
 
 
 if __name__ == '__main__':

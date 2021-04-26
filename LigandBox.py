@@ -31,14 +31,20 @@ class LigandBox:
                 return True
         return False
 
+    #def mean_distance_from_residues(self, het):
+    #    """Calculates the mean distance of an arbitrary residue (protein or HET)
+    #    from the residues that define the box"""
+    #    dist_sum = 0
+    #    nofres = len(self.parent_residues)
+    #    for residue in self.parent_residues:
+    #        dist_sum += LigandBox.min_distance(residue, het.structure)
+    #    return round(dist_sum / nofres, 3)
+
     def mean_distance_from_residues(self, het):
-        """Calculates the mean distance of an arbitrary residue (protein or HET)
-        from the residues that define the box"""
-        dist_sum = 0
-        nofres = len(self.parent_residues)
-        for residue in self.parent_residues:
-            dist_sum += LigandBox.min_distance(residue, het.structure)
-        return round(dist_sum / nofres, 3)
+        dists = [] 
+        for res in self.site:
+            dists.append(het.get_distance(res, kind='com'))
+        return np.nanmean(np.array(dists))
 
     def similarity_with_cognate(self, het):
         try:
