@@ -377,7 +377,7 @@ class PdbSite:
             return False
         return True
 
-    def get_distances(self, kind='min'):
+    def get_distances(self, kind='com'):
         """Calculates all intra-site residue distances and returns a
         numpy array"""
         dists = []
@@ -461,7 +461,6 @@ class PdbSite:
                 if hetfield[0] == 'H' or residue.get_parent().get_id() not in site_chains:
                     het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
                               resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-
                     het.structure = residue.copy()
                     het.structure.set_parent(residue.get_parent())
                     het.parity_score = box.similarity_with_cognate(het)
@@ -472,7 +471,8 @@ class PdbSite:
                 if hetfield[0] == 'H':
                     het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
                               resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-                    het.structure = residue
+                    het.structure = residue.copy()
+                    het.structure.set_parent(residue.get_parent())
                     all_hets.append(het)
         self.structure_hets = all_hets
         self.nearby_hets = nearby_hets
@@ -718,8 +718,6 @@ class PdbSite:
             if not res.structure:
                 return np.array(atoms), np.array(coords)
             for atom in res.structure: 
-                #add_backbone = (omit and self.size in (3,4) and atom.name=='N')
-                add_backbone=False
                 resname = res.resname.upper()
                 if allow_symmetrics:
                     if res.has_main_chain_function:
@@ -727,7 +725,7 @@ class PdbSite:
                     if not res.is_standard:
                         resname = 'PTM'
                 atmid = '{}.{}'.format(resname, atom.name)
-                if atmid in RESIDUE_DEFINITIONS or add_backbone:
+                if atmid in RESIDUE_DEFINITIONS:
                     if allow_symmetrics:
                         if atmid in EQUIVALENT_ATOMS:
                             atmid = EQUIVALENT_ATOMS[atmid]
@@ -848,7 +846,7 @@ class PdbSite:
                 if res == other:
                     continue
                 try:
-                    if res.get_distance(other) < 8:
+                    if res.get_distance(other, kind='min') < 8:
                         skip = False
                         break
                 except TypeError:

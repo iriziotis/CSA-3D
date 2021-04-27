@@ -15,8 +15,12 @@ def main(mcsa_id):
         os.makedirs(outdir)
 
     for i, pdbsite in enumerate(entry.pdbsites):
-        for h in pdbsite.nearby_hets:
-            print(pdbsite.id, h.resname, h.chain, h.resid, h.flag, h.parity_score, h.centrality) 
+        min = np.nanmean(pdbsite.get_distances('min'))
+        ca = np.nanmean(pdbsite.get_distances('ca'))
+        avg = np.nanmean(pdbsite.get_distances('avg'))
+        com = np.nanmean(pdbsite.get_distances('com'))
+        cog = np.nanmean(pdbsite.get_distances('cog'))
+        print(pdbsite.id, min, ca, avg, com, cog)
 
         rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
         ##per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)

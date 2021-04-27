@@ -47,6 +47,39 @@ class PdbResidue:
         """Returns an approximate distance of self to other PdbResidue"""
         return self.get_distance(other)
 
+    # Private methods
+
+    def _avg_distance(self, other):
+        """Average distance between two residues"""
+        dists = []
+        for i in self.structure.get_atoms():
+            for j in other.structure.get_atoms():
+                dists.append(i - j)
+        return np.mean(np.array(dists))
+
+    def _min_distance(self, other):
+        """Minimum distance between two residues"""
+        min_dist = 999
+        for i in self.structure.get_atoms():
+            for j in other.structure.get_atoms():
+                dist = i - j
+                if dist < min_dist:
+                    min_dist = dist
+        return min_dist
+
+    def _com_distance(self, other, geometric=True):
+        """Center of mass or geometry distance. If geometric=True, the
+        distance is between the centers of geometry, otherwise it is between
+        the centers of mass."""
+        if self.structure is None or other.structure is None:
+            return np.nan
+        self_com = self.structure.center_of_mass(geometric)
+        other_com = other.structure.center_of_mass(geometric)
+        return np.linalg.norm(self_com-other_com)
+
+
+    # Public methods
+
     def copy(self, include_structure=False):
         """Returns a copy of the residue. If include_structure is False,
         then structure is not copied."""
@@ -105,25 +138,6 @@ class PdbResidue:
         self.dummy_structure = dummy_residue
         return True
 
-    #def get_distance(self, other, minimum=True):
-    #    """Get distance of two residues. If minimum=True, minimum distance
-    #    is calculated. If False, distance of CAs is returned"""
-    #    if self.structure is None or other.structure is None:
-    #        return np.nan
-    #    if minimum:
-    #        min_dist = 999
-    #        for i in self.structure.get_atoms():
-    #            for j in other.structure.get_atoms():
-    #                dist = i - j
-    #                if dist < min_dist:
-    #                    min_dist = dist
-    #        return min_dist
-    #    else:
-    #        try:
-    #            return self.structure['CA'] - other.structure['CA']
-    #        except KeyError:
-    #            return self.get_distance(other, minimum=True)
-
     def get_distance(self, other, kind='com'):
         if self.structure is None or other.structure is None:
             return np.nan
@@ -132,28 +146,14 @@ class PdbResidue:
         if kind == 'cog':
             return self._com_distance(other, geometric=True)
         if kind == 'min':
-            min_dist = 999
-            for i in self.structure.get_atoms():
-                for j in other.structure.get_atoms():
-                    dist = i - j
-                    if dist < min_dist:
-                        min_dist = dist
-            return min_dist
+            return self._min_distance(other)
+        if kind == 'avg':
+            return self._avg_distance(other)
         if kind == 'ca':
             try:
                 return self.structure['CA'] - other.structure['CA']
             except KeyError:
                 return self.get_distance(other, kind='com')
-
-    def _com_distance(self, other, geometric=True):
-        """Calculates average distance of two residues. If geometric=True, 
-        the distance is between the centers of geometry, otherwise it is between
-        the centers of mass."""
-        if self.structure is None or other.structure is None:
-            return np.nan
-        self_com = self.structure.center_of_mass(geometric)
-        other_com = other.structure.center_of_mass(geometric)
-        return np.linalg.norm(self_com-other_com)
 
     def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
         """Check if residues share the same pdb_id, chiral_id, name, resid
