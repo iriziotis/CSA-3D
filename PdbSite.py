@@ -463,17 +463,6 @@ class PdbSite:
                               resid=residue.get_id()[1], chain=residue.get_parent().get_id())
 
                     het.structure = residue.copy()
-
-                    # This is to override an obscure biopython bug on disordered atoms
-                    # TODO Remove when they update Biopython
-                    het.structure.child_list = []
-                    het.structure.child_dict = {}
-                    for altloc in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890':
-                        for atom in residue.get_unpacked_list():
-                            if atom.get_altloc()[0] in (' ', altloc):
-                                het.structure.add(atom.copy())
-                        if len(het.structure.child_list) > 0:
-                            break
                     het.structure.set_parent(residue.get_parent())
                     het.parity_score = box.similarity_with_cognate(het)
                     het.centrality = box.mean_distance_from_residues(het)

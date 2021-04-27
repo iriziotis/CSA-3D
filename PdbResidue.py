@@ -54,13 +54,6 @@ class PdbResidue:
         if include_structure:
             try:
                 res.structure = self.structure.copy()
-                # This is to override an obscure biopython bug on disordered atoms
-                # TODO Remove when they update Biopython
-                res.structure.child_list = []
-                res.structure.child_dict = {}
-                for atom in self.structure.get_unpacked_list():
-                    if atom.get_altloc() in (' ', 'A'):
-                        res.structure.add(atom.copy())
                 res.structure.set_parent(self.structure.get_parent())
             except AttributeError:
                 res.structure = None
