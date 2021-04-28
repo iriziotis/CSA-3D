@@ -34,8 +34,7 @@ class PdbSite:
         self.reference_site = None
         self.parent_structure = None
         self.structure = None
-        self.structure_hets = []
-        self.nearby_hets = []
+        self.ligands = []
         self.mmcif_dict = dict()
         self.is_sane = None
 
@@ -362,19 +361,19 @@ class PdbSite:
         if type(residue) == PdbResidue:
             self.residues.append(residue)
             self.residues_dict[residue.full_id] = residue
-            if residue.structure:
-                # Initialize structure if empty
-                if self.structure is None:
-                    self.structure = Structure(self.id)
-                    self.structure.add(Model(0))
-                chain_id = residue.structure.get_parent().get_id()
-                if chain_id not in self.structure[0]:
-                    self.structure[0].add(Chain(chain_id))
-                # Add residue structure to site structure
-                self.structure[0][chain_id].add(residue.structure)
-        else:
-            print('Attempted to add non-PdbResidue object in PdbSite')
-            return False
+        if type(residue) == Het:
+            self.ligands.append(residue)
+        residue.parent_site = self
+        if residue.structure:
+            # Initialize structure if empty
+            if self.structure is None:
+                self.structure = Structure(self.id)
+                self.structure.add(Model(0))
+            chain_id = residue.structure.get_parent().get_id()
+            if chain_id not in self.structure[0]:
+                self.structure[0].add(Chain(chain_id))
+            # Add residue structure to site structure
+            self.structure[0][chain_id].add(residue.structure)
         return True
 
     def get_distances(self, kind='com'):
@@ -440,48 +439,31 @@ class PdbSite:
         """
         Searches the parent structure for hetero components close to the
         catalytic residues, by defining a box area around them plus some
-        extra distance. Populates the nearby_hets list with Het objects
+        extra distance. Populates the ligands list with Het objects
 
         Args:
             headroom: the extra search space (in Å) around the catalytic residues
         """
         if type(self.parent_structure) != Structure:
             return
-        all_hets = []
-        nearby_hets = []
         box = LigandBox(self, headroom)
         site_chains = set([res.chain for res in self])
         for residue in self.parent_structure[0].get_residues():
-            residue_id = residue.get_id()
-            hetfield = residue_id[0]
+            restype = residue.get_id()[0][0]
             # Ignore waters
-            if hetfield == 'W':
+            if restype == 'W':
                 continue
             if residue in box:
-                if hetfield[0] == 'H' or residue.get_parent().get_id() not in site_chains:
-                    het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
-                              resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-                    het.structure = residue.copy()
-                    het.structure.set_parent(residue.get_parent())
-                    het.parity_score = box.similarity_with_cognate(het)
-                    het.centrality = box.mean_distance_from_residues(het)
-                    nearby_hets.append(het)
-                    all_hets.append(het)
-            else:
-                if hetfield[0] == 'H':
-                    het = Het(mcsa_id=self.mcsa_id, pdb_id=self.pdb_id, resname=residue.get_resname(),
-                              resid=residue.get_id()[1], chain=residue.get_parent().get_id())
-                    het.structure = residue.copy()
-                    het.structure.set_parent(residue.get_parent())
-                    all_hets.append(het)
-        self.structure_hets = all_hets
-        self.nearby_hets = nearby_hets
+                chain = residue.get_parent().get_id()
+                if restype == 'H' or chain not in site_chains:
+                    self.add(Het(self.mcsa_id, self.pdb_id, residue.get_resname(), 
+                                 residue.get_id()[1], chain, structure=residue, parent_site=self))
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
         """
         Writes site coordinates in PDB format
         Args:
-            write_hets: Include coordinates of nearby hets.
+            write_hets: Include coordinates of ligands.
             outdir: Directory to save the .pdb file
             outfile: If unspecified, name is formatted to include info on M-CSA ID, 
                      chain of each catalytic residue, annotation if the site is a
@@ -511,8 +493,7 @@ class PdbSite:
                       conservation, atms, sanity)
         with open(outfile, 'w') as o:
             if bool(self.mmcif_dict):
-                all_hets = ','.join('{0.resname};{0.resid};{0.chain}{0.flag}'.format(h) for h in self.structure_hets)
-                nearby_hets = ','.join('{0.resname};{0.resid};{0.chain};{0.parity_score};{0.centrality};{0.flag}'.format(h) for h in self.nearby_hets)
+                ligands = ','.join('{0.resname};{0.resid};{0.chain};{0.similarity};{0.centrality};{0.type}'.format(h) for h in self.ligands)
                 remarks = ('REMARK CATALYTIC SITE\n'
                            'REMARK ID {0.id}\n'
                            'REMARK PDB_ID {0.pdb_id}\n'
@@ -525,12 +506,11 @@ class PdbSite:
                            'REMARK RESOLUTION {0.resolution}\n'
                            'REMARK ORGANISM_NAME {0.organism_name}\n'
                            'REMARK ORGANISM_ID {0.organism_id}\n'
-                           'REMARK ALL_HETERO {1}\n'
-                           'REMARK NEARBY_LIGANDS {2}'.format(self, all_hets, nearby_hets))
+                           'REMARK NEARBY_LIGANDS {1}'.format(self, ligands))
                 print(remarks, file=o)
             residues = self.residues.copy()
             if write_hets:
-                residues += self.nearby_hets
+                residues += self.ligands
             for res in residues:
                 if not include_dummy_atoms and res.is_gap:
                     continue
@@ -626,11 +606,7 @@ class PdbSite:
         # Iterative superposition. Get rotation matrix, translation vector and RMSD
         rot, tran, rms, rms_all = PdbSite._super(p_coords, q_coords, cycles, cutoff, weighted, scaling_factor)
         if transform:
-            #other.structure.transform(rot, tran)
-            for o in other.structure.get_list():
-                o.transform(rot, tran)
-            for het in other.nearby_hets:
-                het.structure.transform(rot, tran)
+            other.structure.transform(rot, tran)
         if get_array:
             q_trans = np.dot(q_coords, rot) + tran
             return rot, tran, rms, rms_all, p_coords, q_trans

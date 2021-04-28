@@ -1,11 +1,13 @@
+import os
 import warnings
 import numpy as np
+import parity_core
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Chain import Chain
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
-from .config import PDBID_COFACTORS, METAL_COFACTORS, CRYSTALLIZATION_HETS
+from .config import PDBID_COFACTORS, METAL_COFACTORS, CRYSTALLIZATION_HETS, PDB2EC, HET_MOLS_DIR, REACTION_MOLS_DIR, EC_REACTION
 from copy import copy
 
 
@@ -17,6 +19,7 @@ class PdbResidue:
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
                  auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None,
                  dummy_structure=False):
+        self.parent_site = None
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
         self.resname = resname
@@ -325,15 +328,66 @@ class Het(PdbResidue):
     """
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 chain='', parity_score=None, centrality=None):
+                 chain='', structure=None, parent_site=None):
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
-        self.parity_score = parity_score
-        self.centrality = centrality
+        self.structure = structure.copy()
+        self.structure.set_parent(structure.get_parent())
+        self.parent_site = parent_site
+        self.similarity, self.best_match, self.component_type = self.get_similarity()
+        self.centrality = self.get_centrality()
+
+    def get_centrality(self):
+        """Calculates an average distance to the catalytic residues of the site, 
+        normalized by the average intra-residue distance of the site"""
+        dists = [] 
+        if not self.parent_site:
+            return
+        for res in self.parent_site:
+            dists.append(self.get_distance(res, kind='com'))
+        mean_site_dist = np.nanmean(self.parent_site.get_distances(kind='com'))
+        centrality = np.nanmean(np.array(dists)) / mean_site_dist
+        return np.round(centrality, 2)
+
+    def get_similarity(self):
+        """Calculates the best PARITY match with the cognate reaction components"""
+        #TODO: Check the dataset first and then calculate parity.
+        if self.structure and self.structure.get_id()[0] != ' ':
+            try:
+                return self.generate_parity()
+            except Exception as e:
+                return None, None, None
+        return None, None, None
+        
+    def generate_parity(self):
+        ec = self.parent_site.ec
+        hetcode = self.resname
+        try:
+            b_sdf = f'{HET_MOLS_DIR}/{hetcode}.sdf'
+            cognate_reactants, cognate_products = EC_REACTION[ec]
+        except KeyError:
+            return 0.0
+        max_score = 0.0
+        match = None
+        component_type = None
+        for components in (cognate_reactants, cognate_products):
+            for c in components:
+                c_sdf = f'{REACTION_MOLS_DIR}/{c}.mol'
+                if not os.path.exists(c_sdf) or not os.path.exists(b_sdf):
+                    continue
+                try:
+                    score = parity_core.generate_parity(b_sdf, c_sdf)
+                except Exception as e:
+                    continue
+                if score >= max_score:
+                    max_score = score
+                    match = c
+                    component_type = 'Reactant' if components is cognate_reactants else 'Product'
+        return np.round(max_score, 2), match, component_type
 
     @property
     def is_artefact(self):
         """Check if component is known to be used in protein crystallization media"""
-        return self.resname in CRYSTALLIZATION_HETS
+        return self.resname in CRYSTALLIZATION_HETS and self.similarity < 0.3
 
     @property
     def is_peptide(self):
@@ -353,18 +407,18 @@ class Het(PdbResidue):
         return self.resname in METAL_COFACTORS
 
     @property
-    def flag(self):
+    def type(self):
         """An identifier to tell if component is an artefact, a peptide, a cofactor or a metallic
         compound (in priority order)."""
-        flag = 'H'
+        flag = 'Ligand'
         if self.is_artefact:
-            flag = 'A'
+            flag = 'Artefact'
         if self.is_cofactor:
-            flag = 'C'
+            flag = 'Co-factor'
         if self.is_metal:
-            flag = 'M'
+            flag = 'Metal'
         if self.is_peptide:
-            flag = 'P'
+            flag = 'Polymer'
         if self.is_cofactor and self.is_metal:
-            flag = 'CM'
+            flag = 'Metal Co-factor'
         return flag
