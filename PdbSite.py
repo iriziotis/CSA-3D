@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 from copy import copy
+from collections import defaultdict
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
@@ -361,9 +362,13 @@ class PdbSite:
         if type(residue) == PdbResidue:
             self.residues.append(residue)
             self.residues_dict[residue.full_id] = residue
+            residue.parent_site = self
         if type(residue) == Het:
             self.ligands.append(residue)
-        residue.parent_site = self
+            residue.parent_site = self
+            if residue.is_polymer:
+                self.structure[0].add(residue.structure)
+                return True
         if residue.structure:
             # Initialize structure if empty
             if self.structure is None:
@@ -448,6 +453,7 @@ class PdbSite:
             return
         box = LigandBox(self, headroom)
         site_chains = set([res.chain for res in self])
+        polymers = defaultdict(list)
         for residue in self.parent_structure[0].get_residues():
             restype = residue.get_id()[0][0]
             # Ignore waters
@@ -455,9 +461,16 @@ class PdbSite:
                 continue
             if residue in box:
                 chain = residue.get_parent().get_id()
-                if restype == 'H' or chain not in site_chains:
+                # HET components
+                if restype == 'H':
                     self.add(Het(self.mcsa_id, self.pdb_id, residue.get_resname(), 
                                  residue.get_id()[1], chain, structure=residue, parent_site=self))
+                # Protein/nucleic polymer components
+                if restype == ' ' and chain not in site_chains:
+                    polymers[chain].append(residue)
+        # Build polymers
+        for chain, reslist in polymers.items():
+            self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
         """
@@ -518,7 +531,7 @@ class PdbSite:
                 if res.dummy_structure:
                     structure = res.dummy_structure
                 if structure is not None:
-                    for atom in structure:
+                    for atom in structure.get_atoms():
                         resname = res.resname.upper()
                         if res.has_main_chain_function or not res.is_standard:
                             resname = 'ANY'

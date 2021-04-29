@@ -3,10 +3,11 @@ import warnings
 import numpy as np
 import parity_core
 from Bio.PDB.Structure import Structure
+from Bio.PDB.Model import Model
+from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
-from Bio.PDB.Chain import Chain
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, NUCLEIC, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
 from .config import PDBID_COFACTORS, METAL_COFACTORS, CRYSTALLIZATION_HETS, PDB2EC, HET_MOLS_DIR, REACTION_MOLS_DIR, EC_REACTION
 from copy import copy
 
@@ -330,11 +331,26 @@ class Het(PdbResidue):
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
                  chain='', structure=None, parent_site=None):
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
-        self.structure = structure.copy()
-        self.structure.set_parent(structure.get_parent())
+        self.structure = None
+        if structure:
+            self.structure = structure.copy()
+            self.structure.set_parent(structure.get_parent())
         self.parent_site = parent_site
         self.similarity, self.best_match, self.component_type = self.get_similarity()
         self.centrality = self.get_centrality()
+
+    def __repr__(self):
+        return self.resname
+
+    @classmethod
+    def polymer(cls, reslist, mcsa_id=None, pdb_id=None, chain='', parent_site=None):
+        poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, structure=None, parent_site=parent_site)
+        poly.structure = Chain(chain)
+        for res in reslist:
+            poly.structure.add(res.copy())
+        poly.similarity, poly.best_match, poly.component_type = None, None, None
+        poly.centrality = poly.get_centrality()
+        return poly
 
     def get_centrality(self):
         """Calculates an average distance to the catalytic residues of the site, 
@@ -386,14 +402,25 @@ class Het(PdbResidue):
 
     @property
     def is_artefact(self):
-        """Check if component is known to be used in protein crystallization media"""
+        """Check if component is likely to be a crystallographic artefact"""
         return self.resname in CRYSTALLIZATION_HETS and self.similarity < 0.3
 
     @property
-    def is_peptide(self):
-        """Check if component is from a peptide moiety"""
+    def is_polymer(self):
+        """Check if component is a peptide or nucleic macromolecule"""
         if self.structure:
-            return self.structure.get_id()[0] == ' '
+            return type(self.structure) == Chain
+        return
+
+    @property
+    def is_nucleic(self):
+        """Check if component is DNA or RNA"""
+        if self.structure:
+            return self.structure.get_id()[0] == ' ' and self.resname in NUCLEIC
+
+    @property
+    def is_peptide(self):
+        """Check if component comes from a polypeptide"""
         return
 
     @property
@@ -417,7 +444,7 @@ class Het(PdbResidue):
             flag = 'Co-factor'
         if self.is_metal:
             flag = 'Metal'
-        if self.is_peptide:
+        if self.is_polymer:
             flag = 'Polymer'
         if self.is_cofactor and self.is_metal:
             flag = 'Metal Co-factor'

@@ -11,6 +11,8 @@ STANDARD_RESIDUES = {
     'SER', 'THR', 'TRP', 'TYR', 'VAL'
     }
 
+NUCLEIC = {'DU', 'DT', 'DA', 'DG', 'DC'}
+
 RESIDUE_DEFINITIONS = { 
     'ANY.CA', 'ANY.C', 'ANY.O',
     'PTM.CA', 'PTM.C', 'PTM.CB',

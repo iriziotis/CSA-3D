@@ -30,6 +30,22 @@ class LigandBox:
                 return True
         return False
 
+    def __str__(self):
+        """Get box vertices in PDB format"""
+        out = []
+        string_format = 'ATOM      1  DUM DUM X   0   {0[0]:8.3f}{0[1]:8.3f}{0[2]:8.3f}'
+        points = ((self.points['min_x'], self.points['min_y'], self.points['min_z']),
+                  (self.points['max_x'], self.points['min_y'], self.points['min_z']),
+                  (self.points['min_x'], self.points['max_y'], self.points['min_z']),
+                  (self.points['max_x'], self.points['max_y'], self.points['min_z']),
+                  (self.points['min_x'], self.points['min_y'], self.points['max_z']),
+                  (self.points['min_x'], self.points['max_y'], self.points['max_z']),
+                  (self.points['max_x'], self.points['min_y'], self.points['max_z']),
+                  (self.points['max_x'], self.points['max_y'], self.points['max_z']))
+        for coords in points:
+            out.append(string_format.format(coords))        
+        return str('\n'.join(out))
+
     def _get_parent_residues(self):
         """Populates the list of the corresponding residues from parent structure (untransformed)"""
         parent_residues = []
