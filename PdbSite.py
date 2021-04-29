@@ -1,5 +1,6 @@
 import warnings
 import numpy as np
+import Bio.PDB.Selection
 from copy import copy
 from collections import defaultdict
 from Bio.PDB.Structure import Structure
@@ -8,12 +9,12 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
+from Bio.PDB.NeighborSearch import NeighborSearch
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
-from .LigandBox import LigandBox
 
 warnings.simplefilter('ignore', PDBConstructionWarning)
 
@@ -439,38 +440,51 @@ class PdbSite:
                     if (j, i) not in identicals:
                         identicals.add((i, j))
         return identicals
+    
 
-    def find_ligands(self, headroom=1):
+    def find_ligands(self, radius=4):
         """
         Searches the parent structure for hetero components close to the
-        catalytic residues, by defining a box area around them plus some
-        extra distance. Populates the ligands list with Het objects
+        catalytic residues, by searching around the atoms of catalytic residues
+        and the dummy atoms between distant residues. Populates the ligands list 
+        with Het objects.
 
         Args:
-            headroom: the extra search space (in Å) around the catalytic residues
+            radius: the search space (in Å) around the atoms of the catalytic residues
         """
         if type(self.parent_structure) != Structure:
             return
-        box = LigandBox(self, headroom)
-        site_chains = set([res.chain for res in self])
+        # Get centers of search
+        centers = self._get_ligand_search_centers(radius)        
+        # Initialize KD tree
+        query_atoms = Bio.PDB.Selection.unfold_entities(self.parent_structure, 'A')
+        ns = NeighborSearch(query_atoms)
+        # Search for ligands around each center
         polymers = defaultdict(list)
-        for residue in self.parent_structure[0].get_residues():
-            restype = residue.get_id()[0][0]
-            # Ignore waters
-            if restype == 'W':
-                continue
-            if residue in box:
-                chain = residue.get_parent().get_id()
+        site_chains = set([res.chain for res in self])
+        seen = set()
+        for center in centers:
+            hits = ns.search(center, radius, level='R')
+            for res in hits:
+                if res.get_full_id() in seen:
+                    continue
+                seen.add(res.get_full_id())
+                restype = res.get_id()[0][0]
+                chain = res.get_parent().get_id()
+                # Ignore waters
+                if restype == 'W':
+                    continue
                 # HET components
                 if restype == 'H':
-                    self.add(Het(self.mcsa_id, self.pdb_id, residue.get_resname(), 
-                                 residue.get_id()[1], chain, structure=residue, parent_site=self))
+                    self.add(Het(self.mcsa_id, self.pdb_id, res.get_resname(), 
+                                 res.get_id()[1], chain, structure=res, parent_site=self))
                 # Protein/nucleic polymer components
                 if restype == ' ' and chain not in site_chains:
-                    polymers[chain].append(residue)
+                    polymers[chain].append(res)
         # Build polymers
         for chain, reslist in polymers.items():
             self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
+        return 
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
         """
@@ -750,6 +764,30 @@ class PdbSite:
                     self.residues[pair[0]], self.residues[pair[1]] = \
                     self.residues[pair[1]], self.residues[pair[0]]
         return
+    
+    def _get_ligand_search_centers(self, radius=4):
+        """Gets atom coordinates from catalytic residues, and interpolates the empty 
+        space between distant residues, by calculating the center of geometry of the
+        two residues. Radius is used to identify distant residues in between which an
+        extra center will be added."""
+        centers = []
+        seen = set()
+        for p in self:
+            if p.is_gap:
+                continue
+            for atom in p.structure.get_unpacked_list():
+                centers.append(atom.get_coord()) 
+            p_centroid = p.structure.center_of_mass(geometric=True)
+            for q in self:
+                if p is q or (q.id, p.id) in seen or q.is_gap:
+                    continue
+                seen.add((p.id, q.id))
+                q_centroid  = q.structure.center_of_mass(geometric=True)
+                dist = p.get_distance(q, kind='min')
+                if 2*radius <= dist <= 4*radius:
+                    dummy_coords = np.mean([p_centroid, q_centroid], axis=0)
+                    centers.append(dummy_coords)
+        return centers
 
     @staticmethod
     def _cleanup_list(reslist):
