@@ -20,7 +20,7 @@ pdb_ec_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_enzyme.csv'
 # KEGG
 ec_reaction_mapping_csv = WORKING_DIR + 'kegg/ec_reaction.csv'
 # Ligands
-compound_similarities_csv = WORKING_DIR + 'parity/csa3d.bound_vs_cognate/csa3d.bound_vs_cognate.all.csv'
+pdbe_ions_csv = WORKING_DIR + 'pdbe/pdb_ions.csv'
 pdbe_cofactors_csv = WORKING_DIR + 'pdbe/pdb_cofactors.csv'
 mcsa_cofactors_csv = WORKING_DIR + 'mcsa/mcsa_cofactors.csv'
 crystallization_hets = WORKING_DIR + 'pdbe/crystallization_hets.csv'
@@ -50,11 +50,6 @@ with open(het_info_csv, 'r') as f:
 with open(ec_reaction_mapping_csv, 'r') as f:
     EC_REACTION = {line[0]: ([line[1].split(';'), line[2].split(';')]) for line in csv.reader(f, quotechar='"')}
 
-# Cognate-bound ligand similarities from PARITY
-with open(compound_similarities_csv, 'r') as f:
-    next(f)
-    COMPOUND_SIMILARITIES = {(line[0], line[2]): line[5] for line in csv.reader(f, quotechar='"')}
-
 # PDB ID - co-factors mapping
 PDBID_COFACTORS = defaultdict(set)
 with open(pdbe_cofactors_csv, 'r') as f:
@@ -71,4 +66,17 @@ with open(mcsa_cofactors_csv, 'r') as f:
 with open(crystallization_hets, 'r') as f:
     CRYSTALLIZATION_HETS = {line.strip() for line in f}
 
+# Ions sets
+METALS = set()
+REACTIVE_NONMETALS = set()
+NOBLE_GASES = set()
+with open(pdbe_ions_csv, 'r') as f:
+    next(f)
+    for line in csv.reader(f):
+        if line[3] == 'METAL':
+            METALS.add(line[0])
+        if line[3] == 'REACTIVE_NONMETAL':
+            REACTIVE_NONMETALS.add(line[0])
+        if line[3] == 'NOBLE_GAS':
+            NOBLE_GASES.add(line[0])
 

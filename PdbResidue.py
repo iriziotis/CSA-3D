@@ -2,14 +2,17 @@ import os
 import warnings
 import numpy as np
 import parity_core
+from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
+from Bio.PDB.Polypeptide import is_aa
+from rdkit.Chem.rdmolfiles import MolFromMolFile
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, NUCLEIC, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
-from .config import PDBID_COFACTORS, METAL_COFACTORS, CRYSTALLIZATION_HETS, PDB2EC, HET_MOLS_DIR, REACTION_MOLS_DIR, EC_REACTION
-from copy import copy
+from .config import METALS, REACTIVE_NONMETALS, NOBLE_GASES, METAL_COFACTORS, PDBID_COFACTORS,\
+                    CRYSTALLIZATION_HETS, EC_REACTION, PDB2EC, HET_MOLS_DIR, REACTION_MOLS_DIR
 
 
 class PdbResidue:
@@ -336,6 +339,8 @@ class Het(PdbResidue):
             self.structure = structure.copy()
             self.structure.set_parent(structure.get_parent())
         self.parent_site = parent_site
+        self.cannot_be_artefact = False
+        self.components_missing = False
         self.similarity, self.best_match, self.component_type = self.get_similarity()
         self.centrality = self.get_centrality()
 
@@ -381,7 +386,7 @@ class Het(PdbResidue):
             b_sdf = f'{HET_MOLS_DIR}/{hetcode}.sdf'
             cognate_reactants, cognate_products = EC_REACTION[ec]
         except KeyError:
-            return 0.0
+            return None, None, None
         max_score = 0.0
         match = None
         component_type = None
@@ -389,6 +394,7 @@ class Het(PdbResidue):
             for c in components:
                 c_sdf = f'{REACTION_MOLS_DIR}/{c}.mol'
                 if not os.path.exists(c_sdf) or not os.path.exists(b_sdf):
+                    self.components_missing = True
                     continue
                 try:
                     score = parity_core.generate_parity(b_sdf, c_sdf)
@@ -398,12 +404,17 @@ class Het(PdbResidue):
                     max_score = score
                     match = c
                     component_type = 'Reactant' if components is cognate_reactants else 'Product'
+                # Check if cognate and bound component are single-atom molecules
+                if self.is_polymer or (MolFromMolFile(c_sdf).GetNumAtoms() == 1 and MolFromMolFile(b_sdf).GetNumAtoms() == 1):
+                    self.cannot_be_artefact = True
         return np.round(max_score, 2), match, component_type
 
     @property
     def is_artefact(self):
         """Check if component is likely to be a crystallographic artefact"""
-        return self.resname in CRYSTALLIZATION_HETS and self.similarity < 0.3
+        if self.cannot_be_artefact == True:
+            return False
+        return (self.resname in CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
 
     @property
     def is_polymer(self):
@@ -413,39 +424,59 @@ class Het(PdbResidue):
         return
 
     @property
-    def is_nucleic(self):
-        """Check if component is DNA or RNA"""
-        if self.structure:
-            return self.structure.get_id()[0] == ' ' and self.resname in NUCLEIC
-
-    @property
     def is_peptide(self):
         """Check if component comes from a polypeptide"""
-        return
+        if self.structure:
+            return self.is_polymer and all([is_aa(res.get_resname()) for res in self.structure.get_residues()])
+
+    @property
+    def is_nucleic(self):
+        """Check if component is DNA or RNA"""
+        return self.is_polymer and not self.is_peptide
 
     @property
     def is_cofactor(self):
         """Check if component is annotated as cofactor for this pdb in PDBe"""
-        return self.resname in PDBID_COFACTORS[self.pdb_id]
+        return not self.is_metal_compound and not self.is_metal and self.resname in PDBID_COFACTORS[self.pdb_id]
 
     @property
     def is_metal(self):
+        """Check if component is single-atom metal"""
+        return self.resname in METALS
+
+    @property
+    def is_metal_compound(self):
         """Check if component is a metal or a metallic cofactor"""
-        return self.resname in METAL_COFACTORS
+        return self.is_metal and self.resname in METAL_COFACTORS
+
+    @property
+    def is_reactive_nonmetal(self):
+        """Check if component is a metal or a reactive non metal"""
+        return self.resname in REACTIVE_NONMETALS
+
+    @property
+    def is_noble_gas(self):
+        """Check if component is a noble gas atom"""
+        return self.resname in NOBLE_GASES
+
+    @property
+    def is_ion(self):
+        """Check if component is an ion"""
+        return self.is_metal or self.is_reactive_nonmetal or self.is_noble_gas
 
     @property
     def type(self):
         """An identifier to tell if component is an artefact, a peptide, a cofactor or a metallic
         compound (in priority order)."""
-        flag = 'Ligand'
+        flag = 'Substrate (non-polymer)'
+        if self.is_ion:
+            flag = 'Ion'
         if self.is_artefact:
             flag = 'Artefact'
-        if self.is_cofactor:
-            flag = 'Co-factor'
-        if self.is_metal:
-            flag = 'Metal'
         if self.is_polymer:
-            flag = 'Polymer'
-        if self.is_cofactor and self.is_metal:
-            flag = 'Metal Co-factor'
+            flag = 'Substrate (polymer)'
+        if self.is_cofactor:
+            flag = 'Co-factor (non-metal)'
+        if self.is_metal_compound:
+            flag = 'Co-factor (metal)'
         return flag

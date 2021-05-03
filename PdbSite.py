@@ -72,12 +72,13 @@ class PdbSite:
     # Alternative constructors
 
     @classmethod
-    def from_list(cls, reslist, cif_path, annotate=True):
+    def from_list(cls, reslist, cif_path, parent_entry, annotate=True):
         """Construct PdbSite object directly from residue list"""
         mmcif_dict = dict()
         # First reduce redundant residues with multiple function locations
         reslist = PdbSite._cleanup_list(reslist)
         site = cls()
+        site.parent_entry = parent_entry
         try:
             if annotate: 
                 parser = MMCIFParser(QUIET=True) 
@@ -100,17 +101,17 @@ class PdbSite:
         return site
 
     @classmethod
-    def build_reference(cls, reslist, cif_path, annotate=True):
+    def build_reference(cls, reslist, parent_entry, cif_path, annotate=True):
         """Builds reference active site from a list of PDB catalytic residues.
         Assumes that the list only contains one active site, so use it only
         if it is a list of manually annotated catalytic residues"""
-        ref = PdbSite.from_list(reslist, cif_path, annotate)
+        ref = PdbSite.from_list(reslist, cif_path, parent_entry, annotate)
         ref.reference_site = ref
         ref.is_sane = True
         return ref
 
     @classmethod
-    def build(cls, seed, reslist, reference_site):
+    def build(cls, seed, reslist, reference_site, parent_entry):
         """Builds active site from a list of catalytic residues that may form
         multiple active sites (e.g. all residues annotated as catalytic in a
         PDB structure). Using a residue as seed, it starts building an active site
@@ -126,11 +127,12 @@ class PdbSite:
             if candidate not in site:
                 site.add(candidate)
         site.reference_site = reference_site
+        site.parent_entry = parent_entry
         site._map_reference_residues()
         return site
 
     @classmethod
-    def build_all(cls, reslist, reference_site, cif_path, annotate=True, redundancy_cutoff=None):
+    def build_all(cls, reslist, reference_site, parent_entry, cif_path, annotate=True, redundancy_cutoff=None):
         """Builds all sites in using as input a list of catalytic residues.
         Returns a list of PdbSite objects"""
         # Map structure objects in every residue
@@ -155,7 +157,7 @@ class PdbSite:
         seeds = PdbSite._get_seeds(reslist)
         # Build a site from each seed
         for seed in seeds:
-            site = cls.build(seed, reslist, reference_site)
+            site = cls.build(seed, reslist, reference_site, parent_entry)
             if site.has_missing_functional_atoms or len(site) != len(reference_site):
                 continue
             # Reduce redundancy
@@ -379,7 +381,8 @@ class PdbSite:
             if chain_id not in self.structure[0]:
                 self.structure[0].add(Chain(chain_id))
             # Add residue structure to site structure
-            self.structure[0][chain_id].add(residue.structure)
+            if residue.structure.get_id() not in self.structure[0][chain_id]:
+                self.structure[0][chain_id].add(residue.structure)
         return True
 
     def get_distances(self, kind='com'):
@@ -442,7 +445,7 @@ class PdbSite:
         return identicals
     
 
-    def find_ligands(self, radius=4):
+    def find_ligands(self, radius=3):
         """
         Searches the parent structure for hetero components close to the
         catalytic residues, by searching around the atoms of catalytic residues
@@ -482,8 +485,9 @@ class PdbSite:
                 if restype == ' ' and chain not in site_chains:
                     polymers[chain].append(res)
         # Build polymers
-        for chain, reslist in polymers.items():
-            self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
+        if self.acts_on_polymer:
+            for chain, reslist in polymers.items():
+                self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
         return 
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):

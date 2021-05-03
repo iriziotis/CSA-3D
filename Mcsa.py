@@ -50,6 +50,7 @@ class Mcsa:
         for entry_id in entry_ids:
             if entry_id in self.catalytic_residue_info.keys():
                 self.entries[entry_id] = Entry(entry_id)
+                self.entries[entry_id].info = self.mcsa_entry_info[entry_id]
                 self._build_pdb_residues(entry_id)
                 self._build_uniprot_residues(entry_id)
 
@@ -65,7 +66,6 @@ class Mcsa:
 
                 self._build_pdb_sites(entry_id, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry_id)
-                self.entries[entry_id].info = self.mcsa_entry_info[entry_id]
             else:
                 return False
         return True
@@ -130,16 +130,14 @@ class Mcsa:
         except (IndexError, KeyError):
             print('No reference PDB structure')
             return
-        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry_id],
+        reference_site = PdbSite.build_reference(self.ref_pdb_residues[entry_id], self.entries[entry_id],
                                                  self._get_cif_path(ref_pdb_id), annotate)
-        reference_site.parent_entry = self.entries[entry_id]
         self.entries[entry_id].add(reference_site)
         for pdb_id, pdb in self.pdb_residues[entry_id].items():
-            for site in PdbSite.build_all(pdb, reference_site, self._get_cif_path(pdb_id),
-                                          annotate, redundancy_cutoff):
+            for site in PdbSite.build_all(pdb, reference_site, self.entries[entry_id],
+                                          self._get_cif_path(pdb_id), annotate, redundancy_cutoff):
                 if verbose:
                     print(site.id, site)
-                site.parent_entry = self.entries[entry_id]
                 self.entries[entry_id].add(site)
 
     def _build_uniprot_sites(self, entry_id):
