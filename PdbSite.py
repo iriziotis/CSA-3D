@@ -344,6 +344,8 @@ class PdbSite:
     def has_missing_functional_atoms(self):
         """Checks if there are missing functional atoms from the residue
         structures or site is empty"""
+        if self.is_reference:
+            return all([i.structure for i in ref]))
         try:
             gaps = set(self.get_gaps())
             self_atoms, _ = self._get_func_atoms(omit=gaps)
@@ -784,13 +786,13 @@ class PdbSite:
         centers = []
         seen = set()
         for p in self:
-            if p.is_gap:
+            if p.is_gap or p.structure is None:
                 continue
             for atom in p.structure.get_unpacked_list():
                 centers.append(atom.get_coord()) 
             p_centroid = p.structure.center_of_mass(geometric=True)
             for q in self:
-                if p is q or (q.id, p.id) in seen or q.is_gap:
+                if p is q or (q.id, p.id) in seen or q.is_gap or q.structure is None:
                     continue
                 seen.add((p.id, q.id))
                 q_centroid  = q.structure.center_of_mass(geometric=True)
