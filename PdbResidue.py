@@ -21,8 +21,8 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', funclocs=None, is_reference=False, chiral_id=None,
-                 dummy_structure=False):
+                 auth_resid=None, chain='', alt_chain='', funclocs=None, 
+                 is_reference=False, chiral_id=None, dummy_structure=False):
         self.parent_site = None
         self.mcsa_id = mcsa_id
         self.pdb_id = pdb_id
@@ -30,6 +30,7 @@ class PdbResidue:
         self.resid = resid
         self.auth_resid = auth_resid
         self.chain = chain
+        self.alt_chain = alt_chain
         self.funclocs = funclocs if funclocs else []
         self.is_reference = is_reference
         self.chiral_id = chiral_id
@@ -302,10 +303,12 @@ class PdbResidue:
                 is_reference = pdb_res['is_reference']
                 chain = pdb_res['assembly_chain_name'] if is_reference \
                     else pdb_res['chain_name']
+                alt_chain = pdb_res['chain_name'] if is_reference \
+                    else pdb_res['assembly_chain_name']
                 funclocs = [residue['function_location_abv']]
 
                 yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                          chain, funclocs, is_reference, chiral_id)
+                          chain, alt_chain, funclocs, is_reference, chiral_id)
         except KeyError:
             return
 
@@ -368,7 +371,7 @@ class Het(PdbResidue):
         poly.structure = Chain(chain)
         for res in reslist:
             poly.structure.add(res.copy())
-        poly.similarity, poly.best_match, poly.component_type = None, None, None
+        poly.similarity, poly.best_match, poly.component_type = poly.get_similarity()
         poly.centrality = poly.get_centrality()
         return poly
 
@@ -412,7 +415,11 @@ class Het(PdbResidue):
                     self.components_missing = True
                     continue
                 try:
-                    score = parity_core.generate_parity(b_sdf, c_sdf)
+                    if not self.is_polymer:
+                        score = parity_core.generate_parity(b_sdf, c_sdf)
+                    else:
+                        # This is just to set the components_missing attribute
+                        score = 0
                 except Exception as e:
                     continue
                 if score >= max_score:
@@ -422,6 +429,8 @@ class Het(PdbResidue):
                 # Check if cognate and bound component are single-atom molecules
                 if self.is_polymer or (MolFromMolFile(c_sdf).GetNumAtoms() == 1 and MolFromMolFile(b_sdf).GetNumAtoms() == 1):
                     self.cannot_be_artefact = True
+        if self.is_polymer:
+            return None, None, None
         return np.round(max_score, 2), match, component_type
 
     @property

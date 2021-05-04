@@ -215,7 +215,10 @@ class PdbSite:
                 try:
                     return PDB2EC[(self.pdb_id, res.chain[0])]
                 except KeyError:
-                    continue
+                    try:
+                        return PDB2EC[(self.pdb_id, res.alt_chain[0])]
+                    except KeyError:
+                        continue
         return
 
     @property
@@ -370,6 +373,10 @@ class PdbSite:
             self.ligands.append(residue)
             residue.parent_site = self
             if residue.is_polymer:
+                if residue.chain in self.structure[0]:
+                    for r in residue.structure:
+                        self.structure[0][residue.chain].add(r)
+                    return True
                 self.structure[0].add(residue.structure)
                 return True
         if residue.structure:
