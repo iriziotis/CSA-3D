@@ -343,24 +343,28 @@ class Het(PdbResidue):
     """
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 chain='', structure=None, parent_site=None):
+                 chain='', structure=None, parent_site=None, calculate_scores=True):
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
         self.structure = None
-        if structure:
-            self.structure = structure.copy()
-            self.structure.set_parent(structure.get_parent())
         self.parent_site = parent_site
         self.cannot_be_artefact = False
         self.components_missing = False
-        self.similarity, self.best_match, self.component_type = self.get_similarity()
-        self.centrality = self.get_centrality()
+        self.similarity, self.best_match, self.component_type = None, None, None
+        self.centrality = None
+        if structure:
+            self.structure = structure.copy()
+            self.structure.set_parent(structure.get_parent())
+        if calculate_scores:
+            self.similarity, self.best_match, self.component_type = self.get_similarity()
+            self.centrality = self.get_centrality()
 
     def __repr__(self):
         return self.resname
 
     @classmethod
     def polymer(cls, reslist, mcsa_id=None, pdb_id=None, chain='', parent_site=None):
-        poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, structure=None, parent_site=parent_site)
+        poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, 
+                   structure=None, parent_site=parent_site, calculate_scores=False)
         poly.structure = Chain(chain)
         for res in reslist:
             poly.structure.add(res.copy())
