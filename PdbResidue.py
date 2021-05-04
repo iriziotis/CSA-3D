@@ -370,7 +370,8 @@ class Het(PdbResidue):
                    structure=None, parent_site=parent_site, calculate_scores=False)
         poly.structure = Chain(chain)
         for res in reslist:
-            poly.structure.add(res.copy())
+            if res.get_id() not in poly.structure:
+                poly.structure.add(res.copy())
         poly.similarity, poly.best_match, poly.component_type = poly.get_similarity()
         poly.centrality = poly.get_centrality()
         return poly
