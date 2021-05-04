@@ -345,7 +345,7 @@ class PdbSite:
         """Checks if there are missing functional atoms from the residue
         structures or site is empty"""
         if self.is_reference:
-            return all([i.structure for i in ref]))
+            return all([i.structure for i in ref])
         try:
             gaps = set(self.get_gaps())
             self_atoms, _ = self._get_func_atoms(omit=gaps)
