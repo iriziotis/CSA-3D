@@ -121,16 +121,27 @@ class PdbResidue:
                 self.structure = structure
                 return True
         if type(structure) == Structure:
-            try:
-                residue = structure[0][self.chain][self.auth_resid]
-                if residue.get_resname().capitalize() == self.resname:
-                    self.structure = residue.copy()
-                    self.structure.set_parent(residue.get_parent())
-                    return True
-            except KeyError:
-                if self.is_reference:
+            if self.is_standard:
+                try:
+                    residue = structure[0][self.chain][self.auth_resid]
+                except KeyError:
+                    if self.is_reference:
+                        warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
+                    return False
+            else:
+                found = False
+                for res in structure[0][self.chain].get_residues():
+                    if res.get_id()[1] == self.auth_resid:
+                        residue = res
+                        found = True
+                        break
+                if not found and self.is_reference:
                     warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
-                return False
+                    return False
+            if residue.get_resname().capitalize() == self.resname or not self.is_standard:
+                self.structure = residue.copy()
+                self.structure.set_parent(residue.get_parent())
+                return True
         else:
             return False
 
@@ -261,7 +272,7 @@ class PdbResidue:
     @property
     def is_standard(self):
         """Checks if residue is one of the 20 standard ones"""
-        return self.resname.upper() in STANDARD_RESIDUES
+        return self.resname.upper() in STANDARD_RESIDUES and 'ptm' not in self.funclocs
 
     @property
     def has_double_funcloc(self):
