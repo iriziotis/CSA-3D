@@ -12,7 +12,8 @@ from Bio.PDB.Polypeptide import is_aa
 from rdkit.Chem.rdmolfiles import MolFromMolFile
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, NUCLEIC, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
 from .config import METALS, REACTIVE_NONMETALS, NOBLE_GASES, METAL_COFACTORS, PDBID_COFACTORS,\
-                    CRYSTALLIZATION_HETS, EC_REACTION, PDB2EC, HET_MOLS_DIR, REACTION_MOLS_DIR
+                    CRYSTALLIZATION_HETS, PDB2EC, KEGG_EC_REACTION, RHEA_EC_REACTION,\
+                    HET_MOLS_DIR, CHEBI_MOLS_DIR, KEGG_MOLS_DIR
 
 
 class PdbResidue:
@@ -351,21 +352,25 @@ class Het(PdbResidue):
         self.structure = None
         self.parent_site = parent_site
         self.cannot_be_artefact = False
-        self.components_missing = False
-        self.similarity, self.best_match, self.component_type = None, None, None
+        self.component_missing = False
+        self.similarity, self.best_match = None, None
         self.centrality = None
         if structure:
             self.structure = structure.copy()
             self.structure.set_parent(structure.get_parent())
         if calculate_scores:
-            self.similarity, self.best_match, self.component_type = self.get_similarity()
+            self.similarity, self.best_match = self.get_similarity()
             self.centrality = self.get_centrality()
 
     def __repr__(self):
         return self.resname
 
+    # Alternative constructors 
+
     @classmethod
     def polymer(cls, reslist, mcsa_id=None, pdb_id=None, chain='', parent_site=None):
+        """Alternative constructor for polymers. Takes a residue list and returns
+        a polymer ligand"""
         poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, 
                    structure=None, parent_site=parent_site, calculate_scores=False)
         poly.structure = Chain(chain)
@@ -376,63 +381,7 @@ class Het(PdbResidue):
         poly.centrality = poly.get_centrality()
         return poly
 
-    def get_centrality(self):
-        """Calculates an average distance to the catalytic residues of the site, 
-        normalized by the average intra-residue distance of the site"""
-        dists = [] 
-        if not self.parent_site:
-            return
-        for res in self.parent_site:
-            dists.append(self.get_distance(res, kind='com'))
-        mean_site_dist = np.nanmean(self.parent_site.get_distances(kind='com'))
-        centrality = np.nanmean(np.array(dists)) / mean_site_dist
-        return np.round(centrality, 2)
-
-    def get_similarity(self):
-        """Calculates the best PARITY match with the cognate reaction components"""
-        #TODO: Check the dataset first and then calculate parity.
-        if self.structure and self.structure.get_id()[0] != ' ':
-            try:
-                return self.generate_parity()
-            except Exception as e:
-                return None, None, None
-        return None, None, None
-        
-    def generate_parity(self):
-        ec = self.parent_site.ec
-        hetcode = self.resname
-        try:
-            b_sdf = f'{HET_MOLS_DIR}/{hetcode}.sdf'
-            cognate_reactants, cognate_products = EC_REACTION[ec]
-        except KeyError:
-            return None, None, None
-        max_score = 0.0
-        match = None
-        component_type = None
-        for components in (cognate_reactants, cognate_products):
-            for c in components:
-                c_sdf = f'{REACTION_MOLS_DIR}/{c}.mol'
-                if not os.path.exists(c_sdf) or not os.path.exists(b_sdf):
-                    self.components_missing = True
-                    continue
-                try:
-                    if not self.is_polymer:
-                        score = parity_core.generate_parity(b_sdf, c_sdf)
-                    else:
-                        # This is just to set the components_missing attribute
-                        score = 0
-                except Exception as e:
-                    continue
-                if score >= max_score:
-                    max_score = score
-                    match = c
-                    component_type = 'Reactant' if components is cognate_reactants else 'Product'
-                # Check if cognate and bound component are single-atom molecules
-                if self.is_polymer or (MolFromMolFile(c_sdf).GetNumAtoms() == 1 and MolFromMolFile(b_sdf).GetNumAtoms() == 1):
-                    self.cannot_be_artefact = True
-        if self.is_polymer:
-            return None, None, None
-        return np.round(max_score, 2), match, component_type
+    # Properties
 
     @property
     def is_artefact(self):
@@ -505,3 +454,100 @@ class Het(PdbResidue):
         if self.is_metal_compound:
             flag = 'Co-factor (metal)'
         return flag
+
+    # Public methods
+
+    def get_reaction(self):
+        """Gets filenames of reactants and products either from M-CSA or KEGG, 
+        depending on the EC match with the reference active site."""
+        if self.parent_site.ec == self.parent_site.parent_entry.info['reaction']['ec']:
+            components = self._get_mcsa_reaction()
+        else:
+            components = self._get_rhea_reaction()
+            if not components:
+                components = self._get_kegg_reaction()
+        for component in reversed(components):
+            if not os.path.exists(component):
+                components.remove(component)
+                self.components_missing = True
+        return components
+
+    def get_centrality(self):
+        """Calculates an average distance to the catalytic residues of the site, 
+        normalized by the average intra-residue distance of the site"""
+        dists = [] 
+        if not self.parent_site:
+            return
+        for res in self.parent_site:
+            dists.append(self.get_distance(res, kind='com'))
+        mean_site_dist = np.nanmean(self.parent_site.get_distances(kind='com'))
+        centrality = np.nanmean(np.array(dists)) / mean_site_dist
+        return np.round(centrality, 2)
+
+    def get_similarity(self):
+        """Calculates the best PARITY match with the cognate reaction components"""
+        #TODO: Check the dataset first and then calculate parity.
+        if self.structure and self.structure.get_id()[0] != ' ':
+            try:
+                return self.generate_parity()
+            except Exception as e:
+                return None, None
+        return None, None
+        
+    def generate_parity(self):
+        """Calculates parity score for each cognate reaction component and
+        for the best match, it returns the score, the match ID, and the type
+        (Reactant or Product)."""
+        if self.is_polymer:
+            return None, None
+        bound = f'{HET_MOLS_DIR}/{self.resname}.sdf'
+        max_score = 0.0
+        match = None
+        components = self.get_reaction()
+        if not components:
+            return None, None
+        for cognate in components:
+            try:
+                score = parity_core.generate_parity(bound, cognate, quiet=True)
+            except Exception as e:
+                continue
+            if score >= max_score:
+                max_score = score
+                match = cognate.split('/')[-1].split('.')[0]
+            # Check if cognate and bound component are single-atom molecules
+            if self.is_polymer or (MolFromMolFile(bound).GetNumAtoms() == 1 and MolFromMolFile(cognate).GetNumAtoms() == 1):
+                self.cannot_be_artefact = True
+        return np.round(max_score, 2), match
+
+    # Private methods
+
+    def _get_mcsa_reaction(self):
+        """Gets component filenames of the parent M-CSA reaction."""
+        components = []
+        try:
+            for component in self.parent_site.parent_entry.info['reaction']['compounds']:
+                components.append('{}/ChEBI_{}.sdf'.format(CHEBI_MOLS_DIR, component['chebi_id']))
+        except KeyError:
+            pass
+        return components
+
+    def _get_kegg_reaction(self):
+        """Gets component filenames of the corresponding KEGG reaction."""
+        components = []
+        try:
+            for cognate_components in KEGG_EC_REACTION[self.parent_site.ec]:
+                for component in cognate_components:
+                    components.append('{}/{}.mol'.format(KEGG_MOLS_DIR, component))
+        except KeyError:
+            pass
+        return components
+
+    def _get_rhea_reaction(self):
+        """Gets component filenames of the corresponding KEGG reaction."""
+        components = []
+        try:
+            for component in RHEA_EC_REACTION[self.parent_site.ec]:
+                components.append('{}/ChEBI_{}.sdf'.format(CHEBI_MOLS_DIR, component))
+        except KeyError:
+            pass
+        return components

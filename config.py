@@ -8,7 +8,8 @@ WORKING_DIR = '/Users/riziotis/ebi/phd/datasets/'
 if not os.path.isdir(WORKING_DIR):
     WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd/datasets/'
 ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif'
-REACTION_MOLS_DIR = WORKING_DIR + 'kegg/mols'
+KEGG_MOLS_DIR = WORKING_DIR + 'kegg/mol'
+CHEBI_MOLS_DIR = WORKING_DIR + 'chebi/sdf'
 HET_MOLS_DIR = WORKING_DIR + 'pdbe/het_sdf'
 CAT_RES_INFO = WORKING_DIR + 'mcsa/catalytic_residues_homologues.json'
 MCSA_ENTRY_INFO = WORKING_DIR + 'mcsa/entry_info/mcsa_entry_info.*.json'
@@ -18,7 +19,9 @@ uniprot_pdb_mapping_csv = WORKING_DIR + 'sifts/uniprot_pdb.csv'
 pdb_uniprot_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_uniprot.csv'
 pdb_ec_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_enzyme.csv'
 # KEGG
-ec_reaction_mapping_csv = WORKING_DIR + 'kegg/ec_reaction.csv'
+kegg_reaction_mapping_csv = WORKING_DIR + 'kegg/ec_reaction.csv'
+# RHEA
+rhea_reaction_mapping_csv = WORKING_DIR + 'rhea/rhea_reaction_components.csv'
 # Ligands
 pdbe_ions_csv = WORKING_DIR + 'pdbe/pdb_ions.csv'
 pdbe_cofactors_csv = WORKING_DIR + 'pdbe/pdb_cofactors.csv'
@@ -46,9 +49,14 @@ with open(pdb_ec_mapping_csv, 'r') as f:
 with open(het_info_csv, 'r') as f:
     HET2SMILES = {line[0]: line[3] for line in csv.reader(f, quotechar='"')}
 
-# EC - reaction components mapping
-with open(ec_reaction_mapping_csv, 'r') as f:
-    EC_REACTION = {line[0]: ([line[1].split(';'), line[2].split(';')]) for line in csv.reader(f, quotechar='"')}
+# KEGG ec - reaction components mapping
+with open(kegg_reaction_mapping_csv, 'r') as f:
+    KEGG_EC_REACTION = {line[0]: ([line[1].split(';'), line[2].split(';')]) for line in csv.reader(f, quotechar='"')}
+
+# RHEA ec - reaction components mapping
+with open(rhea_reaction_mapping_csv, 'r') as f:
+    next(f)
+    RHEA_EC_REACTION = {line[2]: line[3].split(';') for line in csv.reader(f)}
 
 # PDB ID - co-factors mapping
 PDBID_COFACTORS = defaultdict(set)
