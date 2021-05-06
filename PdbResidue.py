@@ -377,7 +377,7 @@ class Het(PdbResidue):
         for res in reslist:
             if res.get_id() not in poly.structure:
                 poly.structure.add(res.copy())
-        poly.similarity, poly.best_match, poly.component_type = poly.get_similarity()
+        poly.similarity, poly.best_match = poly.get_similarity()
         poly.centrality = poly.get_centrality()
         return poly
 
