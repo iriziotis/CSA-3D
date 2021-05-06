@@ -19,7 +19,7 @@ uniprot_pdb_mapping_csv = WORKING_DIR + 'sifts/uniprot_pdb.csv'
 pdb_uniprot_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_uniprot.csv'
 pdb_ec_mapping_csv = WORKING_DIR + 'sifts/pdb_chain_enzyme.csv'
 # KEGG
-kegg_reaction_mapping_csv = WORKING_DIR + 'kegg/ec_reaction.csv'
+kegg_reaction_mapping_csv = WORKING_DIR + 'kegg/kegg_reaction_components.csv'
 # RHEA
 rhea_reaction_mapping_csv = WORKING_DIR + 'rhea/rhea_reaction_components.csv'
 # Ligands
@@ -51,7 +51,7 @@ with open(het_info_csv, 'r') as f:
 
 # KEGG ec - reaction components mapping
 with open(kegg_reaction_mapping_csv, 'r') as f:
-    KEGG_EC_REACTION = {line[0]: ([line[1].split(';'), line[2].split(';')]) for line in csv.reader(f, quotechar='"')}
+    KEGG_EC_REACTION = {line[0]: [line[1].split(';')] for line in csv.reader(f)}
 
 # RHEA ec - reaction components mapping
 with open(rhea_reaction_mapping_csv, 'r') as f:

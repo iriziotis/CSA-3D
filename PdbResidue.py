@@ -352,7 +352,7 @@ class Het(PdbResidue):
         self.structure = None
         self.parent_site = parent_site
         self.cannot_be_artefact = False
-        self.component_missing = False
+        self.components_missing = False
         self.similarity, self.best_match = None, None
         self.centrality = None
         if structure:
@@ -535,9 +535,8 @@ class Het(PdbResidue):
         """Gets component filenames of the corresponding KEGG reaction."""
         components = []
         try:
-            for cognate_components in KEGG_EC_REACTION[self.parent_site.ec]:
-                for component in cognate_components:
-                    components.append('{}/{}.mol'.format(KEGG_MOLS_DIR, component))
+            for component in KEGG_EC_REACTION[self.parent_site.ec]:
+                components.append('{}/KEGG_{}.mol'.format(KEGG_MOLS_DIR, component))
         except KeyError:
             pass
         return components
