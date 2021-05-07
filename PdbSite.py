@@ -158,22 +158,27 @@ class PdbSite:
         # Build a site from each seed
         for seed in seeds:
             site = cls.build(seed, reslist, reference_site, parent_entry)
+            sites.append(site)
             if site.has_missing_functional_atoms or len(site) != len(reference_site):
+                sites.remove(site)
                 continue
             # Reduce redundancy
-            if len(sites) > 1:
-                _, _, _, rms_all = site.fit(sites[-1])
-                if site.has_identical_residues(sites[-1]) and rms_all == 0:
+            try:
+                _, _, _, rms_all = site.fit(sites[-2])
+                if site.has_identical_residues(sites[-2]) and rms_all == 0:
+                    sites.remove(site)
                     continue
                 if redundancy_cutoff:
                     if rms_all < redundancy_cutoff:
+                        sites.remove(site)
                         continue
+            except IndexError:
+                pass
             # Add ligands and annotations
             if annotate and structure:
                 site.parent_structure = structure
                 site.mmcif_dict = mmcif_dict
                 site.find_ligands()
-            sites.append(site)
         # Final clean up of unclustered sites
         PdbSite._mark_unclustered(sites)
         return sites
