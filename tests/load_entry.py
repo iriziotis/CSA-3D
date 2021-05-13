@@ -16,9 +16,9 @@ def main(mcsa_id):
 
     for i, pdbsite in enumerate(entry.pdbsites):
         for l in pdbsite.ligands:
-            print(l.resname, l.type, l.centrality, l.similarity, l.best_match, l.parent_site.id, l.parent_site.ec, l.components_missing)
+            print(pdbsite.id, pdbsite.uniprot_id, l.resname, l.type, l.centrality, l.similarity, l.best_match, l.parent_site.id, l.parent_site.ec, l.components_missing)
 
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+        #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
         #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
         ##print(pdbsite.id, rms, rms_all, per_res_rms)
         pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
