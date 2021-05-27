@@ -533,7 +533,7 @@ class PdbSite:
             else:
                 sanity = 'insane'
             outfile = '{}/mcsa_{}.{}.{}.{}.{}.{}.pdb'.format(
-                      outdir.strip('/'), str(self.mcsa_id).zfill(4), self.id,
+                      outdir.rstrip('/'), str(self.mcsa_id).zfill(4), self.id,
                       'reference' if self.is_reference else 'cat_site', 
                       conservation, atms, sanity)
         with open(outfile, 'w') as o:
