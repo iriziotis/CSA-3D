@@ -157,31 +157,19 @@ class PdbSite:
         seeds = PdbSite._get_seeds(reslist)
         # Build a site from each seed
         for seed in seeds:
-            site = cls.build(seed, reslist, reference_site, parent_entry)
-            sites.append(site)
-            if site.has_missing_functional_atoms or len(site) != len(reference_site):
-                sites.remove(site)
-                continue
-            # Reduce redundancy
-            try:
-                _, _, _, rms_all = site.fit(sites[-2])
-                if site.has_identical_residues(sites[-2]) and rms_all == 0:
-                    sites.remove(site)
-                    continue
-                if redundancy_cutoff:
-                    if rms_all < redundancy_cutoff:
-                        sites.remove(site)
-                        continue
-            except IndexError:
-                pass
-            # Add ligands and annotations
-            if annotate and structure:
+            sites.append(cls.build(seed, reslist, reference_site, parent_entry))
+        # Reduce redundancy
+        sites = PdbSite._remove_redundant_sites(sites, cutoff=redundancy_cutoff)
+        # Add ligands and annotations
+        if annotate and structure:
+            for site in sites:
                 site.parent_structure = structure
                 site.mmcif_dict = mmcif_dict
                 site.find_ligands()
-        # Final clean up of unclustered sites
+        # Flag unclustered sites
         PdbSite._mark_unclustered(sites)
         return sites
+
 
     # Properties
 
@@ -931,10 +919,34 @@ class PdbSite:
                 result = eq
                 min_dist = dist
         return result
+
+    @staticmethod
+    def _remove_redundant_sites(sitelist, cutoff=0):
+        """Cleans a list of sites by removing duplicates or similar ones
+        according to an RMSD cutoff"""
+        seen = set()
+        reject = set()
+        for p in sitelist:
+            if p.has_missing_functional_atoms or len(p) != len(p.reference_site):
+                continue
+            for q in sitelist:
+                if q.has_missing_functional_atoms or len(q) != len(q.reference_site):
+                    continue
+                if p.id==q.id or (q.id, p.id) in seen:
+                    continue
+                seen.add((p.id, q.id))
+                _, _, _, rms = p.fit(q)
+                if (p.has_identical_residues(q) and rms < 0.01) or rms < cutoff:
+                    reject.add(q.id)
+        nr = []
+        for site in sitelist:
+            if site.id not in reject and site not in nr:
+                nr.append(site)
+        return nr
     
     @staticmethod
     def _mark_unclustered(sitelist):
-        """Returns a clean list of catalytic sites from the same PDB
+        """Cleans the list of catalytic sites from the same PDB
         by rejecting sites that might have insanely outlying residues"""
         try:
             ref_dists = sitelist[0].reference_site.get_distances(kind='min')
