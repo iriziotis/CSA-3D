@@ -468,6 +468,8 @@ class PdbSite:
         polymers = defaultdict(list)
         site_chains = set([res.chain for res in self])
         seen = set()
+        added = set()
+        # Search for components close to catalytic residues
         for center in centers:
             hits = ns.search(center, radius, level='R')
             for res in hits:
@@ -483,6 +485,7 @@ class PdbSite:
                 if restype == 'H':
                     self.add(Het(self.mcsa_id, self.pdb_id, res.get_resname(), 
                                  res.get_id()[1], chain, structure=res, parent_site=self))
+                    added.add(res.get_full_id())
                 # Protein/nucleic polymer components
                 if restype == ' ' and chain not in site_chains:
                     polymers[chain].append(res)
@@ -490,6 +493,16 @@ class PdbSite:
         if self.acts_on_polymer:
             for chain, reslist in polymers.items():
                 self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
+        ## Find distal co-factor-like molecules
+        #hits = ns.search(self.structure.center_of_mass(geometric=True), 30, level='R')
+        #for res in hits:
+        #    restype = res.get_id()[0][0]
+        #    if restype == 'H' and res.get_full_id() not in added:
+        #        ligand = Het(self.mcsa_id, self.pdb_id, res.get_resname(), 
+        #                     res.get_id()[1], chain, structure=res, parent_site=self)
+        #        if ligand.is_cofactor or ligand.is_metal_compound or ligand.type == 'Substrate (non-polymer)':
+        #            ligand.is_distal = True
+        #            self.add(ligand)
         return 
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):

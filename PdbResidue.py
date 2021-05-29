@@ -353,6 +353,7 @@ class Het(PdbResidue):
         self.parent_site = parent_site
         self.cannot_be_artefact = False
         self.components_missing = False
+        self.is_distal = False
         self.similarity, self.best_match = None, None
         self.centrality = None
         if structure:
