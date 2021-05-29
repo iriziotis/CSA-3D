@@ -941,9 +941,11 @@ class PdbSite:
         reject = set()
         for p in sitelist:
             if p.has_missing_functional_atoms or len(p) != len(p.reference_site):
+                reject.add(p.id)
                 continue
             for q in sitelist:
                 if q.has_missing_functional_atoms or len(q) != len(q.reference_site):
+                    reject.add(q.id)
                     continue
                 if p.id==q.id or (q.id, p.id) in seen:
                     continue

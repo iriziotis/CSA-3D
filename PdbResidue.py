@@ -178,7 +178,8 @@ class PdbResidue:
     def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
         """Check if residues share the same pdb_id, chiral_id, name, resid
         and auth_resid"""
-        basic = self.pdb_id == other.pdb_id and self.resname == other.resname and \
+        basic = self.pdb_id == other.pdb_id and \
+                (self.resname == other.resname or not self.is_standard or not other.is_standard) and \
                 (self.resid == other.resid or self.auth_resid == other.auth_resid)
         chiral_ids = self.chiral_id == other.chiral_id
         chains = self.chain == other.chain
