@@ -11,7 +11,7 @@ from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
 from rdkit.Chem.rdmolfiles import MolFromMolFile
 from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, NUCLEIC, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
-from .config import METALS, REACTIVE_NONMETALS, NOBLE_GASES, METAL_COFACTORS, PDBID_COFACTORS,\
+from .config import METALS, REACTIVE_NONMETALS, NOBLE_GASES, PDBID_COFACTORS, MCSA_EC_COFACTORS,\
                     CRYSTALLIZATION_HETS, PDB2EC, KEGG_EC_REACTION, RHEA_EC_REACTION,\
                     HET_MOLS_DIR, CHEBI_MOLS_DIR, KEGG_MOLS_DIR
 
@@ -386,13 +386,6 @@ class Het(PdbResidue):
     # Properties
 
     @property
-    def is_artefact(self):
-        """Check if component is likely to be a crystallographic artefact"""
-        if self.cannot_be_artefact == True:
-            return False
-        return (self.resname in CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
-
-    @property
     def is_polymer(self):
         """Check if component is a peptide or nucleic macromolecule"""
         if self.structure:
@@ -411,19 +404,9 @@ class Het(PdbResidue):
         return self.is_polymer and not self.is_peptide
 
     @property
-    def is_cofactor(self):
-        """Check if component is annotated as cofactor for this pdb in PDBe"""
-        return not self.is_metal_compound and not self.is_metal and self.resname in PDBID_COFACTORS[self.pdb_id]
-
-    @property
     def is_metal(self):
         """Check if component is single-atom metal"""
         return self.resname in METALS
-
-    @property
-    def is_metal_compound(self):
-        """Check if component is a metal or a metallic cofactor"""
-        return self.is_metal and self.resname in METAL_COFACTORS
 
     @property
     def is_reactive_nonmetal(self):
@@ -441,6 +424,18 @@ class Het(PdbResidue):
         return self.is_metal or self.is_reactive_nonmetal or self.is_noble_gas
 
     @property
+    def is_cofactor(self):
+        """Check if component is annotated as cofactor for this pdb in PDBe or M-CSA"""
+        return self.resname in PDBID_COFACTORS[self.pdb_id] or self.resname in MCSA_EC_COFACTORS[self.parent_site.ec]
+
+    @property
+    def is_artefact(self):
+        """Check if component is likely to be a crystallographic artefact"""
+        if self.cannot_be_artefact == True:
+            return False
+        return (self.resname in CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
+
+    @property
     def type(self):
         """An identifier to tell if component is an artefact, a peptide, a cofactor or a metallic
         compound (in priority order)."""
@@ -452,9 +447,10 @@ class Het(PdbResidue):
         if self.is_polymer:
             flag = 'Substrate (polymer)'
         if self.is_cofactor:
-            flag = 'Co-factor (non-metal)'
-        if self.is_metal_compound:
-            flag = 'Co-factor (metal)'
+            if self.is_ion:
+                flag = 'Co-factor (ion)'
+            else:
+                flag = 'Co-factor (non-ion)'
         return flag
 
     # Public methods

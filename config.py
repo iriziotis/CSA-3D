@@ -26,8 +26,7 @@ rhea_reaction_mapping_csv = WORKING_DIR + 'rhea/rhea_reaction_components.csv'
 pdbe_ions_csv = WORKING_DIR + 'pdbe/pdb_ions.csv'
 pdbe_cofactors_csv = WORKING_DIR + 'pdbe/pdb_cofactors.csv'
 mcsa_cofactors_csv = WORKING_DIR + 'mcsa/mcsa_cofactors.csv'
-crystallization_hets = WORKING_DIR + 'pdbe/crystallization_hets.csv'
-het_info_csv = WORKING_DIR + 'pdbe/het_all_info.csv'
+crystallization_hets_csv = WORKING_DIR + 'pdbe/crystallization_hets.csv'
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:
@@ -45,10 +44,6 @@ with open(pdb_ec_mapping_csv, 'r') as f:
     next(f)
     PDB2EC = {(line[0], line[1]): line[3] for line in csv.reader(f)}
 
-# HET to SMILES mapping
-with open(het_info_csv, 'r') as f:
-    HET2SMILES = {line[0]: line[3] for line in csv.reader(f, quotechar='"')}
-
 # KEGG ec - reaction components mapping
 with open(kegg_reaction_mapping_csv, 'r') as f:
     KEGG_EC_REACTION = {line[0]: [line[1].split(';')] for line in csv.reader(f)}
@@ -58,20 +53,8 @@ with open(rhea_reaction_mapping_csv, 'r') as f:
     next(f)
     RHEA_EC_REACTION = {line[2]: line[3].split(';') for line in csv.reader(f)}
 
-# PDB ID - co-factors mapping
-PDBID_COFACTORS = defaultdict(set)
-with open(pdbe_cofactors_csv, 'r') as f:
-    next(f)
-    for line in csv.reader(f, quotechar='"'):
-        PDBID_COFACTORS[line[0]].add(line[4])
-
-# Metal co-factor set
-with open(mcsa_cofactors_csv, 'r') as f:
-    next(f)
-    METAL_COFACTORS = {line[1] for line in csv.reader(f, quotechar='"') if line[3]=="True"}
-
 # Crystallization artefact HETs set
-with open(crystallization_hets, 'r') as f:
+with open(crystallization_hets_csv, 'r') as f:
     CRYSTALLIZATION_HETS = {line.strip() for line in f}
 
 # Ions sets
@@ -87,4 +70,19 @@ with open(pdbe_ions_csv, 'r') as f:
             REACTIVE_NONMETALS.add(line[0])
         if line[3] == 'NOBLE_GAS':
             NOBLE_GASES.add(line[0])
+
+# PDB ID - co-factors mapping
+PDBID_COFACTORS = defaultdict(set)
+with open(pdbe_cofactors_csv, 'r') as f:
+    next(f)
+    for line in csv.reader(f, quotechar='"'):
+        PDBID_COFACTORS[line[0]].add(line[4])
+
+# MCSA EC - co-factors mapping
+MCSA_EC_COFACTORS = defaultdict(set)
+with open(mcsa_cofactors_csv, 'r') as f:
+    next(f)
+    for line in csv.reader(f, quotechar='"'):
+        for ec in line[4].split(';'):
+            MCSA_EC_COFACTORS[ec].add(line[1])
 

@@ -493,16 +493,17 @@ class PdbSite:
         if self.acts_on_polymer:
             for chain, reslist in polymers.items():
                 self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
-        ## Find distal co-factor-like molecules
-        #hits = ns.search(self.structure.center_of_mass(geometric=True), 30, level='R')
-        #for res in hits:
-        #    restype = res.get_id()[0][0]
-        #    if restype == 'H' and res.get_full_id() not in added:
-        #        ligand = Het(self.mcsa_id, self.pdb_id, res.get_resname(), 
-        #                     res.get_id()[1], chain, structure=res, parent_site=self)
-        #        if ligand.is_cofactor or ligand.is_metal_compound or ligand.type == 'Substrate (non-polymer)':
-        #            ligand.is_distal = True
-        #            self.add(ligand)
+        # Find distal co-factor-like or substrate-like molecules
+        hits = ns.search(self.structure.center_of_mass(geometric=True), 30, level='R')
+        #print(self.id)
+        for res in hits:
+            restype = res.get_id()[0][0]
+            if restype == 'H' and res.get_full_id() not in added:
+                ligand = Het(self.mcsa_id, self.pdb_id, res.get_resname(), 
+                             res.get_id()[1], res.get_parent().get_id(), structure=res, parent_site=self)
+                if ligand.type in ('Substrate (non-polymer)', 'Co-factor (non-ion)'):
+                    ligand.is_distal = True
+                    self.add(ligand)
         return 
 
     def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
