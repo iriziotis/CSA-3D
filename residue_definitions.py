@@ -35,7 +35,7 @@ RESIDUE_DEFINITIONS = {
     'THR.CA', 'THR.CB', 'THR.OG1',
     'TRP.NE1', 'TRP.CZ2', 'TRP.CH2',
     'TYR.CE1', 'TYR.CZ', 'TYR.OH',
-    'VAL.CA', 'VAL.CB', 'VAL.CG',
+    'VAL.CA', 'VAL.CB', 'VAL.CG1',
     }
 
 EQUIVALENT_RESIDUES = {
@@ -71,5 +71,5 @@ EQUIVALENT_ATOMS = {
         'ILE.CG1': 'LEU.CG',
         'VAL.CA': 'LEU.CA',
         'VAL.CB': 'LEU.CB',
-        'VAL.CG': 'LEU.CG',
+        'VAL.CG1': 'LEU.CG',
         }

@@ -14,14 +14,17 @@ def main(mcsa_id):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    for i, pdbsite in enumerate(entry.pdbsites):
-        for l in pdbsite.ligands:
-            print(pdbsite.id, pdbsite.uniprot_id, l.resname, l.type, l.centrality, l.similarity, l.best_match, l.parent_site.id, l.parent_site.ec, l.components_missing)
+    a = entry.get_pdbsite('2pan_A-AA-A-AA-AA-AA-AA-A') 
+    b = entry.get_pdbsite('1pow_AA-A-AA-A-A-A-A-AA')
+ 
+    a.fit(b)
 
-        #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
-        #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
-        ##print(pdbsite.id, rms, rms_all, per_res_rms)
-        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
+    #for i, pdbsite in enumerate(entry.pdbsites):
+
+    #    #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
+    #    #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
+    #    ##print(pdbsite.id, rms, rms_all, per_res_rms)
+    #    pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
 
 
 if __name__ == '__main__':
