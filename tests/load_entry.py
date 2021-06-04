@@ -14,11 +14,7 @@ def main(mcsa_id):
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 
-    a = entry.get_pdbsite('2pan_A-AA-A-AA-AA-AA-AA-A') 
-    b = entry.get_pdbsite('1pow_AA-A-AA-A-A-A-A-AA')
- 
-    a.fit(b)
-
+    
     #for i, pdbsite in enumerate(entry.pdbsites):
 
     #    #rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, scaling_factor=None, transform=True)
