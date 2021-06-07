@@ -144,7 +144,7 @@ class PdbResidue:
                 if not found and self.is_reference:
                     warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
                     return False
-            if residue.get_resname().capitalize() in (self.resname, self.ptm_resname) or not self.is_standard:
+            if residue.get_resname().capitalize() == self.resname or not self.is_standard:
                 self.structure = residue.copy()
                 self.structure.set_parent(residue.get_parent())
                 return True
@@ -280,8 +280,8 @@ class PdbResidue:
     def is_standard(self):
         """Checks if residue is one of the 20 standard ones"""
         return self.resname.upper() in STANDARD_RESIDUES and \
-               'ptm' not in self.funclocs and \
-               self.reference_residue.ptm_resname == ''
+               'ptm' not in self.funclocs# and \
+               #self.reference_residue.ptm_resname == ''
 
     @property
     def has_double_funcloc(self):
