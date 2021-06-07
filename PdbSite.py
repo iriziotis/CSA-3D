@@ -497,7 +497,6 @@ class PdbSite:
                 self.add(Het.polymer(reslist, self.mcsa_id, self.pdb_id, chain, self))
         # Find distal co-factor-like or substrate-like molecules
         hits = ns.search(self.structure.center_of_mass(geometric=True), 30, level='R')
-        #print(self.id)
         for res in hits:
             restype = res.get_id()[0][0]
             if restype == 'H' and res.get_full_id() not in added:

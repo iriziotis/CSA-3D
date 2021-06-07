@@ -22,7 +22,8 @@ class PdbResidue:
     as a Biopython Residue object"""
 
     def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', alt_chain='', funclocs=None, 
+                 auth_resid=None, chain='', alt_chain='', ptm_resname='', 
+                 funclocs=None, domain_name='', domain_cath_id='', 
                  is_reference=False, chiral_id=None, dummy_structure=False):
         self.parent_site = None
         self.mcsa_id = mcsa_id
@@ -32,7 +33,10 @@ class PdbResidue:
         self.auth_resid = auth_resid
         self.chain = chain
         self.alt_chain = alt_chain
+        self.ptm_resname = ptm_resname
         self.funclocs = funclocs if funclocs else []
+        self.domain_name = domain_name
+        self.domain_cath_id = domain_cath_id
         self.is_reference = is_reference
         self.chiral_id = chiral_id
         self.reference_residue = None
@@ -140,7 +144,7 @@ class PdbResidue:
                 if not found and self.is_reference:
                     warnings.warn('Could not add residue {} structure'.format(self.id), RuntimeWarning)
                     return False
-            if residue.get_resname().capitalize() == self.resname or not self.is_standard:
+            if residue.get_resname().capitalize() in (self.resname, self.ptm_resname) or not self.is_standard:
                 self.structure = residue.copy()
                 self.structure.set_parent(residue.get_parent())
                 return True
@@ -275,7 +279,9 @@ class PdbResidue:
     @property
     def is_standard(self):
         """Checks if residue is one of the 20 standard ones"""
-        return self.resname.upper() in STANDARD_RESIDUES and 'ptm' not in self.funclocs
+        return self.resname.upper() in STANDARD_RESIDUES and \
+               'ptm' not in self.funclocs and \
+               self.reference_residue.ptm_resname == ''
 
     @property
     def has_double_funcloc(self):
@@ -295,24 +301,27 @@ class PdbResidue:
         """Constructs a list of PdbResidue objects using information directly from
         the M-CSA homologues json file. Input is a top-level residue entry in the json.
         """
-        try:
-            for pdb_res in residue['residue_chains']:
-                mcsa_id = residue['mcsa_id']
-                pdb_id = pdb_res['pdb_id']
-                resname = pdb_res['code']
-                resid = pdb_res['resid']
-                auth_resid = pdb_res['auth_resid']
-                is_reference = pdb_res['is_reference']
-                chain = pdb_res['assembly_chain_name'] if is_reference \
-                    else pdb_res['chain_name']
-                alt_chain = pdb_res['chain_name'] if is_reference \
-                    else pdb_res['assembly_chain_name']
-                funclocs = [residue['function_location_abv']]
+        for pdb_res in residue['residue_chains']:
+            mcsa_id = residue['mcsa_id']
+            pdb_id = pdb_res['pdb_id']
+            resname = pdb_res['code']
+            resid = pdb_res['resid']
+            auth_resid = pdb_res['auth_resid']
+            is_reference = pdb_res['is_reference']
+            chain = pdb_res['assembly_chain_name'] if is_reference \
+                else pdb_res['chain_name']
+            alt_chain = pdb_res['chain_name'] if is_reference \
+                else pdb_res['assembly_chain_name']
+            funclocs = [residue['function_location_abv']]
+            domain_name = pdb_res['domain_name']
+            domain_cath_id = pdb_res['domain_cath_id']
+            #TODO wait for fixed json
+            ptm_resname = residue.get('ptm', '')
 
-                yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
-                          chain, alt_chain, funclocs, is_reference, chiral_id)
-        except KeyError:
-            return
+            yield cls(mcsa_id, pdb_id, resname, resid, auth_resid,
+                      chain, alt_chain, ptm_resname, funclocs, domain_name,
+                      domain_cath_id, is_reference, chiral_id)
+        return
 
     @staticmethod
     def transform_chain(chain, to_dash=False):
