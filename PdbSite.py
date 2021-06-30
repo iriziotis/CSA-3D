@@ -633,8 +633,6 @@ class PdbSite:
         # Get atom identifier strings and coords as numpy arrays
         p_atoms, p_coords = self._get_func_atoms(allow_symmetrics, omit=gaps, ca=ca)
         q_atoms, q_coords = other._get_func_atoms(allow_symmetrics, omit=gaps, ca=ca)
-        print(p_atoms)
-        print(p_coords)
         if p_atoms is None or q_atoms is None:
             return None, None, None, None
         if len(p_atoms) != len(q_atoms):
