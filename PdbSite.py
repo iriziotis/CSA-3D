@@ -449,7 +449,7 @@ class PdbSite:
         return identicals
     
 
-    def find_ligands(self, radius=3):
+    def find_ligands(self, radius=5):
         """
         Searches the parent structure for hetero components close to the
         catalytic residues, by searching around the atoms of catalytic residues
@@ -590,7 +590,7 @@ class PdbSite:
             print('END', file=o)
 
     def fit(self, other, weighted=False, cycles=1, cutoff=999, scaling_factor=None, transform=False, 
-            mutate=True, reorder=True, allow_symmetrics=True, exclude=None, get_array=False):
+            mutate=True, reorder=True, allow_symmetrics=True, ca=False, exclude=None, get_array=False):
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -631,8 +631,10 @@ class PdbSite:
             for i in exclude:
                 gaps.add(i)
         # Get atom identifier strings and coords as numpy arrays
-        p_atoms, p_coords = self._get_func_atoms(allow_symmetrics, omit=gaps)
-        q_atoms, q_coords = other._get_func_atoms(allow_symmetrics, omit=gaps)
+        p_atoms, p_coords = self._get_func_atoms(allow_symmetrics, omit=gaps, ca=ca)
+        q_atoms, q_coords = other._get_func_atoms(allow_symmetrics, omit=gaps, ca=ca)
+        print(p_atoms)
+        print(p_coords)
         if p_atoms is None or q_atoms is None:
             return None, None, None, None
         if len(p_atoms) != len(q_atoms):
@@ -716,7 +718,7 @@ class PdbSite:
         self._reorder()
         return
 
-    def _get_func_atoms(self, allow_symmetrics=True, omit=None):
+    def _get_func_atoms(self, allow_symmetrics=True, omit=None, ca=False):
         """Gets atoms and coordinates for superposition and atom reordering
         calculations        
 
@@ -749,7 +751,7 @@ class PdbSite:
                     if not res.is_standard:
                         resname = 'PTM'
                 atmid = '{}.{}'.format(resname, atom.name)
-                if atmid in RESIDUE_DEFINITIONS:
+                if (not ca and atmid in RESIDUE_DEFINITIONS) or (ca and atom.name=='CA'):
                     if allow_symmetrics:
                         if atmid in EQUIVALENT_ATOMS:
                             atmid = EQUIVALENT_ATOMS[atmid]
