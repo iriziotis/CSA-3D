@@ -1,8 +1,13 @@
 import json
 import warnings
+import ssl
+import gzip
+import time
 from collections import defaultdict
 from glob import glob
 from natsort import natsorted
+from urllib.request import urlopen
+from urllib.error import HTTPError
 from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR
 from .Entry import Entry
 from .PdbSite import PdbSite
@@ -76,6 +81,22 @@ class Mcsa:
             return False
         self.entries[entry.mcsa_id] = entry
         return True
+
+    def update_pdbs(self):
+        """Updates the raw assembly directory from PDBe"""
+        pdbs = set()
+        existing = glob(f'{ASSEMBLIES_DIR}/*')
+        for entry, json_res in self.catalytic_residue_info.items():
+            for res in json_res:
+                for res_chain in res['residue_chains']:
+                    pdb_id = res_chain['pdb_id']
+                    assembly = res_chain['assembly'] if res_chain['assembly'] else 1
+                    filename = '{}-assembly-{}.cif.gz'.format(pdb_id, assembly)
+                    print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
+                    scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
+                    cmd = "cp {} {}".format(scp_path, ASSEMBLIES_DIR)
+                    subprocess.call(cmd.split(" "))
+                    return
 
     # Properties
 
@@ -187,3 +208,4 @@ class Mcsa:
             return glob(path)[0]
         warnings.warn('Could not find mmCIF file for {}'.format(pdb_id), RuntimeWarning)
         return
+
