@@ -1,13 +1,9 @@
 import json
 import warnings
-import ssl
-import gzip
-import time
+import subprocess
 from collections import defaultdict
 from glob import glob
 from natsort import natsorted
-from urllib.request import urlopen
-from urllib.error import HTTPError
 from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR
 from .Entry import Entry
 from .PdbSite import PdbSite
@@ -96,7 +92,7 @@ class Mcsa:
                     scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
                     cmd = "cp {} {}".format(scp_path, ASSEMBLIES_DIR)
                     subprocess.call(cmd.split(" "))
-                    return
+        return
 
     # Properties
 
