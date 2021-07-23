@@ -90,7 +90,7 @@ class Mcsa:
                     filename = '{}-assembly-{}.cif.gz'.format(pdb_id, assembly)
                     print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
                     scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
-                    cmd = "cp {} {}".format(scp_path, ASSEMBLIES_DIR)
+                    cmd = "rsync {} {}".format(scp_path, ASSEMBLIES_DIR)
                     subprocess.call(cmd.split(" "))
         return
 
