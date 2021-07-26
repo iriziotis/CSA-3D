@@ -1,3 +1,4 @@
+import os
 import json
 import warnings
 import subprocess
@@ -81,17 +82,21 @@ class Mcsa:
     def update_pdbs(self):
         """Updates the raw assembly directory from PDBe"""
         pdbs = set()
-        existing = glob(f'{ASSEMBLIES_DIR}/*')
         for entry, json_res in self.catalytic_residue_info.items():
             for res in json_res:
                 for res_chain in res['residue_chains']:
                     pdb_id = res_chain['pdb_id']
                     assembly = res_chain['assembly'] if res_chain['assembly'] else 1
-                    filename = '{}-assembly-{}.cif.gz'.format(pdb_id, assembly)
-                    print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
-                    scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
-                    cmd = "rsync {} {}".format(scp_path, ASSEMBLIES_DIR)
-                    subprocess.call(cmd.split(" "))
+                    pdbs.add((pdb_id, assembly))
+        for pdb in pdbs:
+            pdb_id, assembly = pdb[0], pdb[1]
+            filename = '{}-assembly-{}.cif.gz'.format(pdb_id, assembly)
+            if os.path.isfile(os.path.join(ASSEMBLIES_DIR, filename)):
+                continue
+            print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
+            scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
+            cmd = "cp {} {}".format(scp_path, ASSEMBLIES_DIR)
+            subprocess.call(cmd.split(" "))
         return
 
     # Properties
