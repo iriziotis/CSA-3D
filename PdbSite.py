@@ -459,7 +459,7 @@ class PdbSite:
         Args:
             radius: the search space (in Å) around the atoms of the catalytic residues
         """
-        if type(self.parent_structure) != Structure:
+        if type(self.parent_structure) != Structure or self.structure is None:
             return
         # Get centers of search
         centers = self._get_ligand_search_centers(radius)        
