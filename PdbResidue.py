@@ -182,9 +182,7 @@ class PdbResidue:
     def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
         """Check if residues share the same pdb_id, chiral_id, name, resid
         and auth_resid"""
-        basic = self.pdb_id == other.pdb_id and \
-                (self.resname == other.resname or not self.is_standard or not other.is_standard) and \
-                (self.resid == other.resid or self.auth_resid == other.auth_resid)
+        basic = self.reference_residue == other.reference_residue
         chiral_ids = self.chiral_id == other.chiral_id
         chains = self.chain == other.chain
 
@@ -308,8 +306,8 @@ class PdbResidue:
             resid = pdb_res['resid']
             auth_resid = pdb_res['auth_resid']
             is_reference = pdb_res['is_reference']
-            chain = pdb_res['assembly_chain_name'] if is_reference \
-                else pdb_res['chain_name']
+            chain = PdbResidue.transform_chain(pdb_res['assembly_chain_name']) if is_reference \
+                else PdbResidue.transform_chain(pdb_res['chain_name'])
             alt_chain = pdb_res['chain_name'] if is_reference \
                 else pdb_res['assembly_chain_name']
             funclocs = [residue['function_location_abv']]

@@ -170,7 +170,6 @@ class PdbSite:
         PdbSite._mark_unclustered(sites)
         return sites
 
-
     # Properties
 
     @property
@@ -929,7 +928,10 @@ class PdbSite:
             #Check if the same residue is already in the site
             if site.contains_equivalent(eq):
                 continue
-            dist = eq.get_distance(other, kind='min')
+            if site.structure:
+                dist = eq.get_distance(site, kind='cog')
+            else:
+                dist = eq.get_distance(other, kind='cog')
             if dist<min_dist:
                 result = eq
                 min_dist = dist
