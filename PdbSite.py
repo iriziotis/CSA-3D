@@ -820,7 +820,8 @@ class PdbSite:
             for q in reslist:
                 if p==q or (q.full_id, p.full_id) in seen:
                     continue
-                if p.is_equivalent(q, by_chiral_id=False, by_chain=True):
+                if p.resname == q.resname and p.resid == q.resid and \
+                        p.auth_resid == q.auth_resid and p.chain == q.chain:
                     if p.funclocs != q.funclocs:
                         new_res = p.copy(include_structure=True)
                         new_res.funclocs = [p.funclocs[0], q.funclocs[0]]
