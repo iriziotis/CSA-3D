@@ -32,7 +32,7 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entry_ids=None, annotate=True, redundancy_cutoff=None, verbose=False):
+    def build(self, entry_ids=None, annotate=True, redundancy_cutoff=None, verbose=False, no_sites=False):
         """
         Builds M-CSA entries (Entry objects) containing PDB and UniProt
         catalytic sites (PdbSite and UniSite objects respectively
@@ -65,7 +65,8 @@ class Mcsa:
                 if len(set([r.uniprot_id for r in self.ref_uni_residues[entry_id]]))>1:
                     print('Has multiple UniProt references. Not yet implemented')
                     return False
-
+                if no_sites:
+                    continue
                 self._build_pdb_sites(entry_id, annotate, redundancy_cutoff, verbose)
                 self._build_uniprot_sites(entry_id)
             else:
