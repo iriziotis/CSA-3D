@@ -5,7 +5,7 @@ import subprocess
 from collections import defaultdict
 from glob import glob
 from natsort import natsorted
-from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR
+from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
 from .Entry import Entry
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -32,7 +32,7 @@ class Mcsa:
     def __iter__(self):
         yield from self.entries.values()
 
-    def build(self, entry_ids=None, annotate=True, redundancy_cutoff=None, verbose=False, no_sites=False):
+    def build(self, entry_ids=None, annotate=True, redundancy_cutoff=None, resolution_cutoff=None,  verbose=False, no_sites=False):
         """
         Builds M-CSA entries (Entry objects) containing PDB and UniProt
         catalytic sites (PdbSite and UniSite objects respectively
@@ -53,7 +53,7 @@ class Mcsa:
             if entry_id in self.catalytic_residue_info.keys():
                 self.entries[entry_id] = Entry(entry_id)
                 self.entries[entry_id].info = self.mcsa_entry_info[entry_id]
-                self._build_pdb_residues(entry_id)
+                self._build_pdb_residues(entry_id, resolution_cutoff)
                 self._build_uniprot_residues(entry_id)
 
                 # TODO check cases with two pdb references
@@ -108,15 +108,19 @@ class Mcsa:
 
     # Private methods
 
-    def _build_pdb_residues(self, entry_id):
+    def _build_pdb_residues(self, entry_id, resolution_cutoff=None):
         """Builds PdbResidue objects from using raw info found in the .json
         file from M-CSA API (catalytic_residues_homologues.json). Extracts
         all equivalent residues from identical chains in biological assemblies,
         and creates individual instances for them"""
         reference_residue = None
-        seen = set()
         for chiral_id, json_res in enumerate(self.catalytic_residue_info[entry_id]):
             for residue in PdbResidue.from_json(json_res, chiral_id):
+                # Resolution cutoff
+                if resolution_cutoff and not residue.is_reference:
+                    resolution = float(PDBID_RESOLUTION.get(residue.pdb_id, -1.0))
+                    if resolution == -1.0 or resolution > resolution_cutoff:
+                        continue
                 if residue.is_reference:
                     reference_residue = residue
                     self.ref_pdb_residues[residue.mcsa_id].append(residue)

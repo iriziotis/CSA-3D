@@ -15,7 +15,7 @@ def main(mcsa_id, outdir):
     # Build test entry
     print('Building entry {}'.format(mcsa_id))
     i = time()
-    build = db.build(mcsa_id, annotate=True, redundancy_cutoff=0.5, verbose=False)
+    build = db.build(mcsa_id, annotate=True, redundancy_cutoff=0.5, resolution_cutoff=2.0, verbose=False)
     if not build:
         print('No entry {}, or has multiple references'.format(mcsa_id))
         exit()

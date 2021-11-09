@@ -27,6 +27,8 @@ pdbe_ions_csv = WORKING_DIR + 'pdbe/pdb_ions.csv'
 pdbe_cofactors_csv = WORKING_DIR + 'pdbe/pdb_cofactors.csv'
 mcsa_cofactors_csv = WORKING_DIR + 'mcsa/mcsa_cofactors.csv'
 crystallization_hets_csv = WORKING_DIR + 'pdbe/crystallization_hets.csv'
+# Resolution
+pdb_resolution = WORKING_DIR + 'pdbe/resolu.idx'
 
 # UniProt to PDB mapping from sifts
 with open(uniprot_pdb_mapping_csv, 'r') as f:
@@ -86,3 +88,7 @@ with open(mcsa_cofactors_csv, 'r') as f:
         for ec in line[4].split(';'):
             MCSA_EC_COFACTORS[ec].add(line[1])
 
+# PDB_ID - resolution
+with open(pdb_resolution, 'r') as f:
+    PDBID_RESOLUTION = {line[0].strip().lower(): line[1].strip() for line in csv.reader(f, delimiter=';')}
+    
