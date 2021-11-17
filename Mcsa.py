@@ -118,7 +118,10 @@ class Mcsa:
             for residue in PdbResidue.from_json(json_res, chiral_id):
                 # Resolution cutoff
                 if resolution_cutoff and not residue.is_reference:
-                    resolution = float(PDBID_RESOLUTION.get(residue.pdb_id, -1.0))
+                    try:
+                        resolution = float(PDBID_RESOLUTION.get(residue.pdb_id, -1.0))
+                    except ValueError:
+                        resolution = -1.0
                     if resolution == -1.0 or resolution > resolution_cutoff:
                         continue
                 if residue.is_reference:
