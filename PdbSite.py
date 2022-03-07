@@ -9,7 +9,7 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
-from Bio.PDB.NeighborSearch import NeighborSearch
+from Bio.PDB.NeighborSearch import NeighborSearch 
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
 from .config import PDB2EC, PDB2UNI
@@ -587,6 +587,26 @@ class PdbSite:
                             atom.get_occupancy() if atom.get_occupancy() else '')
                         print(pdb_line, file=o)
             print('END', file=o)
+
+
+    def get_functional_site(self, ca=False):
+        """Returns site only containing functional atoms"""
+        # TODO DEBUG COPY METHOD
+        site = self.copy(include_structure=True)
+        for res in list(site.residues)[::-1]:
+            for atom in list(res.structure.get_atoms())[::-1]:
+                resname = res.resname.upper()
+                if res.has_main_chain_function or not res.is_standard:
+                    resname = 'ANY'
+                funcstring = '{}.{}'.format(resname, atom.get_id().upper())
+                if ca:
+                    if type(res) == PdbResidue and atom.get_id().upper() not in ('N','CA','C'):
+                        del res.structure[atom.get_id()]
+                else:
+                    if type(res) == PdbResidue and funcstring not in RESIDUE_DEFINITIONS:
+                        del res.structure[atom.get_id()]
+        return site
+
 
     def fit(self, other, weighted=False, cycles=1, cutoff=999, scaling_factor=None, transform=False, 
             mutate=True, reorder=True, allow_symmetrics=True, ca=False, exclude=None, get_array=False):

@@ -17,10 +17,10 @@ def main(mcsa_id):
     
     ref = entry.pdbsites[0].reference_site
     for i, pdbsite in enumerate(entry.pdbsites):
-        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, ca=True, scaling_factor=None, transform=True)
+        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, ca=False, scaling_factor=None, transform=True)
     #    #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
     #    ##print(pdbsite.id, rms, rms_all, per_res_rms)
-        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=True)
+        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=False)
 
 
 if __name__ == '__main__':
