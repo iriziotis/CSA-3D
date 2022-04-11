@@ -169,15 +169,13 @@ class Entry:
                 reference = site.get_functional_site(ca=ca)
 
         # Calculate average coordinates
-        avg = deepcopy(reference)
+        avg = reference.copy()
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
             if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
                 continue
             funcsite = site.get_functional_site(ca=ca)
-            # TODO There is still a problem with this method, copying does not work properly. Biopython atoms
-            # still remain references and not new objects.
             rot, tran, rms, rms_all = avg.fit(funcsite, transform=True, ca=ca)
             site_coords = np.array([atom.get_coord() for res in funcsite for atom in res.structure])
             avg_coords = np.array([atom.get_coord() for res in avg for atom in res.structure])
@@ -188,10 +186,11 @@ class Entry:
         # Find representative site
         min_rms = 999
         template = None
-        for site in self.get_pdbsites(sane_only=False):
+        for site in self.get_pdbsites(sane_only=True):
             if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
                 continue
-            rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
+            rot, tran, rms, rms_all = avg.fit(site, transform=True, ca=ca)
+            site.write_pdb(func_atoms_only=True, write_hets=False)
             if rms_all < min_rms:
                 min_rms = rms_all
                 template = site

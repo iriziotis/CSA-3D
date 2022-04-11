@@ -351,11 +351,21 @@ class PdbSite:
     # Methods
 
     def copy(self, include_structure=True):
-        """Returns a copy of the site. If include_structure is False,
-        then the structure is not copied"""
-        site = copy(self)
-        if include_structure:
-            site.structure = self.structure.copy()
+        """Returns a copy of the site"""
+        site = PdbSite()
+        for res in self:
+            res_copy = res.copy(include_structure=include_structure)
+            res_copy.parent_site = site
+            site.add(res_copy)
+        for ligand in self.ligands:
+            ligand_copy = ligand.copy(include_structure=include_structure)
+            site.add(ligand_copy)
+        site.reference_site = self.reference_site
+        site.is_sane = self.is_sane
+        site.parent_entry = self.parent_entry
+        site._map_reference_residues()
+        site.parent_structure = self.parent_structure
+        site.mmcif_dict = self.mmcif_dict
         return site
 
     def add(self, residue):
@@ -592,7 +602,8 @@ class PdbSite:
     def get_functional_site(self, ca=False):
         """Returns site only containing functional atoms"""
         # TODO DEBUG COPY METHOD
-        site = self.copy(include_structure=True)
+        #site = self.copy(include_structure=True)
+        site = self.copy()
         for res in list(site.residues)[::-1]:
             for atom in list(res.structure.get_atoms())[::-1]:
                 resname = res.resname.upper()
