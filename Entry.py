@@ -5,6 +5,7 @@ from copy import deepcopy
 from collections import defaultdict
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
+from dendrogram_cut import DendrogramCut
 from .config import UNI2PDB
 from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
 from .PdbSite import PdbSite
@@ -143,7 +144,7 @@ class Entry:
         matrix = pd.DataFrame(squareform(rmsds), columns=ids, index=ids)
         return matrix
 
-    def clustering(self, matrix, outdir=None, height=None):
+    def clustering(self, matrix, height=None, get_linkage_matrix=False):
         """Performs hierarchical clustering on the provided RMSD matrix."""
         ids = list(matrix.index)
         # Compute linkage matrix
@@ -159,7 +160,25 @@ class Entry:
             for i, id in zip(clusters, ids):
                 if i == cluster:
                     cluster_dict[cluster].append(self.get_pdbsite(id).id)
-        return Z, cluster_dict
+        if get_linkage_matrix:
+            return cluster_dict, Z
+        return cluster_dict
+
+    def clustering_bayesian(self, matrix, k_max=4, l=1.0, plot_outfile=None):
+        """Performs hierarchical clustering on the provided RMSD matrix,
+        and cuts the tree automatically using Bayesian statistics"""
+        cluster_dict = defaultdict(list)
+        ids = list(matrix.index)
+        matrix = np.array(matrix)
+        model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
+        k = model.pac_bayesian_cut(lambda_=l)
+        clusters = model.get_cluster_label(k=k)
+        if plot_outfile:
+            fig = model.heatmap_with_dendrogram_plot(k=k)
+            fig.write_image(plot_outfile)
+        for i,cluster_no in enumerate(clusters):
+            cluster_dict[cluster_no].append(ids[i])
+        return cluster_dict
 
     def create_template(self, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None):
         """Creates template from conserved sites"""
