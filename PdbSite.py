@@ -601,8 +601,6 @@ class PdbSite:
 
     def get_functional_site(self, ca=False):
         """Returns site only containing functional atoms"""
-        # TODO DEBUG COPY METHOD
-        #site = self.copy(include_structure=True)
         site = self.copy()
         for res in list(site.residues)[::-1]:
             for atom in list(res.structure.get_atoms())[::-1]:

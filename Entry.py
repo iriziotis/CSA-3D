@@ -6,6 +6,7 @@ from collections import defaultdict
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from .config import UNI2PDB
+from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
 from .PdbSite import PdbSite
 from .UniSite import UniSite
 
@@ -157,17 +158,16 @@ class Entry:
         for cluster in np.unique(clusters):
             for i, id in zip(clusters, ids):
                 if i == cluster:
-                    cluster_dict[cluster].append(self.get_pdbsite(id))
+                    cluster_dict[cluster].append(self.get_pdbsite(id).id)
         return Z, cluster_dict
 
-    def create_template(self, ca=False, subset=None):
+    def create_template(self, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None):
         """Creates template from conserved sites"""
-
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         for site in self.get_pdbsites():
             if site.is_reference:
                 reference = site.get_functional_site(ca=ca)
-
+                break
         # Calculate average coordinates
         avg = reference.copy()
         for site in self.get_pdbsites(sane_only=True):
@@ -176,29 +176,125 @@ class Entry:
             if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
                 continue
             funcsite = site.get_functional_site(ca=ca)
-            rot, tran, rms, rms_all = avg.fit(funcsite, transform=True, ca=ca)
+            avg.fit(funcsite, transform=True, ca=ca)
             site_coords = np.array([atom.get_coord() for res in funcsite for atom in res.structure])
             avg_coords = np.array([atom.get_coord() for res in avg for atom in res.structure])
             avg_coords = np.mean([avg_coords, site_coords], axis=0)
             for atom, coord in zip([atom for res in avg for atom in res.structure], avg_coords):
                 atom.set_coord(coord)    
-
         # Find representative site
         min_rms = 999
         template = None
         for site in self.get_pdbsites(sane_only=True):
             if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
                 continue
-            rot, tran, rms, rms_all = avg.fit(site, transform=True, ca=ca)
-            site.write_pdb(func_atoms_only=True, write_hets=False)
+            rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:
                 min_rms = rms_all
                 template = site
-
         # Fit template to reference
         reference.fit(template, transform=True)
-        reference.fit(avg, transform=True)
-
+        # Write template
+        self.write_template(template, subset, cluster_no, outdir, outfile)
         return template, avg
+
+    def write_template(self, template, subset=None, cluster_no=None, outdir=None, outfile=None):
+        """
+        Writes template coordinates and constraints in TESS/Jess format
+        Args:
+            outdir: Output directory
+            outfile: Default 'mcsa_id.cluster_no.template.pdb' 
+        """
+        if not outdir:
+            outdir = '.'
+        if not outfile:
+            cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
+            outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.template.pdb'
+        with open(outfile, 'w') as o:
+            remarks = (f'REMARK TEMPLATE\n'
+                       f'REMARK MCSA_ID {template.mcsa_id}\n'
+                       f'REMARK PDB_ID {template.pdb_id}\n'
+                       f'REMARK UNIPROT_ID {template.uniprot_id}\n'
+                       f'REMARK EC {template.ec}\n'
+                       f'REMARK ENZYME {template.enzyme}\n'
+                       f'REMARK EXPERIMENTAL_METHOD {template.experimental_method}\n'
+                       f'REMARK RESOLUTION {template.resolution}\n'
+                       f'REMARK ORGANISM_NAME {template.organism_name}\n'
+                       f'REMARK ORGANISM_ID {template.organism_id}\n')
+            print(remarks, file=o)
+            alt_residues = self.get_alt_residues(template)
+            matchcodes = self.get_matchnumbers(template, alt_residues)
+            dist_cutoffs = self.get_dist_cutoffs(template, subset=subset)
+            for i, res in enumerate(template):
+                if res.structure is not None:
+                    if res.has_main_chain_function or not res.is_standard:
+                        resname = 'ANY'
+                    else:
+                        resname = res.structure.get_resname()
+                    for atom in res.structure.get_atoms():
+                        funcstring = '{}.{}'.format(resname, atom.get_id().upper())
+                        if funcstring not in RESIDUE_DEFINITIONS:
+                            continue
+                        pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<4.4}{:<5.2f}'.format(
+                            'ATOM', matchcodes[int(i)][atom.name], 
+                            atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
+                            resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
+                            atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
+                            alt_residues[i], dist_cutoffs[i])
+                        print(pdb_line, file=o)
+            print('END', file=o)
+
+    def get_alt_residues(self, template):
+        """Returns a string of alternative residues to be matched in the template"""
+        observed = defaultdict(set)
+        expected = defaultdict(set)
+        intersection = defaultdict(set)
+        # Get alternative residues in each position from sequence alignment
+        for site in template.parent_entry.unisites:
+            if site.is_conserved or site.is_conservative_mutation:
+                for i, res in enumerate(site):
+                    observed[i].add(AA_3TO1[res.resname])
+        # Compare expected with observed substitutions
+        ref = template.reference_site
+        for i, res in enumerate(ref):
+            expected[i] = set(list(TEMPLATE_FUZZY_RESIDUES.get(res.resname.upper(), '')))
+            expected[i].add(AA_3TO1[res.resname])
+        for i in expected:
+            intersection[i] = ''.join(list(expected[i].intersection(observed[i])))
+        return intersection
+
+    def get_matchnumbers(self, template, fuzzy_residues):
+        """Returns the Jess match option number for each template atom"""
+        matchnumbers = defaultdict(dict)
+        for i, res in enumerate(template):
+            resname = res.resname.upper()
+            if 'ptm' in res.funclocs:
+                resname = 'PTM'
+            for funcloc in res.funclocs:
+                if 'main' in funcloc:
+                    resname = 'ANY'
+            for atom in res.structure:
+                if atom.name in TEMPLATE_FUZZY_ATOMS[resname]:
+                    matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
+        return matchnumbers
+
+    def get_dist_cutoffs(self, template, subset=None, 
+            comparisons_file='/Users/riziotis/ebi/phd/datasets/csa3d/variation/data/per_entry/csa3d_0133.csv'):
+        """Returns the distance threshold weight for each residue"""
+        comparisons = pd.read_csv(open(comparisons_file, 'r'))
+        if subset:
+            comparisons = comparisons.query('p_id in @subset and q_id in @subset')
+        per_res = comparisons.loc[~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'].astype('str').str.split(';', expand=True).astype('float32')
+        cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
+        return cutoffs
+
+            
+        
+
+
+
+
+
+
 
 

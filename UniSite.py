@@ -113,9 +113,10 @@ class UniSite:
         result = False
         for res in self.residues:
             if ignore_funcloc_main:
-                if 'main' in res.funclocs:
-                    result = True
-                    continue
+                for funcloc in res.funclocs:
+                    if 'main' in funcloc:
+                        result = True
+                        continue
             if not res.is_conserved and not res.is_conservative_mutation:
                 return False
             if res.is_conservative_mutation:
