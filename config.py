@@ -6,7 +6,7 @@ from collections import defaultdict
 
 WORKING_DIR = '/Users/riziotis/ebi/phd/datasets/'
 if not os.path.isdir(WORKING_DIR):
-    WORKING_DIR = '/nfs/research1/thornton/riziotis/research/phd/datasets/'
+    WORKING_DIR = '/nfs/research/thornton/riziotis/research/phd/datasets/'
 ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif'
 KEGG_MOLS_DIR = WORKING_DIR + 'kegg/mol'
 CHEBI_MOLS_DIR = WORKING_DIR + 'chebi/sdf'

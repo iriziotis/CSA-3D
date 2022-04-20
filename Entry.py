@@ -180,7 +180,7 @@ class Entry:
             cluster_dict[cluster_no].append(ids[i])
         return cluster_dict
 
-    def create_template(self, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         for site in self.get_pdbsites():
@@ -214,10 +214,10 @@ class Entry:
         # Fit template to reference
         reference.fit(template, transform=True)
         # Write template
-        self.write_template(template, subset, cluster_no, outdir, outfile)
+        self.write_template(template, comparisons, subset, cluster_no, outdir, outfile)
         return template, avg
 
-    def write_template(self, template, subset=None, cluster_no=None, outdir=None, outfile=None):
+    def write_template(self, template, comparisons=None, subset=None, cluster_no=None, outdir=None, outfile=None):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -229,8 +229,11 @@ class Entry:
         if not outfile:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
             outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.template.pdb'
+        size = len(subset) if subset else 'ALL'
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
+                       f'REMARK CLUSTER {cluster_no}\n'
+                       f'REMARK REPRESENTING {size} CATALYTIC SITES\n'
                        f'REMARK MCSA_ID {template.mcsa_id}\n'
                        f'REMARK PDB_ID {template.pdb_id}\n'
                        f'REMARK UNIPROT_ID {template.uniprot_id}\n'
@@ -243,7 +246,8 @@ class Entry:
             print(remarks, file=o)
             alt_residues = self.get_alt_residues(template)
             matchcodes = self.get_matchnumbers(template, alt_residues)
-            dist_cutoffs = self.get_dist_cutoffs(template, subset=subset)
+            if comparisons is not None:
+                dist_cutoffs = self.get_dist_cutoffs(template, comparisons, subset=subset)
             for i, res in enumerate(template):
                 if res.structure is not None:
                     if res.has_main_chain_function or not res.is_standard:
@@ -259,7 +263,7 @@ class Entry:
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
                             resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
                             atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
-                            alt_residues[i], dist_cutoffs[i])
+                            alt_residues[i], dist_cutoffs[i] if dist_cutoffs else '')
                         print(pdb_line, file=o)
             print('END', file=o)
 
@@ -297,10 +301,10 @@ class Entry:
                     matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
         return matchnumbers
 
-    def get_dist_cutoffs(self, template, subset=None, 
-            comparisons_file='/Users/riziotis/ebi/phd/datasets/csa3d/variation/data/per_entry/csa3d_0133.csv'):
+    def get_dist_cutoffs(self, template, comparisons, subset=None):
         """Returns the distance threshold weight for each residue"""
-        comparisons = pd.read_csv(open(comparisons_file, 'r'))
+        if type(comparisons) == str:
+            comparisons = pd.read_csv(open(comparisons, 'r'))
         if subset:
             comparisons = comparisons.query('p_id in @subset and q_id in @subset')
         per_res = comparisons.loc[~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'].astype('str').str.split(';', expand=True).astype('float32')
