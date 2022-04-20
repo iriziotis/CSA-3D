@@ -180,7 +180,7 @@ class Entry:
             cluster_dict[cluster_no].append(ids[i])
         return cluster_dict
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, no_write=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         for site in self.get_pdbsites():
@@ -214,8 +214,9 @@ class Entry:
         # Fit template to reference
         reference.fit(template, transform=True)
         # Write template
-        self.write_template(template, comparisons, subset, cluster_no, outdir, outfile)
-        return template, avg
+        if no_write == False:
+            self.write_template(template, comparisons, subset, cluster_no, outdir, outfile)
+        return template
 
     def write_template(self, template, comparisons=None, subset=None, cluster_no=None, outdir=None, outfile=None):
         """
@@ -246,6 +247,7 @@ class Entry:
             print(remarks, file=o)
             alt_residues = self.get_alt_residues(template)
             matchcodes = self.get_matchnumbers(template, alt_residues)
+            dist_cutoffs = None
             if comparisons is not None:
                 dist_cutoffs = self.get_dist_cutoffs(template, comparisons, subset=subset)
             for i, res in enumerate(template):
@@ -263,7 +265,7 @@ class Entry:
                             atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
                             resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
                             atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
-                            alt_residues[i], dist_cutoffs[i] if dist_cutoffs else '')
+                            alt_residues[i], dist_cutoffs[i] if dist_cutoffs is not None else 0.0)
                         print(pdb_line, file=o)
             print('END', file=o)
 
