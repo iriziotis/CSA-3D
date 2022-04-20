@@ -164,7 +164,7 @@ class Entry:
             return cluster_dict, Z
         return cluster_dict
 
-    def clustering_bayesian(self, matrix, k_max=4, l=1.0, plot_outfile=None):
+    def clustering_bayesian(self, matrix, k_max=5, l=1.0, plot_outfile=None):
         """Performs hierarchical clustering on the provided RMSD matrix,
         and cuts the tree automatically using Bayesian statistics"""
         cluster_dict = defaultdict(list)
