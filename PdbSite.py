@@ -603,6 +603,8 @@ class PdbSite:
         """Returns site only containing functional atoms"""
         site = self.copy()
         for res in list(site.residues)[::-1]:
+            if res.structure is None:
+                continue
             for atom in list(res.structure.get_atoms())[::-1]:
                 resname = res.resname.upper()
                 if res.has_main_chain_function or not res.is_standard:

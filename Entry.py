@@ -170,8 +170,14 @@ class Entry:
         cluster_dict = defaultdict(list)
         ids = list(matrix.index)
         matrix = np.array(matrix)
-        model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
-        k = model.pac_bayesian_cut(lambda_=l)
+        try:
+            model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
+        except ValueError:
+            return {0: ids}
+        try:
+            k = model.pac_bayesian_cut(lambda_=l)
+        except RecursionError:
+            return {0: ids}
         clusters = model.get_cluster_label(k=k)
         if plot_outfile:
             fig = model.heatmap_with_dendrogram_plot(k=k)
@@ -183,6 +189,8 @@ class Entry:
     def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, no_write=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
+        if subset is None:
+            subset = []
         for site in self.get_pdbsites():
             if site.is_reference:
                 reference = site.get_functional_site(ca=ca)
@@ -203,7 +211,7 @@ class Entry:
                 atom.set_coord(coord)    
         # Find representative site
         min_rms = 999
-        template = None
+        template = reference
         for site in self.get_pdbsites(sane_only=True):
             if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
                 continue
@@ -213,9 +221,11 @@ class Entry:
                 template = site
         # Fit template to reference
         reference.fit(template, transform=True)
+        # Bind subset to template
+        template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, subset, cluster_no, outdir, outfile)
+            self.write_template(template, comparisons, template.subset, cluster_no, outdir, outfile)
         return template
 
     def write_template(self, template, comparisons=None, subset=None, cluster_no=None, outdir=None, outfile=None):
@@ -243,13 +253,13 @@ class Entry:
                        f'REMARK EXPERIMENTAL_METHOD {template.experimental_method}\n'
                        f'REMARK RESOLUTION {template.resolution}\n'
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
-                       f'REMARK ORGANISM_ID {template.organism_id}\n')
+                       f'REMARK ORGANISM_ID {template.organism_id}')
             print(remarks, file=o)
             alt_residues = self.get_alt_residues(template)
             matchcodes = self.get_matchnumbers(template, alt_residues)
             dist_cutoffs = None
             if comparisons is not None:
-                dist_cutoffs = self.get_dist_cutoffs(template, comparisons, subset=subset)
+                dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
             for i, res in enumerate(template):
                 if res.structure is not None:
                     if res.has_main_chain_function or not res.is_standard:
@@ -260,12 +270,13 @@ class Entry:
                         funcstring = '{}.{}'.format(resname, atom.get_id().upper())
                         if funcstring not in RESIDUE_DEFINITIONS:
                             continue
+                        matchcode = matchcodes.get(int(i), {}).get(atom.name, -2)
+                        dist_cutoff = dist_cutoffs[i] if dist_cutoffs is not None else 0.0
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<4.4}{:<5.2f}'.format(
-                            'ATOM', matchcodes[int(i)][atom.name], 
-                            atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
+                            'ATOM', matchcode, atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
                             resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
                             atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
-                            alt_residues[i], dist_cutoffs[i] if dist_cutoffs is not None else 0.0)
+                            alt_residues[i], dist_cutoff )
                         print(pdb_line, file=o)
             print('END', file=o)
 
@@ -298,28 +309,22 @@ class Entry:
             for funcloc in res.funclocs:
                 if 'main' in funcloc:
                     resname = 'ANY'
+            if not res.structure:
+                continue
             for atom in res.structure:
                 if atom.name in TEMPLATE_FUZZY_ATOMS[resname]:
                     matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
         return matchnumbers
 
-    def get_dist_cutoffs(self, template, comparisons, subset=None):
+    def get_dist_cutoffs(self, comparisons, subset=None):
         """Returns the distance threshold weight for each residue"""
         if type(comparisons) == str:
             comparisons = pd.read_csv(open(comparisons, 'r'))
         if subset:
+            if len(subset) <= 1:
+                return
             comparisons = comparisons.query('p_id in @subset and q_id in @subset')
         per_res = comparisons.loc[~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'].astype('str').str.split(';', expand=True).astype('float32')
         cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
         return cutoffs
-
-            
-        
-
-
-
-
-
-
-
 
