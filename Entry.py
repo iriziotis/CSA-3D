@@ -214,7 +214,7 @@ class Entry:
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
-            if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
+            if not (site.is_conserved or site.is_conservative_mutation) or site.id==reference.id:
                 continue
             funcsite = site.get_functional_site(ca=ca)
             avg.fit(funcsite, transform=True, ca=ca)
@@ -227,7 +227,7 @@ class Entry:
         min_rms = 999
         template = reference
         for site in self.get_pdbsites(sane_only=True):
-            if not (site.is_conserved or site.is_conservative_mutation) or site.is_reference:
+            if not (site.is_conserved or site.is_conservative_mutation) or site.id==reference.id:
                 continue
             rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:

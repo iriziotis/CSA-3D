@@ -17,22 +17,23 @@ def main(mcsa_id):
         entry = pickle.load(f)
 
     print('Building matrix')
-    #matrix = entry.rmsd_matrix(entry.pdbsites)
-    matrix = pd.read_csv('/Users/riziotis/ebi/phd/datasets/csa3d/per_entry_analyses/case_studies/csa3d_0133/rmsd_matrix.conserved.csv', index_col=0)
+    sitelist = [site for site in entry.pdbsites if site.is_conserved or site.is_conservative_mutation]
+    matrix = entry.rmsd_matrix(sitelist)
+#    matrix = pd.read_csv('/Users/riziotis/ebi/phd/datasets/csa3d/per_entry_analyses/case_studies/csa3d_0133/rmsd_matrix.conserved.csv', index_col=0)
 
     print('Clustering')
-    Z, clusters = entry.clustering(matrix)
+    clusters = entry.clustering_bayesian(matrix, plot_outfile=f'{outdir}/dendrogram.png')
 
     print('Building templates')
     for i, cluster in clusters.items():
-        os.makedirs(f'{outdir}/cluster_{i}', exist_ok=True)
+        os.makedirs(f'{outdir}/cluster_{i+1}', exist_ok=True)
         print(f'Cluster {i}')
         for site in entry.pdbsites:
-            if site.is_conserved or site.is_conservative_mutation and site.id in cluster:
+            if site.id in cluster:
                 site.reference_site.fit(site, transform=True)
-                site.write_pdb(outdir=f'{outdir}/cluster_{i}', func_atoms_only=True, write_hets=False)
-        entry.create_template(outdir=outdir, subset=cluster, cluster_no=i)
-    entry.create_template(outdir=outdir)
+                site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
+        entry.create_template(outdir=outdir, subset=cluster, cluster_no=i+1)
+#    entry.create_template(outdir=outdir)
 
     
 #    ref = entry.pdbsites[0].reference_site
@@ -40,7 +41,7 @@ def main(mcsa_id):
 #        rot, tran, rms, rms_all = pdbsite.reference_site.fit(pdbsite, weighted=True, ca=False, scaling_factor=None, transform=True)
 #    #    #per_res_rms = pdbsite.reference_site.per_residue_rms(pdbsite, rot, tran, transform=False)
 #    #    ##print(pdbsite.id, rms, rms_all, per_res_rms)
-#        pdbsite.write_pdb(outdir=outdir, write_hets=True, func_atoms_only=False, include_dummy_atoms=False)
+#        pdbsite.write_pdb(outdir=outdir, write_hets=False, func_atoms_only=False, include_dummy_atoms=False)
 
 
 if __name__ == '__main__':
