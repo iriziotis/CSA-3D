@@ -186,15 +186,29 @@ class Entry:
             cluster_dict[cluster_no].append(ids[i])
         return cluster_dict
 
+    def _get_template_reference(self):
+        """Gets a reference site on which templates will be fitted into"""
+        ref = None
+        for site in self.get_pdbsites():
+            if site.is_reference and not site.has_missing_functional_atoms:
+                ref = site
+                break
+        if not ref:
+            for site in self.get_pdbsites(sane_only=True):
+                if (site.is_conserved or site.is_conservative_mutation) and not site.has_missing_functional_atoms:
+                    ref = site
+                    break
+        return ref
+
     def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, no_write=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         if subset is None:
             subset = []
-        for site in self.get_pdbsites():
-            if site.is_reference:
-                reference = site.get_functional_site(ca=ca)
-                break
+        try:
+            reference = self._get_template_reference().get_functional_site(ca=ca)
+        except TypeError:
+            return
         # Calculate average coordinates
         avg = reference.copy()
         for site in self.get_pdbsites(sane_only=True):
@@ -219,7 +233,7 @@ class Entry:
             if rms_all < min_rms:
                 min_rms = rms_all
                 template = site
-        # Fit template to reference
+        # Fit template to reference or any other site with sane atoms
         reference.fit(template, transform=True)
         # Bind subset to template
         template.subset = subset
@@ -272,7 +286,7 @@ class Entry:
                             continue
                         matchcode = matchcodes.get(int(i), {}).get(atom.name, -2)
                         dist_cutoff = dist_cutoffs[i] if dist_cutoffs is not None else 0.0
-                        pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<4.4}{:<5.2f}'.format(
+                        pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<5.5} {:<5.2f}'.format(
                             'ATOM', matchcode, atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
                             resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
                             atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
