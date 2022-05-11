@@ -11,7 +11,7 @@ def main(mcsa_id):
     outdir = './out/mcsa_{}'.format(str(mcsa_id).zfill(4))
     if not os.path.exists(outdir):
         os.makedirs(outdir)
-
+    
     print('Loading entry')
     with open('entries/csa3d_{}.ent'.format(str(mcsa_id).zfill(4)), 'rb') as f:
         entry = pickle.load(f)
@@ -19,7 +19,6 @@ def main(mcsa_id):
     print('Building matrix')
     sitelist = [site for site in entry.pdbsites if site.is_conserved or site.is_conservative_mutation]
     matrix = entry.rmsd_matrix(sitelist)
-#    matrix = pd.read_csv('/Users/riziotis/ebi/phd/datasets/csa3d/per_entry_analyses/case_studies/csa3d_0133/rmsd_matrix.conserved.csv', index_col=0)
 
     print('Clustering')
     clusters = entry.clustering_bayesian(matrix, plot_outfile=f'{outdir}/dendrogram.png')
@@ -28,11 +27,13 @@ def main(mcsa_id):
     for i, cluster in clusters.items():
         os.makedirs(f'{outdir}/cluster_{i+1}', exist_ok=True)
         print(f'Cluster {i}')
-        #for site in entry.pdbsites:
-        #    if site.id in cluster:
-        #        site.reference_site.fit(site, transform=True)
-        #        site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
-        entry.create_template(outdir=outdir, subset=cluster, cluster_no=i+1)
+
+        template = entry.create_template(ca=False, outdir=outdir, subset=cluster, cluster_no=i+1)
+
+        for site in entry.pdbsites:
+            if site.id in cluster:
+                site.reference_site.fit(site, transform=True)
+                site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
 #    entry.create_template(outdir=outdir)
 
     
