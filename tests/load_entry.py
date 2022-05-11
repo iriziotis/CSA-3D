@@ -28,10 +28,10 @@ def main(mcsa_id):
     for i, cluster in clusters.items():
         os.makedirs(f'{outdir}/cluster_{i+1}', exist_ok=True)
         print(f'Cluster {i}')
-        for site in entry.pdbsites:
-            if site.id in cluster:
-                site.reference_site.fit(site, transform=True)
-                site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
+        #for site in entry.pdbsites:
+        #    if site.id in cluster:
+        #        site.reference_site.fit(site, transform=True)
+        #        site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
         entry.create_template(outdir=outdir, subset=cluster, cluster_no=i+1)
 #    entry.create_template(outdir=outdir)
 
