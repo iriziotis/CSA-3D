@@ -886,17 +886,12 @@ class PdbSite:
                     continue
                 # If we have a standard residue
                 if res.is_standard:
-                    try:
-                        res_structure = chain[res.auth_resid]
-                    except KeyError:
+                    for resid in (res.auth_resid, res.corrected_auth_resid, res.resid):
                         try:
-                            res_structure = chain[res.corrected_auth_resid]
+                            if chain[resid].resname.capitalize() == res.resname:
+                                res_structure = chain[resid]
+                                break
                         except KeyError:
-                            try:
-                                res_structure = chain[res.resid]
-                            except KeyError:
-                                continue
-                        if res_structure.resname != res.resname.upper():
                             continue
                 # If we have a modified residue
                 else:
