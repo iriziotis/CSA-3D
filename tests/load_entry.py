@@ -30,10 +30,10 @@ def main(mcsa_id):
 
         template = entry.create_template(ca=False, outdir=outdir, subset=cluster, cluster_no=i+1)
 
-#       for site in entry.pdbsites:
-#           if site.id in cluster:
-#               site.reference_site.fit(site, transform=True)
-#               site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
+       for site in entry.pdbsites:
+           if site.id in cluster:
+               site.reference_site.fit(site, transform=True)
+               site.write_pdb(outdir=f'{outdir}/cluster_{i+1}', func_atoms_only=True, write_hets=False)
 
     
 #    ref = entry.pdbsites[0].reference_site

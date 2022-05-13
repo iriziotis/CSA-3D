@@ -604,8 +604,10 @@ class PdbSite:
                 continue
             for atom in list(res.structure.get_atoms())[::-1]:
                 resname = res.resname.upper()
-                if res.has_main_chain_function or not res.is_standard:
+                if res.has_main_chain_function:
                     resname = 'ANY'
+                if not res.is_standard:
+                    resname = 'PTM'
                 funcstring = '{}.{}'.format(resname, atom.get_id().upper())
                 if ca:
                     if type(res) == PdbResidue and atom.get_id().upper() not in ('N','CA','C'):
