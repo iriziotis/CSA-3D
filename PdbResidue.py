@@ -278,8 +278,8 @@ class PdbResidue:
     def is_standard(self):
         """Checks if residue is one of the 20 standard ones"""
         return self.resname.upper() in STANDARD_RESIDUES and \
-               'ptm' not in self.funclocs# and \
-               #self.reference_residue.ptm_resname == ''
+               'ptm' not in self.funclocs and \
+               (self.reference_residue is None or self.reference_residue.ptm_resname == '')
 
     @property
     def has_double_funcloc(self):

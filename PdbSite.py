@@ -95,9 +95,9 @@ class PdbSite:
                 res.add_structure(structure)
             site.add(res)
         if annotate:
-            site.parent_structure = structure
+            site.parent_structure = cif_path
             site.mmcif_dict = mmcif_dict
-            site.find_ligands()
+            site.find_ligands(structure)
         return site
 
     @classmethod
@@ -163,9 +163,9 @@ class PdbSite:
         # Add ligands and annotations
         if annotate and structure:
             for site in sites:
-                site.parent_structure = structure
+                site.parent_structure = cif_path
                 site.mmcif_dict = mmcif_dict
-                site.find_ligands()
+                site.find_ligands(structure)
         # Flag unclustered sites
         PdbSite._mark_unclustered(sites)
         return sites
@@ -354,12 +354,9 @@ class PdbSite:
         """Returns a copy of the site"""
         site = PdbSite()
         for res in self:
-            res_copy = res.copy(include_structure=include_structure)
-            res_copy.parent_site = site
-            site.add(res_copy)
+            site.add(res)
         for ligand in self.ligands:
-            ligand_copy = ligand.copy(include_structure=include_structure)
-            site.add(ligand_copy)
+            site.add(ligand)
         site.reference_site = self.reference_site
         site.is_sane = self.is_sane
         site.parent_entry = self.parent_entry
@@ -458,7 +455,7 @@ class PdbSite:
         return identicals
     
 
-    def find_ligands(self, radius=5):
+    def find_ligands(self, structure, radius=5):
         """
         Searches the parent structure for hetero components close to the
         catalytic residues, by searching around the atoms of catalytic residues
@@ -468,12 +465,12 @@ class PdbSite:
         Args:
             radius: the search space (in Å) around the atoms of the catalytic residues
         """
-        if type(self.parent_structure) != Structure or self.structure is None:
+        if type(structure) != Structure or self.structure is None:
             return
         # Get centers of search
         centers = self._get_ligand_search_centers(radius)        
         # Initialize KD tree
-        query_atoms = Bio.PDB.Selection.unfold_entities(self.parent_structure, 'A')
+        query_atoms = Bio.PDB.Selection.unfold_entities(structure, 'A')
         ns = NeighborSearch(query_atoms)
         # Search for ligands around each center
         polymers = defaultdict(list)
