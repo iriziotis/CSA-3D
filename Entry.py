@@ -130,8 +130,12 @@ class Entry:
         ids = []
         seen = set()
         for p in sitelist:
+            if p.has_missing_functional_atoms:
+                continue
             ids.append(p.id)
             for q in sitelist:
+                if q.has_missing_functional_atoms:
+                    continue
                 if p.id == q.id or (q.id, p.id) in seen:
                     continue
                 seen.add((p.id, q.id))
@@ -214,7 +218,8 @@ class Entry:
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
-            if not (site.is_conserved or site.is_conservative_mutation) or site.id==reference.id:
+            if not (site.is_conserved or site.is_conservative_mutation) or \
+                    site.id==reference.id or site.has_missing_functional_atoms:
                 continue
             funcsite = site.get_functional_site(ca=ca)
             avg.fit(funcsite, transform=True, ca=ca)
@@ -227,7 +232,8 @@ class Entry:
         min_rms = 999
         template = reference
         for site in self.get_pdbsites(sane_only=True):
-            if not (site.is_conserved or site.is_conservative_mutation) or site.id==reference.id:
+            if not (site.is_conserved or site.is_conservative_mutation) or \
+                    site.id==reference.id or site.has_missing_functional_atoms:
                 continue
             rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:
