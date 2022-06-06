@@ -4,9 +4,9 @@ import json
 from ast import literal_eval
 from collections import defaultdict
 
-WORKING_DIR = '/Users/riziotis/ebi/phd/datasets/'
+WORKING_DIR = '/Users/riziotis/ebi/phd/data/'
 if not os.path.isdir(WORKING_DIR):
-    WORKING_DIR = '/nfs/research/thornton/riziotis/research/phd/datasets/'
+    WORKING_DIR = '/nfs/research/thornton/riziotis/research/phd/data/'
 ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif'
 KEGG_MOLS_DIR = WORKING_DIR + 'kegg/mol'
 CHEBI_MOLS_DIR = WORKING_DIR + 'chebi/sdf'

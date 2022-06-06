@@ -240,15 +240,15 @@ class Entry:
                 min_rms = rms_all
                 template = site
         # Fit template to reference or any other site with sane atoms
-        reference.fit(template, transform=True)
+        reference.fit(template, transform=True, ca=ca)
         # Bind subset to template
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, template.subset, cluster_no, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, outdir, outfile)
         return template
 
-    def write_template(self, template, comparisons=None, subset=None, cluster_no=None, outdir=None, outfile=None):
+    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, outdir=None, outfile=None):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -276,7 +276,7 @@ class Entry:
                        f'REMARK ORGANISM_ID {template.organism_id}')
             print(remarks, file=o)
             alt_residues = self.get_alt_residues(template)
-            matchcodes = self.get_matchnumbers(template, alt_residues)
+            matchcodes = self.get_matchnumbers(template, ca=ca)
             dist_cutoffs = None
             if comparisons is not None:
                 dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
@@ -287,7 +287,7 @@ class Entry:
                     else:
                         resname = res.structure.get_resname()
                     for atom in res.structure.get_atoms():
-                        funcstring = '{}.{}'.format(resname, atom.get_id().upper())
+                        funcstring = '{}.{}'.format(resname if not ca else 'ANY', atom.get_id().upper())
                         if funcstring not in RESIDUE_DEFINITIONS:
                             continue
                         matchcode = matchcodes.get(int(i), {}).get(atom.name, -2)
@@ -319,7 +319,7 @@ class Entry:
             intersection[i] = ''.join(list(expected[i].intersection(observed[i])))
         return intersection
 
-    def get_matchnumbers(self, template, fuzzy_residues):
+    def get_matchnumbers(self, template, ca=False):
         """Returns the Jess match option number for each template atom"""
         matchnumbers = defaultdict(dict)
         for i, res in enumerate(template):
@@ -332,8 +332,15 @@ class Entry:
             if not res.structure:
                 continue
             for atom in res.structure:
-                if atom.name in TEMPLATE_FUZZY_ATOMS[resname]:
-                    matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
+                if ca:
+                    if atom.name in TEMPLATE_FUZZY_ATOMS['ANY']:
+                        if resname in ['ANY', 'PTM']:
+                            matchnumbers[i][atom.name] = 100
+                        else:
+                            matchnumbers[i][atom.name] = 0
+                else:
+                    if atom.name in TEMPLATE_FUZZY_ATOMS[resname]:
+                        matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
         return matchnumbers
 
     def get_dist_cutoffs(self, comparisons, subset=None):
