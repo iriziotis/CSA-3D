@@ -11,7 +11,7 @@ from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
 from Bio.PDB.NeighborSearch import NeighborSearch 
 from rmsd import reorder_hungarian
-from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS
+from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
 from .config import PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
@@ -610,7 +610,7 @@ class PdbSite:
                     resname = 'PTM'
                 funcstring = '{}.{}'.format(resname, atom.get_id().upper())
                 if ca:
-                    if type(res) == PdbResidue and atom.get_id().upper() not in ('N','CA','C'):
+                    if type(res) == PdbResidue and atom.get_id().upper() not in TEMPLATE_FUZZY_ATOMS['ANY']:
                         del res.structure[atom.get_id()]
                 else:
                     if type(res) == PdbResidue and funcstring not in RESIDUE_DEFINITIONS:

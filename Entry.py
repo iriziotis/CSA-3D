@@ -311,12 +311,11 @@ class Entry:
                 if residues is not None and  i not in residues:
                     continue
                 if res.structure is not None:
-                    if res.has_main_chain_function or not res.is_standard:
-                        resname = 'ANY'
+                    resname = res.structure.get_resname()
                     if not res.is_standard:
                         resname = 'PTM'
-                    else:
-                        resname = res.structure.get_resname()
+                    if res.has_main_chain_function:
+                        resname = 'ANY'
                     for atom in res.structure.get_atoms():
                         funcstring = '{}.{}'.format(resname if not ca else 'ANY', atom.get_id().upper())
                         if funcstring not in RESIDUE_DEFINITIONS:

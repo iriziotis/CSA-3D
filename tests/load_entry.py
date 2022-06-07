@@ -28,7 +28,7 @@ def main(mcsa_id):
         os.makedirs(f'{outdir}/cluster_{i+1}', exist_ok=True)
         print(f'Cluster {i}')
 
-        template = entry.create_template(ca=False, outdir=outdir, subset=cluster, cluster_no=i+1)
+        template = entry.create_template(ca=True, outdir=outdir, subset=cluster, cluster_no=i+1)
 
         #for site in entry.pdbsites:
         #   if site.id in cluster:
