@@ -246,7 +246,7 @@ class Entry:
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, outdir, outfile)
         return template
 
     def break_template(self, template, n_residues=3):
@@ -279,6 +279,8 @@ class Entry:
             outdir: Output directory
             outfile: Default 'mcsa_id.cluster_no.template.pdb' 
         """
+        if len(template.residues) < 3:
+            return
         if not outdir:
             outdir = '.'
         if not outfile:
@@ -306,18 +308,20 @@ class Entry:
                 if not comparisons.empty:
                     dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
             for i, res in enumerate(template):
-                if residues is not None and i not in residues:
+                if residues is not None and  i not in residues:
                     continue
                 if res.structure is not None:
                     if res.has_main_chain_function or not res.is_standard:
                         resname = 'ANY'
+                    if not res.is_standard:
+                        resname = 'PTM'
                     else:
                         resname = res.structure.get_resname()
                     for atom in res.structure.get_atoms():
                         funcstring = '{}.{}'.format(resname if not ca else 'ANY', atom.get_id().upper())
                         if funcstring not in RESIDUE_DEFINITIONS:
                             continue
-                        matchcode = matchcodes.get(int(i), {}).get(atom.name, -2)
+                        matchcode = matchcodes.get(int(i), {}).get(atom.name, 0)
                         dist_cutoff = dist_cutoffs[i] if dist_cutoffs is not None else 0.0
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<5.5} {:<5.2f}'.format(
                             'ATOM', matchcode, atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
@@ -351,7 +355,7 @@ class Entry:
         matchnumbers = defaultdict(dict)
         for i, res in enumerate(template):
             resname = res.resname.upper()
-            if 'ptm' in res.funclocs:
+            if 'ptm' in res.funclocs or not res.is_standard:
                 resname = 'PTM'
             for funcloc in res.funclocs:
                 if 'main' in funcloc:
