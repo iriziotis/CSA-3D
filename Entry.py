@@ -5,6 +5,7 @@ from copy import deepcopy
 from collections import defaultdict
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
+from sklearn.cluster import KMeans
 from dendrogram_cut import DendrogramCut
 from .config import UNI2PDB
 from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
@@ -248,7 +249,30 @@ class Entry:
             self.write_template(template, comparisons, ca, template.subset, cluster_no, outdir, outfile)
         return template
 
-    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, outdir=None, outfile=None):
+    def break_template(self, template, n_residues=3):
+        """Breaks template in smaller groups of arbitrary size (default=3).
+        Returns a list of indeces of the residues of each group. Overlap is allowed."""
+        # First calulate the centers of mass of each residue
+        coms = []
+        for res in template:
+            coms.append(res.structure.center_of_mass())
+        coms = np.array(coms)
+        # Calculate the number of groups to generate
+        n_clusters = int(np.round(len(template.residues)/n_residues))
+        # Do k-means clustering in template residues centers of mass
+        kmeans = KMeans(n_clusters = n_clusters, random_state=0).fit(coms)
+        # Generate groups around each cluster centre
+        centers = kmeans.cluster_centers_
+        triplets = []
+        for center in centers:
+            dists = []
+            for com in coms:
+                dists.append(np.linalg.norm(com-center))
+            top = np.argsort(np.array(dists))[:n_residues]
+            triplets.append(top)
+        return triplets
+
+    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, outdir=None, outfile=None):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -279,8 +303,11 @@ class Entry:
             matchcodes = self.get_matchnumbers(template, ca=ca)
             dist_cutoffs = None
             if comparisons is not None:
-                dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
+                if not comparisons.empty:
+                    dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
             for i, res in enumerate(template):
+                if residues is not None and i not in residues:
+                    continue
                 if res.structure is not None:
                     if res.has_main_chain_function or not res.is_standard:
                         resname = 'ANY'
