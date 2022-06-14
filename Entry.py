@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 from collections import defaultdict
+from itertools import combinations
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
@@ -123,7 +124,6 @@ class Entry:
                     continue
                 seen.add((p.id, q.id))
                 yield p, q
-
 
     def rmsd_matrix(self, sitelist):
         """Contstructs RMSD matrix for the sites provided in sitelist"""
@@ -249,28 +249,42 @@ class Entry:
             self.write_template(template, comparisons, ca, template.subset, cluster_no, None, outdir, outfile)
         return template
 
-    def break_template(self, template, n_residues=3):
+    def break_template(self, template, n_residues=3, permutations=False, max_distance=6):
         """Breaks template in smaller groups of arbitrary size (default=3).
         Returns a list of indeces of the residues of each group. Overlap is allowed."""
-        # First calulate the centers of mass of each residue
-        coms = []
-        for res in template:
-            coms.append(res.structure.center_of_mass())
-        coms = np.array(coms)
-        # Calculate the number of groups to generate
-        n_clusters = int(np.round(len(template.residues)/n_residues))
-        # Do k-means clustering in template residues centers of mass
-        kmeans = KMeans(n_clusters = n_clusters, random_state=0).fit(coms)
-        # Generate groups around each cluster centre
-        centers = kmeans.cluster_centers_
-        triplets = []
-        for center in centers:
-            dists = []
-            for com in coms:
-                dists.append(np.linalg.norm(com-center))
-            top = np.argsort(np.array(dists))[:n_residues]
-            triplets.append(top)
-        return triplets
+        if permutations:
+            triplets = set()
+            combis = list(combinations(range(template.size), n_residues))
+            for combi in combis:
+                residues = [template.residues[i] for i in combi]
+                discard = False
+                for i in residues:
+                    for j in residues:
+                        if i.get_distance(j, kind='min') > max_distance:
+                            discard = True
+                if not discard:
+                    triplets.add(combi)
+            return triplets
+        else:
+            # First calulate the centers of mass of each residue
+            coms = []
+            for res in template:
+                coms.append(res.structure.center_of_mass())
+            coms = np.array(coms)
+            # Calculate the number of groups to generate
+            n_clusters = int(np.round(len(template.residues)/n_residues))
+            # Do k-means clustering in template residues centers of mass
+            kmeans = KMeans(n_clusters = n_clusters, random_state=0).fit(coms)
+            # Generate groups around each cluster centre
+            centers = kmeans.cluster_centers_
+            triplets = []
+            for center in centers:
+                dists = []
+                for com in coms:
+                    dists.append(np.linalg.norm(com-center))
+                top = np.argsort(np.array(dists))[:n_residues]
+                triplets.append(top)
+            return triplets
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, outdir=None, outfile=None):
         """
@@ -385,3 +399,16 @@ class Entry:
         cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
         return cutoffs
 
+    @staticmethod
+    def _get_chunks(input_size, chosen_set_size , max_overlap=2):
+        selected_combinations=list()
+        for c in combinations(range(input_size), chosen_set_size):
+            overlap_found=False
+            if len(selected_combinations):
+                for s in selected_combinations:
+                    if sum([ x in list(c) for x in s]) > max_overlap:
+                        overlap_found=True
+                        break
+            if not overlap_found:
+                selected_combinations.append(list(c))
+        return selected_combinations
