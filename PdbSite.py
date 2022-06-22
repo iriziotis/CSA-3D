@@ -367,7 +367,7 @@ class PdbSite:
 
     def add(self, residue):
         """Add PdbResidue object to site (in the residues list and dict)"""
-        residue = residue.copy(include_structure=True)
+        residue = residue.copy()
         if type(residue) == PdbResidue:
             self.residues.append(residue)
             self.residues_dict[residue.full_id] = residue

@@ -125,25 +125,25 @@ class Entry:
                 seen.add((p.id, q.id))
                 yield p, q
 
-    def rmsd_matrix(self, sitelist):
+    def rmsd_matrix(self, sitelist, ca=False):
         """Contstructs RMSD matrix for the sites provided in sitelist"""
         rmsds = []
         ids = []
         seen = set()
         for p in sitelist:
-            if p.has_missing_functional_atoms:
+            if not ca and p.has_missing_functional_atoms:
                 continue
             ids.append(p.id)
             for q in sitelist:
-                if q.has_missing_functional_atoms:
+                if not ca and q.has_missing_functional_atoms:
                     continue
                 if p.id == q.id or (q.id, p.id) in seen:
                     continue
                 seen.add((p.id, q.id))
                 try:
-                    _, _, _, rms_all = p.fit(q, weighted=True)
+                    _, _, _, rms_all = p.fit(q, weighted=True, ca=ca)
                 except Exception:
-                    _, _, _, rms_all = p.fit(q, weighted=False, cycles=10, cutoff=5)
+                    _, _, _, rms_all = p.fit(q, weighted=False, ca=ca, cycles=10, cutoff=5)
                 rmsds.append(rms_all)
         rmsds = np.array(rmsds, dtype='float32')
         matrix = pd.DataFrame(squareform(rmsds), columns=ids, index=ids)
