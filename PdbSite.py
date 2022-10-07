@@ -289,7 +289,7 @@ class PdbSite:
     def id(self):
         """Unique ID of the active site. Consists of PDB ID and a string
         of chain IDs of all residues"""
-        return '{}_{}'.format(self.pdb_id, '-'.join(res.chain for res in self.residues))
+        return '{}_{}'.format(self.pdb_id, '-'.join(f'{res.chain}{res.auth_resid}' for res in self.residues))
 
     @property
     def size(self):
@@ -354,9 +354,9 @@ class PdbSite:
         """Returns a copy of the site"""
         site = PdbSite()
         for res in self:
-            site.add(res)
+            site.add(res.copy(include_structure))
         for ligand in self.ligands:
-            site.add(ligand)
+            site.add(ligand.copy(include_structure))
         site.reference_site = self.reference_site
         site.is_sane = self.is_sane
         site.parent_entry = self.parent_entry
@@ -513,7 +513,7 @@ class PdbSite:
                     self.add(ligand)
         return 
 
-    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False):
+    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False, subset=None):
         """
         Writes site coordinates in PDB format
         Args:
@@ -565,7 +565,9 @@ class PdbSite:
             residues = self.residues.copy()
             if write_hets:
                 residues += self.ligands
-            for res in residues:
+            for i, res in enumerate(residues):
+                if subset and i not in subset:
+                    continue
                 if not include_dummy_atoms and res.is_gap:
                     continue
                 structure = res.structure
@@ -598,7 +600,7 @@ class PdbSite:
 
     def get_functional_site(self, ca=False):
         """Returns site only containing functional atoms"""
-        site = self.copy()
+        site = self.copy(include_structure=True)
         for res in list(site.residues)[::-1]:
             if res.structure is None:
                 continue
@@ -610,8 +612,11 @@ class PdbSite:
                     resname = 'PTM'
                 funcstring = '{}.{}'.format(resname, atom.get_id().upper())
                 if ca:
-                    if type(res) == PdbResidue and atom.get_id().upper() not in TEMPLATE_FUZZY_ATOMS['ANY']:
+                    if atom.get_id().upper() not in ('CA', 'CB', 'CG'):
                         del res.structure[atom.get_id()]
+
+                    #if type(res) == PdbResidue and atom.get_id().upper() not in TEMPLATE_FUZZY_ATOMS['ANY']:
+                    #    del res.structure[atom.get_id()]
                 else:
                     if type(res) == PdbResidue and funcstring not in RESIDUE_DEFINITIONS:
                         del res.structure[atom.get_id()]
@@ -665,6 +670,7 @@ class PdbSite:
         if p_atoms is None or q_atoms is None:
             return None, None, None, None
         if len(p_atoms) != len(q_atoms):
+            print(p_atoms, q_atoms)
             raise Exception('Atom number mismatch in sites {} and {}'.format(self.id, other.id))
         # Initial crude superposition
         rot, tran, rms, _ = PdbSite._super(p_coords, q_coords, cycles=1)
@@ -778,7 +784,8 @@ class PdbSite:
                     if not res.is_standard:
                         resname = 'PTM'
                 atmid = '{}.{}'.format(resname, atom.name)
-                if (not ca and atmid in RESIDUE_DEFINITIONS) or (ca and atom.name=='CA'):
+                #if (not ca and atmid in RESIDUE_DEFINITIONS) or (ca and atom.name=='CA'):
+                if (not ca and atmid in RESIDUE_DEFINITIONS) or (ca and atom.name in ('CA', 'CB', 'CG')):
                     if allow_symmetrics:
                         if atmid in EQUIVALENT_ATOMS:
                             atmid = EQUIVALENT_ATOMS[atmid]

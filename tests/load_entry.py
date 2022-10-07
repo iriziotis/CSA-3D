@@ -29,6 +29,8 @@ def main(mcsa_id):
         print(f'Cluster {i}')
 
         template = entry.create_template(ca=True, outdir=outdir, subset=cluster, cluster_no=i+1)
+        groups = entry.break_template(template, n_residues=9, permutations=False, max_distance=8)
+        print(groups)
 
         #for site in entry.pdbsites:
         #   if site.id in cluster:

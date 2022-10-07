@@ -191,35 +191,40 @@ class Entry:
             cluster_dict[cluster_no].append(ids[i])
         return cluster_dict
 
-    def _get_template_reference(self):
+    def _get_template_reference(self, ca=False):
         """Gets a reference site on which templates will be fitted into"""
         ref = None
         for site in self.get_pdbsites():
-            if site.is_reference and not site.has_missing_functional_atoms:
-                ref = site
-                break
-        if not ref:
-            for site in self.get_pdbsites(sane_only=True):
-                if (site.is_conserved or site.is_conservative_mutation) and not site.has_missing_functional_atoms:
+            if site.is_reference: 
+                if ca or (not ca and not site.has_missing_functional_atoms):
                     ref = site
                     break
+        if not ref:
+            for site in self.get_pdbsites(sane_only=True):
+                if (site.is_conserved or site.is_conservative_mutation): 
+                    if ca or (not ca and not site.has_missing_functional_atoms):
+                        ref = site
+                        break
+                    if not site.has_missing_functional_atoms:
+                        ref = site
+                        break
         return ref
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, no_write=False):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, no_alt=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         if subset is None:
             subset = []
         try:
-            reference = self._get_template_reference().get_functional_site(ca=ca)
+            reference = self._get_template_reference(ca=ca).get_functional_site(ca=ca)
         except TypeError:
             return
         # Calculate average coordinates
-        avg = reference.copy()
+        avg = reference.copy(include_structure=True)
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
-            if not (site.is_conserved or site.is_conservative_mutation) or \
+            if (not ca and not (site.is_conserved or site.is_conservative_mutation)) or \
                     site.id==reference.id or site.has_missing_functional_atoms:
                 continue
             funcsite = site.get_functional_site(ca=ca)
@@ -233,8 +238,10 @@ class Entry:
         min_rms = 999
         template = reference
         for site in self.get_pdbsites(sane_only=True):
-            if not (site.is_conserved or site.is_conservative_mutation) or \
-                    site.id==reference.id or site.has_missing_functional_atoms:
+            if subset and site.id not in subset:
+                continue
+            if (not ca and not (site.is_conserved or site.is_conservative_mutation)) or \
+                    (site.id==reference.id or not ca and site.has_missing_functional_atoms):
                 continue
             rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:
@@ -246,7 +253,7 @@ class Entry:
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, outdir, outfile)
         return template
 
     def break_template(self, template, n_residues=3, permutations=False, max_distance=6):
@@ -286,7 +293,7 @@ class Entry:
                 triplets.append(top)
             return triplets
 
-    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, outdir=None, outfile=None):
+    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, no_alt=False,  outdir=None, outfile=None):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -299,12 +306,13 @@ class Entry:
             outdir = '.'
         if not outfile:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
-            outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.template.pdb'
+            outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.{template.id}.template.pdb'
         size = len(subset) if subset else 'ALL'
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
                        f'REMARK CLUSTER {cluster_no}\n'
                        f'REMARK REPRESENTING {size} CATALYTIC SITES\n'
+                       f'REMARK ID {template.id}\n'
                        f'REMARK MCSA_ID {template.mcsa_id}\n'
                        f'REMARK PDB_ID {template.pdb_id}\n'
                        f'REMARK UNIPROT_ID {template.uniprot_id}\n'
@@ -315,7 +323,9 @@ class Entry:
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
                        f'REMARK ORGANISM_ID {template.organism_id}')
             print(remarks, file=o)
-            alt_residues = self.get_alt_residues(template)
+            alt_residues = None
+            if not no_alt:
+                alt_residues = self.get_alt_residues(template)
             matchcodes = self.get_matchnumbers(template, ca=ca)
             dist_cutoffs = None
             if comparisons is not None:
@@ -332,15 +342,20 @@ class Entry:
                         resname = 'ANY'
                     for atom in res.structure.get_atoms():
                         funcstring = '{}.{}'.format(resname if not ca else 'ANY', atom.get_id().upper())
-                        if funcstring not in RESIDUE_DEFINITIONS:
-                            continue
+                        if atoms is not None:
+                            if atom.get_id().upper() not in atoms:
+                                continue
+                        else:
+                            if funcstring not in RESIDUE_DEFINITIONS:
+                                continue
                         matchcode = matchcodes.get(int(i), {}).get(atom.name, 0)
                         dist_cutoff = dist_cutoffs[i] if dist_cutoffs is not None else 0.0
+                        alt = alt_residues[i] if alt_residues is not None else ''
                         pdb_line = '{:6}{:5d} {:<4}{}{:>3}{:>2}{:>4}{:>12.3f}{:>8.3f}{:>8.3f} {:<5.5} {:<5.2f}'.format(
                             'ATOM', matchcode, atom.name if len(atom.name) == 4 else ' {}'.format(atom.name), 'Z',
                             resname, res.structure.get_parent().get_id(), res.structure.get_id()[1],
                             atom.get_coord()[0], atom.get_coord()[1], atom.get_coord()[2],
-                            alt_residues[i], dist_cutoff )
+                            alt, dist_cutoff )
                         print(pdb_line, file=o)
             print('END', file=o)
 
