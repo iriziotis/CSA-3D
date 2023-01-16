@@ -7,8 +7,8 @@ from collections import defaultdict
 WORKING_DIR = '/Users/riziotis/ebi/phd/data/'
 if not os.path.isdir(WORKING_DIR):
     WORKING_DIR = '/nfs/research/thornton/riziotis/research/phd/data/'
-ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif'
-KEGG_MOLS_DIR = WORKING_DIR + 'kegg/mol'
+ASSEMBLIES_DIR = WORKING_DIR + 'pdbe/assembly_cif/cif'
+KEGG_MOLS_DIR = WORKING_DIR + 'kegg/sdf'
 CHEBI_MOLS_DIR = WORKING_DIR + 'chebi/sdf'
 HET_MOLS_DIR = WORKING_DIR + 'pdbe/het_sdf'
 CAT_RES_INFO = WORKING_DIR + 'mcsa/catalytic_residues_homologues.json'

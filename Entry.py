@@ -153,7 +153,7 @@ class Entry:
         """Performs hierarchical clustering on the provided RMSD matrix."""
         ids = list(matrix.index)
         # Compute linkage matrix
-        Z = linkage(matrix, method='average')
+        Z = linkage(squareform(matrix), method='ward')
         # Cut tree at automatic height
         if not height:
             height = 0.7 * max(Z[:, 2])
@@ -176,7 +176,7 @@ class Entry:
         ids = list(matrix.index)
         matrix = np.array(matrix)
         try:
-            model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
+            model = DendrogramCut(k_max=k_max, method='ward').fit(matrix)
         except ValueError:
             return {0: ids}
         try:
@@ -293,7 +293,8 @@ class Entry:
                 triplets.append(top)
             return triplets
 
-    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, no_alt=False,  outdir=None, outfile=None):
+    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
+                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -325,7 +326,7 @@ class Entry:
             print(remarks, file=o)
             alt_residues = None
             if not no_alt:
-                alt_residues = self.get_alt_residues(template)
+                alt_residues = self.get_alt_residues(template, all_fuzzy)
             matchcodes = self.get_matchnumbers(template, ca=ca)
             dist_cutoffs = None
             if comparisons is not None:
@@ -359,7 +360,7 @@ class Entry:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def get_alt_residues(self, template):
+    def get_alt_residues(self, template, all_fuzzy=False):
         """Returns a string of alternative residues to be matched in the template"""
         observed = defaultdict(set)
         expected = defaultdict(set)
@@ -375,7 +376,10 @@ class Entry:
             expected[i] = set(list(TEMPLATE_FUZZY_RESIDUES.get(res.resname.upper(), '')))
             expected[i].add(AA_3TO1[res.resname])
         for i in expected:
-            intersection[i] = ''.join(list(expected[i].intersection(observed[i])))
+            if all_fuzzy:
+                intersection[i] = ''.join(list(expected[i])).replace(' ','')
+            else:
+                intersection[i] = ''.join(list(expected[i].intersection(observed[i]))).replace(' ','')
         return intersection
 
     def get_matchnumbers(self, template, ca=False):
@@ -411,7 +415,10 @@ class Entry:
                 return
             comparisons = comparisons.query('p_id in @subset and q_id in @subset')
         per_res = comparisons.loc[~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'].astype('str').str.split(';', expand=True).astype('float32')
-        cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
+        try:
+            cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
+        except ValueError:
+            return
         return cutoffs
 
     @staticmethod
