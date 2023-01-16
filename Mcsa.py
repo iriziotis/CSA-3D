@@ -91,12 +91,14 @@ class Mcsa:
                     pdbs.add((pdb_id, assembly))
         for pdb in pdbs:
             pdb_id, assembly = pdb[0], pdb[1]
-            filename = '{}-assembly-{}.cif.gz'.format(pdb_id, assembly)
-            if os.path.isfile(os.path.join(ASSEMBLIES_DIR, filename)):
+            filename_in = '{}-assembly{}.cif.gz'.format(pdb_id, assembly)
+            filename_out = '{}-assembly-{}.cif'.format(pdb_id, assembly)
+            if os.path.isfile(os.path.join(ASSEMBLIES_DIR, filename_out)):
                 continue
             print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
-            scp_path = "/nfs/services/pdbe/release-data/www-static-content/entry/{}/{}/{}".format(pdb_id[1:3], pdb_id, filename)
-            cmd = "cp {} {}".format(scp_path, ASSEMBLIES_DIR)
+            scp_path = '/nfs/production/gerard/pdbe/ftp/pdb/data/assemblies/mmCIF/divided/{}/{}'.format(pdb_id[1:3], filename_in)
+            filename_out = '{}.gz'.format(filename_out)
+            cmd = "cp {} {}/{}".format(scp_path, ASSEMBLIES_DIR, filename_out)
             subprocess.call(cmd.split(" "))
         return
 

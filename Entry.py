@@ -152,6 +152,8 @@ class Entry:
     def clustering(self, matrix, height=None, get_linkage_matrix=False):
         """Performs hierarchical clustering on the provided RMSD matrix."""
         ids = list(matrix.index)
+        if len(ids)<2:
+            return {0: ids}
         # Compute linkage matrix
         Z = linkage(squareform(matrix), method='ward')
         # Cut tree at automatic height
