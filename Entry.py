@@ -155,7 +155,7 @@ class Entry:
         if len(ids)<2:
             return {0: ids}
         # Compute linkage matrix
-        Z = linkage(squareform(matrix), method='ward')
+        Z = linkage(squareform(matrix), method='average')
         # Cut tree at automatic height
         if not height:
             height = 0.7 * max(Z[:, 2])
@@ -178,7 +178,7 @@ class Entry:
         ids = list(matrix.index)
         matrix = np.array(matrix)
         try:
-            model = DendrogramCut(k_max=k_max, method='ward').fit(matrix)
+            model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
         except ValueError:
             return {0: ids}
         try:
@@ -262,18 +262,18 @@ class Entry:
         """Breaks template in smaller groups of arbitrary size (default=3).
         Returns a list of indeces of the residues of each group. Overlap is allowed."""
         if permutations:
-            triplets = set()
+            groups = set()
             combis = list(combinations(range(template.size), n_residues))
             for combi in combis:
                 residues = [template.residues[i] for i in combi]
                 discard = False
                 for i in residues:
                     for j in residues:
-                        if i.get_distance(j, kind='min') > max_distance:
+                        if i.get_distance(j, kind='com') > max_distance:
                             discard = True
                 if not discard:
-                    triplets.add(combi)
-            return triplets
+                    groups.add(combi)
+            return groups
         else:
             # First calulate the centers of mass of each residue
             coms = []
@@ -286,14 +286,14 @@ class Entry:
             kmeans = KMeans(n_clusters = n_clusters, random_state=0).fit(coms)
             # Generate groups around each cluster centre
             centers = kmeans.cluster_centers_
-            triplets = []
+            groups = []
             for center in centers:
                 dists = []
                 for com in coms:
                     dists.append(np.linalg.norm(com-center))
                 top = np.argsort(np.array(dists))[:n_residues]
-                triplets.append(top)
-            return triplets
+                groups.append(top)
+            return groups
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
                        no_alt=False, all_fuzzy=False, outdir=None, outfile=None):
