@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -8,7 +9,7 @@ from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
 from dendrogram_cut import DendrogramCut
-from .config import UNI2PDB
+from .config import UNI2PDB, REF_RES_INFO
 from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -155,7 +156,7 @@ class Entry:
         if len(ids)<2:
             return {0: ids}
         # Compute linkage matrix
-        Z = linkage(squareform(matrix), method='ward')
+        Z = linkage(squareform(matrix), method='average')
         # Cut tree at automatic height
         if not height:
             height = 0.7 * max(Z[:, 2])
@@ -178,7 +179,7 @@ class Entry:
         ids = list(matrix.index)
         matrix = np.array(matrix)
         try:
-            model = DendrogramCut(k_max=k_max, method='ward').fit(matrix)
+            model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
         except ValueError:
             return {0: ids}
         try:
@@ -258,24 +259,25 @@ class Entry:
             self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, outdir, outfile)
         return template
 
-    def break_template(self, template, n_residues=3, permutations=False, max_distance=6):
+    def break_template(self, template, method='clusters', n_residues=3, max_distance=6):
         """Breaks template in smaller groups of arbitrary size (default=3).
         Returns a list of indeces of the residues of each group. Overlap is allowed."""
-        if permutations:
-            triplets = set()
+        if method=='combinations':
+            groups = set()
             combis = list(combinations(range(template.size), n_residues))
             for combi in combis:
                 residues = [template.residues[i] for i in combi]
                 discard = False
                 for i in residues:
                     for j in residues:
-                        if i.get_distance(j, kind='min') > max_distance:
+                        if i.get_distance(j, kind='com') > max_distance:
                             discard = True
                 if not discard:
-                    triplets.add(combi)
-            return triplets
-        else:
+                    groups.add(combi)
+            return groups
+        elif method=='clusters':
             # First calulate the centers of mass of each residue
+            ids = {}
             coms = []
             for res in template:
                 coms.append(res.structure.center_of_mass())
@@ -286,14 +288,22 @@ class Entry:
             kmeans = KMeans(n_clusters = n_clusters, random_state=0).fit(coms)
             # Generate groups around each cluster centre
             centers = kmeans.cluster_centers_
-            triplets = []
+            groups = []
             for center in centers:
                 dists = []
                 for com in coms:
                     dists.append(np.linalg.norm(com-center))
                 top = np.argsort(np.array(dists))[:n_residues]
-                triplets.append(top)
-            return triplets
+                groups.append(top)
+            return groups
+        elif method=='functional':
+            # Get free text annotation for each residue
+            annotations = self._get_free_text_annotations()
+            groups = defaultdict(list)
+            for i, res in enumerate(template):
+                for annotation in annotations[(res.reference_residue.chain, res.reference_residue.resid)]:
+                    groups[annotation].append(i)
+            return groups
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
                        no_alt=False, all_fuzzy=False, outdir=None, outfile=None):
@@ -326,16 +336,15 @@ class Entry:
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
                        f'REMARK ORGANISM_ID {template.organism_id}')
             print(remarks, file=o)
-            alt_residues = None
-            if not no_alt:
-                alt_residues = self.get_alt_residues(template, all_fuzzy)
-            matchcodes = self.get_matchnumbers(template, ca=ca)
+            matchcodes, alt_residues = self.get_template_params(template, all_fuzzy)
+            if no_alt:
+                alt_residues = None
             dist_cutoffs = None
             if comparisons is not None:
                 if not comparisons.empty:
                     dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
             for i, res in enumerate(template):
-                if residues is not None and  i not in residues:
+                if residues is not None and i not in residues:
                     continue
                 if res.structure is not None:
                     resname = res.structure.get_resname()
@@ -362,13 +371,19 @@ class Entry:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def get_alt_residues(self, template, all_fuzzy=False):
+    def get_template_params(self, template, all_fuzzy=False):
+        alt_residues, backbone_fuzzy = self._get_alt_residues(template, all_fuzzy)
+        matchnumbers = self._get_matchnumbers(template, backbone_fuzzy)
+        return matchnumbers, alt_residues
+        
+    def _get_alt_residues(self, template, all_fuzzy=False):
         """Returns a string of alternative residues to be matched in the template"""
         observed = defaultdict(set)
         expected = defaultdict(set)
         intersection = defaultdict(set)
+        backbone_fuzzy = {}
         # Get alternative residues in each position from sequence alignment
-        for site in template.parent_entry.unisites:
+        for site in template.parent_entry.pdbsites:
             if site.is_conserved or site.is_conservative_mutation:
                 for i, res in enumerate(site):
                     observed[i].add(AA_3TO1[res.resname])
@@ -378,13 +393,19 @@ class Entry:
             expected[i] = set(list(TEMPLATE_FUZZY_RESIDUES.get(res.resname.upper(), '')))
             expected[i].add(AA_3TO1[res.resname])
         for i in expected:
+            backbone_fuzzy[i] = True
             if all_fuzzy:
                 intersection[i] = ''.join(list(expected[i])).replace(' ','')
             else:
                 intersection[i] = ''.join(list(expected[i].intersection(observed[i]))).replace(' ','')
-        return intersection
+                res = site.residues[i]
+                if res.has_main_chain_function or 'ptm' in res.funclocs or not res.is_standard:
+                    if len(observed[i])<=5:
+                        intersection[i] = ''.join(list(observed[i])).replace(' ','')
+                        backbone_fuzzy[i] = False
+        return intersection, backbone_fuzzy
 
-    def get_matchnumbers(self, template, ca=False):
+    def _get_matchnumbers(self, template, backbone_fuzzy, ca=False):
         """Returns the Jess match option number for each template atom"""
         matchnumbers = defaultdict(dict)
         for i, res in enumerate(template):
@@ -397,6 +418,9 @@ class Entry:
             if not res.structure:
                 continue
             for atom in res.structure:
+                if not backbone_fuzzy[i]:
+                    matchnumbers[i][atom.name] = 0
+                    continue
                 if ca:
                     if atom.name in TEMPLATE_FUZZY_ATOMS['ANY']:
                         if resname in ['ANY', 'PTM']:
@@ -423,16 +447,15 @@ class Entry:
             return
         return cutoffs
 
-    @staticmethod
-    def _get_chunks(input_size, chosen_set_size , max_overlap=2):
-        selected_combinations=list()
-        for c in combinations(range(input_size), chosen_set_size):
-            overlap_found=False
-            if len(selected_combinations):
-                for s in selected_combinations:
-                    if sum([ x in list(c) for x in s]) > max_overlap:
-                        overlap_found=True
-                        break
-            if not overlap_found:
-                selected_combinations.append(list(c))
-        return selected_combinations
+    def _get_free_text_annotations(self):
+        """Gets free text role annotations for each reference residue
+        from the M-CSA API file and returns them as a list, preserving
+        the order of the residues as chiral id in the reference catalytic site"""
+        info = json.load(open(REF_RES_INFO))
+        annotations = defaultdict(list)
+        for res in info:
+            if res['mcsa_id'] == self.mcsa_id:
+                chain, resid = res['residue_chains'][0]['assembly_chain_name'], res['residue_chains'][0]['auth_resid']
+                annotations[(chain, resid)].append(res['main_annotation'])
+        return annotations
+
