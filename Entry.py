@@ -301,12 +301,12 @@ class Entry:
             annotations = self._get_free_text_annotations()
             groups = defaultdict(list)
             for i, res in enumerate(template):
-                for annotation in annotations[(res.reference_residue.chain, res.reference_residue.resid)]:
+                for annotation in annotations[(res.reference_residue.chain, res.reference_residue.auth_resid)]:
                     groups[annotation].append(i)
             return groups
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
-                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None):
+                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None, annotation=''):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -334,7 +334,8 @@ class Entry:
                        f'REMARK EXPERIMENTAL_METHOD {template.experimental_method}\n'
                        f'REMARK RESOLUTION {template.resolution}\n'
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
-                       f'REMARK ORGANISM_ID {template.organism_id}')
+                       f'REMARK ORGANISM_ID {template.organism_id}\n'
+                       f'REMARK ANNOTATION {annotation}')
             print(remarks, file=o)
             matchcodes, alt_residues = self.get_template_params(template, all_fuzzy)
             if no_alt:
