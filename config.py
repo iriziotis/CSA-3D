@@ -12,6 +12,7 @@ KEGG_MOLS_DIR = WORKING_DIR + 'kegg/sdf'
 CHEBI_MOLS_DIR = WORKING_DIR + 'chebi/sdf'
 HET_MOLS_DIR = WORKING_DIR + 'pdbe/het_sdf'
 CAT_RES_INFO = WORKING_DIR + 'mcsa/catalytic_residues_homologues.json'
+REF_RES_INFO = WORKING_DIR + 'mcsa/catalytic_residues_references.json'
 MCSA_ENTRY_INFO = WORKING_DIR + 'mcsa/entry_info/mcsa_entry_info.*.json'
 
 # SIFTS

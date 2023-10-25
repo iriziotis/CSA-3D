@@ -1,4 +1,5 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 from copy import deepcopy
@@ -8,7 +9,7 @@ from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
 from dendrogram_cut import DendrogramCut
-from .config import UNI2PDB
+from .config import UNI2PDB, REF_RES_INFO
 from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
 from .PdbSite import PdbSite
 from .UniSite import UniSite
@@ -212,7 +213,7 @@ class Entry:
                         break
         return ref
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, no_alt=False):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, all_fuzzy=False, no_alt=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         if subset is None:
@@ -255,13 +256,13 @@ class Entry:
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, all_fuzzy, outdir, outfile)
         return template
 
-    def break_template(self, template, n_residues=3, permutations=False, max_distance=6):
+    def break_template(self, template, method='clusters', n_residues=3, max_distance=6):
         """Breaks template in smaller groups of arbitrary size (default=3).
         Returns a list of indeces of the residues of each group. Overlap is allowed."""
-        if permutations:
+        if method=='combinations':
             groups = set()
             combis = list(combinations(range(template.size), n_residues))
             for combi in combis:
@@ -273,9 +274,10 @@ class Entry:
                             discard = True
                 if not discard:
                     groups.add(combi)
-            return groups
-        else:
+            return list(groups)
+        elif method=='clusters':
             # First calulate the centers of mass of each residue
+            ids = {}
             coms = []
             for res in template:
                 coms.append(res.structure.center_of_mass())
@@ -294,15 +296,25 @@ class Entry:
                 top = np.argsort(np.array(dists))[:n_residues]
                 groups.append(top)
             return groups
+        elif method=='functional':
+            # Get free text annotation for each residue
+            annotations = self._get_free_text_annotations()
+            groups = defaultdict(list)
+            for i, res in enumerate(template):
+                for annotation in annotations[(res.reference_residue.chain, res.reference_residue.auth_resid)]:
+                    groups[annotation].append(i)
+            return groups
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
-                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None):
+                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None, annotation=''):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
             outdir: Output directory
             outfile: Default 'mcsa_id.cluster_no.template.pdb' 
         """
+        if type(subset) == list and len(subset)==0:
+            subset = None
         if len(template.residues) < 3:
             return
         if not outdir:
@@ -311,6 +323,7 @@ class Entry:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
             outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.{template.id}.template.pdb'
         size = len(subset) if subset else 'ALL'
+        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(template, subset, residues)
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
                        f'REMARK CLUSTER {cluster_no}\n'
@@ -324,18 +337,23 @@ class Entry:
                        f'REMARK EXPERIMENTAL_METHOD {template.experimental_method}\n'
                        f'REMARK RESOLUTION {template.resolution}\n'
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
-                       f'REMARK ORGANISM_ID {template.organism_id}')
+                       f'REMARK ORGANISM_ID {template.organism_id}\n'
+                       f'REMARK ANNOTATION {annotation}\n'
+                       f'REMARK LIGANDS_IN_CLUSTER {cluster_ligands}\n'
+                       f'REMARK SUBSTRATE_SCORE {substrate_score}\n'
+                       f'REMARK COFACTOR_SCORE {cofactor_score}\n'
+                       f'REMARK ION_SCORE {ion_score}\n'
+                       f'REMARK ARTEFACT_SCORE {artefact_score}')
             print(remarks, file=o)
-            alt_residues = None
-            if not no_alt:
-                alt_residues = self.get_alt_residues(template, all_fuzzy)
-            matchcodes = self.get_matchnumbers(template, ca=ca)
+            matchcodes, alt_residues = self._get_template_params(template, all_fuzzy)
+            if no_alt:
+                alt_residues = None
             dist_cutoffs = None
             if comparisons is not None:
                 if not comparisons.empty:
                     dist_cutoffs = self.get_dist_cutoffs(comparisons, subset)
             for i, res in enumerate(template):
-                if residues is not None and  i not in residues:
+                if residues is not None and i not in residues:
                     continue
                 if res.structure is not None:
                     resname = res.structure.get_resname()
@@ -362,13 +380,65 @@ class Entry:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def get_alt_residues(self, template, all_fuzzy=False):
+    def _get_cluster_ligands(self, template, subset=None, residues=None):
+        """Returns all ligands from the template and its homologues from the
+        cluster it represents. Ligands must be within 5A away from all template residues"""
+        ligands = []
+        substrate_score = 0
+        cofactor_score = 0
+        ion_score = 0
+        artefact_score = 0
+        n = 0
+        for site in self.pdbsites:
+            has_substrate = 0
+            has_cofactor = 0
+            has_ion = 0
+            has_artefact = 0
+            if subset is not None and site.id not in subset:
+                continue
+            n+=1
+            for ligand in site.ligands:
+                reject = False
+                for i, res in enumerate(site.residues):
+                    if residues is not None and i not in residues:
+                        continue
+                    d = round(res.get_distance(ligand, kind='min'), 2)
+                    if d>6 or np.isnan(d):
+                        reject = True
+                if not reject:
+                    ligands.append(f'{ligand.resname}:{ligand.type}:{d}')
+                    if ligand.type == 'Substrate (polymer)':
+                        has_substrate = 1
+                    if ligand.type == 'Substrate (non-polymer)' and (ligand.similarity is not None and ligand.similarity>=0.5):
+                        has_substrate = 1
+                    if ligand.type == 'Co-factor (non-ion)':
+                        has_cofactor = 1
+                    if ligand.type in ('Co-factor (ion)', 'Ion'):
+                        has_ion = 1
+                    if ligand.type == 'Artefact':
+                        has_artefact = 1
+            substrate_score += has_substrate
+            cofactor_score += has_cofactor
+            ion_score += has_ion
+            artefact_score += has_artefact
+        if n==0:
+            n=1
+        return ';'.join(ligands), np.round(substrate_score/n, 2), \
+               np.round(cofactor_score/n, 2), np.round(ion_score/n, 2), np.round(artefact_score/n, 2)
+
+    def _get_template_params(self, template, all_fuzzy=False):
+        alt_residues, backbone_fuzzy = self._get_alt_residues(template, all_fuzzy)
+        matchnumbers = self._get_matchnumbers(template, backbone_fuzzy)
+        return matchnumbers, alt_residues
+        
+    def _get_alt_residues(self, template, all_fuzzy=False):
         """Returns a string of alternative residues to be matched in the template"""
         observed = defaultdict(set)
         expected = defaultdict(set)
         intersection = defaultdict(set)
+        backbone_fuzzy = {}
         # Get alternative residues in each position from sequence alignment
-        for site in template.parent_entry.unisites:
+        for site in template.parent_entry.pdbsites:
             if site.is_conserved or site.is_conservative_mutation:
                 for i, res in enumerate(site):
                     observed[i].add(AA_3TO1[res.resname])
@@ -378,13 +448,19 @@ class Entry:
             expected[i] = set(list(TEMPLATE_FUZZY_RESIDUES.get(res.resname.upper(), '')))
             expected[i].add(AA_3TO1[res.resname])
         for i in expected:
+            backbone_fuzzy[i] = True
             if all_fuzzy:
                 intersection[i] = ''.join(list(expected[i])).replace(' ','')
             else:
                 intersection[i] = ''.join(list(expected[i].intersection(observed[i]))).replace(' ','')
-        return intersection
+                res = site.residues[i]
+                if res.has_main_chain_function or 'ptm' in res.funclocs or not res.is_standard:
+                    if len(observed[i])<=5:
+                        intersection[i] = ''.join(list(observed[i])).replace(' ','')
+                        backbone_fuzzy[i] = False
+        return intersection, backbone_fuzzy
 
-    def get_matchnumbers(self, template, ca=False):
+    def _get_matchnumbers(self, template, backbone_fuzzy, ca=False):
         """Returns the Jess match option number for each template atom"""
         matchnumbers = defaultdict(dict)
         for i, res in enumerate(template):
@@ -397,6 +473,9 @@ class Entry:
             if not res.structure:
                 continue
             for atom in res.structure:
+                if not backbone_fuzzy[i]:
+                    matchnumbers[i][atom.name] = 0
+                    continue
                 if ca:
                     if atom.name in TEMPLATE_FUZZY_ATOMS['ANY']:
                         if resname in ['ANY', 'PTM']:
@@ -423,16 +502,15 @@ class Entry:
             return
         return cutoffs
 
-    @staticmethod
-    def _get_chunks(input_size, chosen_set_size , max_overlap=2):
-        selected_combinations=list()
-        for c in combinations(range(input_size), chosen_set_size):
-            overlap_found=False
-            if len(selected_combinations):
-                for s in selected_combinations:
-                    if sum([ x in list(c) for x in s]) > max_overlap:
-                        overlap_found=True
-                        break
-            if not overlap_found:
-                selected_combinations.append(list(c))
-        return selected_combinations
+    def _get_free_text_annotations(self):
+        """Gets free text role annotations for each reference residue
+        from the M-CSA API file and returns them as a list, preserving
+        the order of the residues as chiral id in the reference catalytic site"""
+        info = json.load(open(REF_RES_INFO))
+        annotations = defaultdict(list)
+        for res in info:
+            if res['mcsa_id'] == self.mcsa_id:
+                chain, resid = res['residue_chains'][0]['assembly_chain_name'], res['residue_chains'][0]['auth_resid']
+                annotations[(chain, resid)].append(res['main_annotation'])
+        return annotations
+
