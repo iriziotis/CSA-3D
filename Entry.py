@@ -213,7 +213,7 @@ class Entry:
                         break
         return ref
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, no_alt=False):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, all_fuzzy=False, no_alt=False):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         if subset is None:
@@ -256,7 +256,7 @@ class Entry:
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, all_fuzzy, outdir, outfile)
         return template
 
     def break_template(self, template, method='clusters', n_residues=3, max_distance=6):
@@ -274,7 +274,7 @@ class Entry:
                             discard = True
                 if not discard:
                     groups.add(combi)
-            return groups
+            return list(groups)
         elif method=='clusters':
             # First calulate the centers of mass of each residue
             ids = {}
@@ -313,6 +313,8 @@ class Entry:
             outdir: Output directory
             outfile: Default 'mcsa_id.cluster_no.template.pdb' 
         """
+        if type(subset) == list and len(subset)==0:
+            subset = None
         if len(template.residues) < 3:
             return
         if not outdir:
@@ -321,6 +323,7 @@ class Entry:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
             outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.{template.id}.template.pdb'
         size = len(subset) if subset else 'ALL'
+        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(template, subset, residues)
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
                        f'REMARK CLUSTER {cluster_no}\n'
@@ -335,9 +338,14 @@ class Entry:
                        f'REMARK RESOLUTION {template.resolution}\n'
                        f'REMARK ORGANISM_NAME {template.organism_name}\n'
                        f'REMARK ORGANISM_ID {template.organism_id}\n'
-                       f'REMARK ANNOTATION {annotation}')
+                       f'REMARK ANNOTATION {annotation}\n'
+                       f'REMARK LIGANDS_IN_CLUSTER {cluster_ligands}\n'
+                       f'REMARK SUBSTRATE_SCORE {substrate_score}\n'
+                       f'REMARK COFACTOR_SCORE {cofactor_score}\n'
+                       f'REMARK ION_SCORE {ion_score}\n'
+                       f'REMARK ARTEFACT_SCORE {artefact_score}')
             print(remarks, file=o)
-            matchcodes, alt_residues = self.get_template_params(template, all_fuzzy)
+            matchcodes, alt_residues = self._get_template_params(template, all_fuzzy)
             if no_alt:
                 alt_residues = None
             dist_cutoffs = None
@@ -372,7 +380,53 @@ class Entry:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def get_template_params(self, template, all_fuzzy=False):
+    def _get_cluster_ligands(self, template, subset=None, residues=None):
+        """Returns all ligands from the template and its homologues from the
+        cluster it represents. Ligands must be within 5A away from all template residues"""
+        ligands = []
+        substrate_score = 0
+        cofactor_score = 0
+        ion_score = 0
+        artefact_score = 0
+        n = 0
+        for site in self.pdbsites:
+            has_substrate = 0
+            has_cofactor = 0
+            has_ion = 0
+            has_artefact = 0
+            if subset is not None and site.id not in subset:
+                continue
+            n+=1
+            for ligand in site.ligands:
+                reject = False
+                for i, res in enumerate(site.residues):
+                    if residues is not None and i not in residues:
+                        continue
+                    d = round(res.get_distance(ligand, kind='min'), 2)
+                    if d>6 or np.isnan(d):
+                        reject = True
+                if not reject:
+                    ligands.append(f'{ligand.resname}:{ligand.type}:{d}')
+                    if ligand.type == 'Substrate (polymer)':
+                        has_substrate = 1
+                    if ligand.type == 'Substrate (non-polymer)' and (ligand.similarity is not None and ligand.similarity>=0.5):
+                        has_substrate = 1
+                    if ligand.type == 'Co-factor (non-ion)':
+                        has_cofactor = 1
+                    if ligand.type in ('Co-factor (ion)', 'Ion'):
+                        has_ion = 1
+                    if ligand.type == 'Artefact':
+                        has_artefact = 1
+            substrate_score += has_substrate
+            cofactor_score += has_cofactor
+            ion_score += has_ion
+            artefact_score += has_artefact
+        if n==0:
+            n=1
+        return ';'.join(ligands), np.round(substrate_score/n, 2), \
+               np.round(cofactor_score/n, 2), np.round(ion_score/n, 2), np.round(artefact_score/n, 2)
+
+    def _get_template_params(self, template, all_fuzzy=False):
         alt_residues, backbone_fuzzy = self._get_alt_residues(template, all_fuzzy)
         matchnumbers = self._get_matchnumbers(template, backbone_fuzzy)
         return matchnumbers, alt_residues
