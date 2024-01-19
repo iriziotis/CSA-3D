@@ -58,13 +58,12 @@ class Mcsa:
 
                 # TODO check cases with two pdb references
                 if len(set([r.pdb_id for r in self.ref_pdb_residues[entry_id]]))>1:
-                    print('Has multiple PDB references. Not yet implemented')
-                    return False
+                    print('Has multiple PDB references. Not yet implemented, proceed with caution.')
                 # Temporary, until I implement treating of multiple references
                 # TODO see cases like mcsa 212 - Multiple uniprot reference seqs
                 if len(set([r.uniprot_id for r in self.ref_uni_residues[entry_id]]))>1:
                     print('Has multiple UniProt references. Not yet implemented')
-                    return False
+                    #return False
                 if no_sites:
                     continue
                 self._build_pdb_sites(entry_id, annotate, redundancy_cutoff, verbose)

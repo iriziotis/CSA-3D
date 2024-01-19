@@ -14,7 +14,6 @@ from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, T
 from .PdbSite import PdbSite
 from .UniSite import UniSite
 
-
 class Entry:
     """M-CSA entry. Contains a list of UniSite objects and a list
     of PdbSite objects"""
@@ -213,7 +212,7 @@ class Entry:
                         break
         return ref
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, all_fuzzy=False, no_alt=False):
+    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, all_fuzzy=False, no_alt=False, find_ligands=True, transform_to_ref=True):
         """Creates template from conserved sites"""
         # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
         if subset is None:
@@ -246,17 +245,20 @@ class Entry:
             if (not ca and not (site.is_conserved or site.is_conservative_mutation)) or \
                     (site.id==reference.id or not ca and site.has_missing_functional_atoms):
                 continue
+            if 'nmr' in site.experimental_method.lower():
+                continue
             rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:
                 min_rms = rms_all
                 template = site
         # Fit template to reference or any other site with sane atoms
-        reference.fit(template, transform=True, ca=ca)
+        if transform_to_ref:
+            reference.fit(template, transform=True, ca=ca)
         # Bind subset to template
         template.subset = subset
         # Write template
         if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, all_fuzzy, outdir, outfile)
+            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, all_fuzzy, outdir, outfile, '', find_ligands)
         return template
 
     def break_template(self, template, method='clusters', n_residues=3, max_distance=6):
@@ -306,7 +308,7 @@ class Entry:
             return groups
 
     def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
-                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None, annotation=''):
+                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None, annotation='', find_ligands=True):
         """
         Writes template coordinates and constraints in TESS/Jess format
         Args:
@@ -323,10 +325,15 @@ class Entry:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
             outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.{template.id}.template.pdb'
         size = len(subset) if subset else 'ALL'
-        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(template, subset, residues)
+        index = residues if residues else (i for i,j in enumerate(template.residues))
+        index = '-'.join([str(i) for i in index])
+        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = '','','','',''
+        if find_ligands:
+            cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(template, subset, residues)
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
                        f'REMARK CLUSTER {cluster_no}\n'
+                       f'REMARK INDEX {index}\n'
                        f'REMARK REPRESENTING {size} CATALYTIC SITES\n'
                        f'REMARK ID {template.id}\n'
                        f'REMARK MCSA_ID {template.mcsa_id}\n'
