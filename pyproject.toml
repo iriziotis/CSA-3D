@@ -1,0 +1,125 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csa3d"
+version = "0.1.0"
+description = "Extract and analyze enzyme catalytic sites in 3D from the Mechanism and Catalytic Site Atlas (M-CSA)"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Ioannis Riziotis", email = "riziotis@ebi.ac.uk"}
+]
+keywords = ["enzymes", "catalysis", "structural-biology", "M-CSA", "active-sites"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "biopython>=1.81",
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "scikit-learn>=0.24.0",
+    "rdkit>=2021.09.0",
+    "natsort>=8.0.0",
+    "dendrogram-cut>=0.1.0",
+    "parity-core>=0.5.0",
+    "rmsd>=1.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "types-setuptools",
+    "types-requests",
+]
+docs = [
+    "sphinx>=6.0",
+    "sphinx-rtd-theme>=1.2",
+    "myst-parser>=0.19",
+]
+examples = [
+    "jupyter>=1.0",
+    "notebook>=6.0",
+    "matplotlib>=3.5",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-username/csa3d"
+Documentation = "https://csa3d.readthedocs.io"
+Repository = "https://github.com/your-username/csa3d"
+"Issue Tracker" = "https://github.com/your-username/csa3d/issues"
+
+[tool.setuptools]
+packages = ["csa3d", "csa3d.config"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+known_first_party = ["csa3d"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_incomplete_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -v"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["csa3d"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+min_percentage = 70
