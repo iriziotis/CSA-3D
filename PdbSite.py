@@ -1,3 +1,9 @@
+"""Protein Data Bank (PDB) structure site representation.
+
+Provides the PdbSite class for managing catalytic sites from PDB structures,
+including residue extraction, RMSD calculation, and structure fitting.
+"""
+
 import logging
 import warnings
 from typing import Optional, List, Dict, Tuple, Any, Generator

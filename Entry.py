@@ -1,3 +1,10 @@
+"""M-CSA entry representation and analysis.
+
+Provides the Entry class for manipulating enzyme catalytic sites from both
+PDB structures and UniProt sequences. Includes RMSD calculation, clustering,
+and template generation methods.
+"""
+
 import logging
 import os
 import json
