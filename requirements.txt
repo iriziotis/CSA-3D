@@ -1,0 +1,10 @@
+biopython>=1.81
+numpy>=1.21.0
+pandas>=1.3.0
+scipy>=1.7.0
+scikit-learn>=0.24.0
+rdkit>=2021.09.0
+natsort>=8.0.0
+dendrogram-cut>=0.1.0
+parity-core>=0.5.0
+rmsd>=1.4.0
