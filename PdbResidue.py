@@ -1,5 +1,9 @@
+"""PDB catalytic residue representation for M-CSA."""
+
+import logging
 import os
 import warnings
+from typing import Optional, List, Dict, Any, Tuple
 import numpy as np
 import parity_core
 from copy import copy
@@ -10,69 +14,120 @@ from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
 from rdkit.Chem.rdmolfiles import MolFromMolFile
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, NUCLEIC, EQUIVALENT_RESIDUES, EQUIVALENT_ATOMS, RESIDUE_DEFINITIONS
-from .config import METALS, REACTIVE_NONMETALS, NOBLE_GASES, PDBID_COFACTORS, MCSA_EC_COFACTORS,\
-                    CRYSTALLIZATION_HETS, PDB2EC, KEGG_EC_REACTION, RHEA_EC_REACTION,\
-                    HET_MOLS_DIR, CHEBI_MOLS_DIR, KEGG_MOLS_DIR
+from .residue_definitions import (
+    AA_3TO1,
+    STANDARD_RESIDUES,
+    NUCLEIC,
+    EQUIVALENT_RESIDUES,
+    EQUIVALENT_ATOMS,
+    RESIDUE_DEFINITIONS,
+)
+from .config import (
+    METALS,
+    REACTIVE_NONMETALS,
+    NOBLE_GASES,
+    PDBID_COFACTORS,
+    MCSA_EC_COFACTORS,
+    CRYSTALLIZATION_HETS,
+    PDB2EC,
+    KEGG_EC_REACTION,
+    RHEA_EC_REACTION,
+    HET_MOLS_DIR,
+    CHEBI_MOLS_DIR,
+    KEGG_MOLS_DIR,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class PdbResidue:
-    """M-CSA PDB residue. Basic information is collected from the M-CSA
-    API catalytic residue info .json. Residue structure is set independently
-    as a Biopython Residue object"""
+    """Catalytic residue in a PDB structure.
 
-    def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 auth_resid=None, chain='', alt_chain='', ptm_resname='', 
-                 funclocs=None, domain_name='', domain_cath_id='', 
-                 is_reference=False, chiral_id=None, dummy_structure=False):
-        self.parent_site = None
-        self.mcsa_id = mcsa_id
-        self.pdb_id = pdb_id
-        self.resname = resname
-        self.resid = resid
-        self.auth_resid = auth_resid
-        self.chain = chain
-        self.alt_chain = alt_chain
-        self.ptm_resname = ptm_resname
-        self.funclocs = funclocs if funclocs else []
-        self.domain_name = domain_name
-        self.domain_cath_id = domain_cath_id
-        self.is_reference = is_reference
-        self.chiral_id = chiral_id
-        self.reference_residue = None
-        self.structure = None
-        self.dummy_structure = None
+    Represents a single catalytic residue with 3D coordinates, structural
+    information, and functional annotations from M-CSA.
+
+    Attributes:
+        parent_site: Parent PdbSite object
+        mcsa_id: M-CSA entry ID
+        pdb_id: PDB identifier
+        resname: Residue name (3-letter code)
+        resid: Internal residue number
+        auth_resid: Author-provided residue number
+        chain: Chain identifier
+        structure: Biopython Residue object
+        reference_residue: Reference residue for comparison
+    """
+
+    def __init__(
+        self,
+        mcsa_id: Optional[int] = None,
+        pdb_id: Optional[str] = None,
+        resname: str = '',
+        resid: Optional[int] = None,
+        auth_resid: Optional[int] = None,
+        chain: str = '',
+        alt_chain: str = '',
+        ptm_resname: str = '',
+        funclocs: Optional[List[str]] = None,
+        domain_name: str = '',
+        domain_cath_id: str = '',
+        is_reference: bool = False,
+        chiral_id: Optional[int] = None,
+        dummy_structure: bool = False,
+    ) -> None:
+        """Initialize PdbResidue."""
+        self.parent_site: Optional[Any] = None
+        self.mcsa_id: Optional[int] = mcsa_id
+        self.pdb_id: Optional[str] = pdb_id
+        self.resname: str = resname
+        self.resid: Optional[int] = resid
+        self.auth_resid: Optional[int] = auth_resid
+        self.chain: str = chain
+        self.alt_chain: str = alt_chain
+        self.ptm_resname: str = ptm_resname
+        self.funclocs: List[str] = funclocs if funclocs else []
+        self.domain_name: str = domain_name
+        self.domain_cath_id: str = domain_cath_id
+        self.is_reference: bool = is_reference
+        self.chiral_id: Optional[int] = chiral_id
+        self.reference_residue: Optional['PdbResidue'] = None
+        self.structure: Optional[Residue] = None
+        self.dummy_structure: Optional[Residue] = None
         if dummy_structure:
             self.add_dummy_structure()
 
-    def __str__(self):
-        """Returns one-letter representation"""
-        return AA_3TO1[self.resname]
+    def __str__(self) -> str:
+        """Return one-letter code representation."""
+        return AA_3TO1.get(self.resname, 'X')
 
-    def __eq__(self, other):
-        """Checks if residues share the same information"""
-        return (self.resname == other.resname and
-                self.auth_resid == other.auth_resid and
-                self.chain == other.chain and
-                self.chiral_id == other.chiral_id)
+    def __eq__(self, other: Any) -> bool:
+        """Check if residues share same information."""
+        if not isinstance(other, PdbResidue):
+            return False
+        return (
+            self.resname == other.resname
+            and self.auth_resid == other.auth_resid
+            and self.chain == other.chain
+            and self.chiral_id == other.chiral_id
+        )
 
-    def __sub__(self, other):
-        """Returns an approximate distance of self to other PdbResidue"""
+    def __sub__(self, other: 'PdbResidue') -> float:
+        """Return approximate distance to other residue."""
         return self.get_distance(other)
 
     # Private methods
 
-    def _avg_distance(self, other):
-        """Average distance between two residues"""
+    def _avg_distance(self, other: 'PdbResidue') -> float:
+        """Average distance between two residues."""
         dists = []
         for i in self.structure.get_atoms():
             for j in other.structure.get_atoms():
                 dists.append(i - j)
         return np.mean(np.array(dists))
 
-    def _min_distance(self, other):
-        """Minimum distance between two residues"""
-        min_dist = 999
+    def _min_distance(self, other: 'PdbResidue') -> float:
+        """Minimum distance between two residues."""
+        min_dist = 999.0
         for i in self.structure.get_atoms():
             for j in other.structure.get_atoms():
                 dist = i - j
@@ -80,24 +135,23 @@ class PdbResidue:
                     min_dist = dist
         return min_dist
 
-    def _com_distance(self, other, geometric=True):
-        """Center of mass or geometry distance. If geometric=True, the
-        distance is between the centers of geometry, otherwise it is between
-        the centers of mass."""
+    def _com_distance(
+        self, other: 'PdbResidue', geometric: bool = True
+    ) -> float:
+        """Center of mass or geometry distance.
+
+        Args:
+            other: Residue to compare
+            geometric: Use center of geometry (True) vs center of mass (False)
+
+        Returns:
+            Distance in Angstroms
+        """
         if self.structure is None or other.structure is None:
             return np.nan
         self_com = self.structure.center_of_mass(geometric)
         other_com = other.structure.center_of_mass(geometric)
-        return np.linalg.norm(self_com-other_com)
-
-
-    # Public methods
-
-    def copy(self, include_structure=False):
-        """Returns a copy of the residue. If include_structure is False,
-        then structure is not copied."""
-        res = copy(self)
-        if include_structure:
+        return float(np.linalg.norm(self_com - other_com))
             try:
                 res.structure = self.structure.copy()
                 res.structure.set_parent(self.structure.get_parent())
@@ -555,3 +609,6 @@ class Het(PdbResidue):
         except KeyError:
             pass
         return components
+
+
+__all__ = ['PdbResidue', 'Het']
