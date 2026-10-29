@@ -312,10 +312,15 @@ If you use CSA-3D in your research, please cite:
 ```bibtex
 @article{Riziotis2022,
     title={CSA-3D: {A} framework to manipulate enzyme catalytic sites in three dimensions},
-    author={Riziotis, Ioannis and ...},
+    author={Riziotis, Ioannis and others},
     journal={Journal of Molecular Biology},
+    volume={434},
+    number={5},
+    pages={167488},
     year={2022},
-    doi={...}
+    issn={0022-2836},
+    doi={10.1016/j.jmb.2022.167488},
+    url={https://www.sciencedirect.com/science/article/pii/S0022283622000912}
 }
 ```
 

@@ -181,28 +181,51 @@ class Entry:
                                 unisite.mapped_pdbsites.append(pdbsite)
         return True
 
-    def all_vs_all(self, sane_only=False):
-        """Returns a generator with all combinations of PDB sites in the entry.
-        If sane_only, insane sites are excuded."""
-        seen = set()
+    def all_vs_all(
+        self, sane_only: bool = False
+    ) -> Generator[Tuple[PdbSite, PdbSite], None, None]:
+        """Generate all pairwise combinations of PDB sites.
+
+        Args:
+            sane_only: Only include sites marked as 'sane'. Defaults to False.
+
+        Yields:
+            Tuple of two PdbSite objects (p, q) where p != q
+        """
+        seen: Set[Tuple[str, str]] = set()
         for p in self.pdbsites:
-            if sane_only:
-                if not p.is_sane:
-                    continue
+            if sane_only and not p.is_sane:
+                continue
             for q in self.pdbsites:
-                if sane_only:
-                    if not q.is_sane:
-                        continue
-                if p==q or (q.id, p.id) in seen:
+                if sane_only and not q.is_sane:
+                    continue
+                if p == q or (q.id, p.id) in seen:
                     continue
                 seen.add((p.id, q.id))
                 yield p, q
 
-    def rmsd_matrix(self, sitelist, ca=False):
-        """Contstructs RMSD matrix for the sites provided in sitelist"""
-        rmsds = []
-        ids = []
-        seen = set()
+    def rmsd_matrix(
+        self, sitelist: List[PdbSite], ca: bool = False
+    ) -> pd.DataFrame:
+        """Calculate pairwise RMSD matrix for catalytic sites.
+
+        Computes structural similarity between all pairs of sites using
+        spatial RMSD (root-mean-square-deviation).
+
+        Args:
+            sitelist: List of PdbSite objects to compare
+            ca: Use CA (alpha carbon) only. Defaults to False (all atoms).
+
+        Returns:
+            DataFrame with RMSD values (symmetric, NaN on diagonal)
+
+        Raises:
+            ValueError: If insufficient sites or missing coordinates
+        """
+        rmsds: List[float] = []
+        ids: List[str] = []
+        seen: Set[Tuple[str, str]] = set()
+
         for p in sitelist:
             if not ca and p.has_missing_functional_atoms:
                 continue
@@ -215,92 +238,193 @@ class Entry:
                 seen.add((p.id, q.id))
                 try:
                     _, _, _, rms_all = p.fit(q, weighted=True, ca=ca)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Weighted fit failed for {p.id}-{q.id}: {e}, trying unweighted")
                     _, _, _, rms_all = p.fit(q, weighted=False, ca=ca, cycles=10, cutoff=5)
                 rmsds.append(rms_all)
-        rmsds = np.array(rmsds, dtype='float32')
-        matrix = pd.DataFrame(squareform(rmsds), columns=ids, index=ids)
+
+        rmsds_array = np.array(rmsds, dtype='float32')
+        matrix = pd.DataFrame(squareform(rmsds_array), columns=ids, index=ids)
         return matrix
 
-    def clustering(self, matrix, height=None, get_linkage_matrix=False):
-        """Performs hierarchical clustering on the provided RMSD matrix."""
+    def clustering(
+        self,
+        matrix: pd.DataFrame,
+        height: Optional[float] = None,
+        get_linkage_matrix: bool = False,
+    ) -> Union[Dict[int, List[str]], Tuple[Dict[int, List[str]], np.ndarray]]:
+        """Perform hierarchical clustering on RMSD matrix.
+
+        Groups catalytic sites based on structural similarity using average
+        linkage hierarchical clustering.
+
+        Args:
+            matrix: RMSD distance matrix (from rmsd_matrix())
+            height: Cutoff height for tree cutting. If None, uses automatic
+                (70% of max distance). Defaults to None.
+            get_linkage_matrix: Also return the linkage matrix. Defaults to False.
+
+        Returns:
+            Dictionary mapping cluster ID to list of site IDs. Optionally includes
+            the linkage matrix as second element of tuple.
+
+        Example:
+            >>> entry = Mcsa().entries[1]
+            >>> sites = list(entry.get_pdbsites(sane_only=True))
+            >>> matrix = entry.rmsd_matrix(sites)
+            >>> clusters = entry.clustering(matrix)
+            >>> len(clusters)
+            3
+        """
         ids = list(matrix.index)
-        if len(ids)<2:
+        if len(ids) < 2:
             return {0: ids}
+
         # Compute linkage matrix
         Z = linkage(squareform(matrix), method='average')
+
         # Cut tree at automatic height
-        if not height:
+        if height is None:
             height = 0.7 * max(Z[:, 2])
+
         # Get clusters index
         clusters = cut_tree(Z, height=height).flatten()
         # Group sites to clusters
-        cluster_dict = defaultdict(list)
+        cluster_dict: Dict[int, List[str]] = defaultdict(list)
         for cluster in np.unique(clusters):
-            for i, id in zip(clusters, ids):
+            for i, site_id in zip(clusters, ids):
                 if i == cluster:
-                    cluster_dict[cluster].append(self.get_pdbsite(id).id)
+                    cluster_dict[cluster].append(self.get_pdbsite(site_id).id)
         if get_linkage_matrix:
             return cluster_dict, Z
         return cluster_dict
 
-    def clustering_bayesian(self, matrix, k_max=5, l=1.0, plot_outfile=None):
-        """Performs hierarchical clustering on the provided RMSD matrix,
-        and cuts the tree automatically using Bayesian statistics"""
-        cluster_dict = defaultdict(list)
+    def clustering_bayesian(
+        self,
+        matrix: pd.DataFrame,
+        k_max: int = 5,
+        l: float = 1.0,
+        plot_outfile: Optional[str] = None,
+    ) -> Dict[int, List[str]]:
+        """Perform hierarchical clustering with Bayesian automatic cutting.
+
+        Uses PAC-Bayesian statistics to automatically determine optimal
+        number of clusters. More sophisticated than fixed-height cutting.
+
+        Args:
+            matrix: RMSD distance matrix (from rmsd_matrix())
+            k_max: Maximum number of clusters to test. Defaults to 5.
+            l: Lambda parameter for Bayesian cut. Defaults to 1.0.
+            plot_outfile: Optional path to save dendrogram plot. Defaults to None.
+
+        Returns:
+            Dictionary mapping cluster ID to list of site IDs
+
+        Raises:
+            ValueError: If matrix is invalid
+        """
+        cluster_dict: Dict[int, List[str]] = defaultdict(list)
         ids = list(matrix.index)
-        matrix = np.array(matrix)
+        matrix_array = np.array(matrix)
         try:
-            model = DendrogramCut(k_max=k_max, method='average').fit(matrix)
-        except ValueError:
+            model = DendrogramCut(k_max=k_max, method='average').fit(matrix_array)
+        except ValueError as e:
+            logger.warning(f"Bayesian clustering failed: {e}. Using single cluster.")
             return {0: ids}
         try:
             k = model.pac_bayesian_cut(lambda_=l)
         except RecursionError:
+            logger.warning("Recursion error in Bayesian cut. Using single cluster.")
             return {0: ids}
         clusters = model.get_cluster_label(k=k)
         if plot_outfile:
             fig = model.heatmap_with_dendrogram_plot(k=k)
             fig.write_image(plot_outfile)
-        for i,cluster_no in enumerate(clusters):
+            logger.info(f"Saved dendrogram plot to {plot_outfile}")
+        for i, cluster_no in enumerate(clusters):
             cluster_dict[cluster_no].append(ids[i])
         return cluster_dict
 
-    def _get_template_reference(self, ca=False):
-        """Gets a reference site on which templates will be fitted into"""
-        ref = None
+    def _get_template_reference(self, ca: bool = False) -> Optional[PdbSite]:
+        """Get a reference site for template generation.
+
+        Selects the best reference site for fitting other sites into,
+        prioritizing reference structures over conserved homologues.
+
+        Args:
+            ca: Use CA (alpha carbon) only. Defaults to False.
+
+        Returns:
+            Best available PdbSite for template reference, or None if none found
+        """
+        ref: Optional[PdbSite] = None
         for site in self.get_pdbsites():
-            if site.is_reference: 
+            if site.is_reference:
                 if ca or (not ca and not site.has_missing_functional_atoms):
                     ref = site
                     break
         if not ref:
             for site in self.get_pdbsites(sane_only=True):
-                if (site.is_conserved or site.is_conservative_mutation): 
+                if site.is_conserved or site.is_conservative_mutation:
                     if ca or (not ca and not site.has_missing_functional_atoms):
-                        ref = site
-                        break
-                    if not site.has_missing_functional_atoms:
                         ref = site
                         break
         return ref
 
-    def create_template(self, comparisons=None, ca=False, outdir=None, outfile=None, subset=None, cluster_no=None, atoms=None, no_write=False, all_fuzzy=False, no_alt=False):
-        """Creates template from conserved sites"""
-        # Get reference as functional site (maybe make a separate method for retrieving reference from entry)
+    def create_template(
+        self,
+        comparisons: Optional[Union[str, pd.DataFrame]] = None,
+        ca: bool = False,
+        outdir: Optional[str] = None,
+        outfile: Optional[str] = None,
+        subset: Optional[List[str]] = None,
+        cluster_no: Optional[int] = None,
+        atoms: Optional[List[str]] = None,
+        no_write: bool = False,
+        all_fuzzy: bool = False,
+        no_alt: bool = False,
+    ) -> Optional[PdbSite]:
+        """Create a template structure from conserved catalytic sites.
+
+        Generates an averaged template structure representing the consensus
+        active site geometry across conserved homologues.
+
+        Args:
+            comparisons: Comparison data for per-residue constraints (optional)
+            ca: Use CA atoms only. Defaults to False.
+            outdir: Output directory for template file. Defaults to current dir.
+            outfile: Output filename. Defaults to auto-generated name.
+            subset: Limit to specific site IDs. Defaults to None (all conserved).
+            cluster_no: Cluster identifier for output filename. Defaults to None.
+            atoms: Specific atoms to include. Defaults to None (functional atoms).
+            no_write: Don't write output file. Defaults to False.
+            all_fuzzy: Allow all fuzzy residue matches. Defaults to False.
+            no_alt: Exclude alternative residues. Defaults to False.
+
+        Returns:
+            PdbSite object representing the template, or None if failed
+
+        Example:
+            >>> entry = Mcsa().entries[1]
+            >>> template = entry.create_template(outdir="./templates")
+            >>> template.pdb_id
+            '1abc'
+        """
         if subset is None:
             subset = []
         try:
             reference = self._get_template_reference(ca=ca).get_functional_site(ca=ca)
-        except TypeError:
-            return
+        except (TypeError, AttributeError) as e:
+            logger.error(f"Could not get template reference: {e}")
+            return None
+
         # Calculate average coordinates
         avg = reference.copy(include_structure=True)
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
             if (not ca and not (site.is_conserved or site.is_conservative_mutation)) or \
-                    site.id==reference.id or site.has_missing_functional_atoms:
+                    site.id == reference.id or site.has_missing_functional_atoms:
                 continue
             funcsite = site.get_functional_site(ca=ca)
             avg.fit(funcsite, transform=True, ca=ca)
@@ -308,32 +432,61 @@ class Entry:
             avg_coords = np.array([atom.get_coord() for res in avg for atom in res.structure])
             avg_coords = np.mean([avg_coords, site_coords], axis=0)
             for atom, coord in zip([atom for res in avg for atom in res.structure], avg_coords):
-                atom.set_coord(coord)    
+                atom.set_coord(coord)
+
         # Find representative site
-        min_rms = 999
+        min_rms = 999.0
         template = reference
         for site in self.get_pdbsites(sane_only=True):
             if subset and site.id not in subset:
                 continue
             if (not ca and not (site.is_conserved or site.is_conservative_mutation)) or \
-                    (site.id==reference.id or not ca and site.has_missing_functional_atoms):
+                    (site.id == reference.id or (not ca and site.has_missing_functional_atoms)):
                 continue
             rot, tran, rms, rms_all = avg.fit(site, transform=False, ca=ca)
             if rms_all < min_rms:
                 min_rms = rms_all
                 template = site
+
         # Fit template to reference or any other site with sane atoms
         reference.fit(template, transform=True, ca=ca)
-        # Bind subset to template
         template.subset = subset
-        # Write template
-        if no_write == False:
-            self.write_template(template, comparisons, ca, template.subset, cluster_no, None, atoms, no_alt, all_fuzzy, outdir, outfile)
+
+        # Write template if requested
+        if not no_write:
+            self.write_template(
+                template, comparisons, ca, template.subset, cluster_no,
+                None, atoms, no_alt, all_fuzzy, outdir, outfile
+            )
         return template
 
-    def break_template(self, template, method='clusters', n_residues=3, max_distance=6):
-        """Breaks template in smaller groups of arbitrary size (default=3).
-        Returns a list of indeces of the residues of each group. Overlap is allowed."""
+    def break_template(
+        self,
+        template: PdbSite,
+        method: str = 'clusters',
+        n_residues: int = 3,
+        max_distance: float = 6.0,
+    ) -> Union[List[List[int]], Dict[str, List[int]]]:
+        """Break template into smaller residue groups.
+
+        Divides a large template into smaller, manageable subsets for
+        more focused analysis or docking.
+
+        Args:
+            template: Template PdbSite to break
+            method: Grouping method - 'clusters', 'combinations', or 'functional'.
+                Defaults to 'clusters'.
+            n_residues: Target residues per group. Defaults to 3.
+            max_distance: Maximum distance between residues in group (Å).
+                Defaults to 6.0.
+
+        Returns:
+            List of residue index groups, or dict if using 'functional' method
+
+        Example:
+            >>> template = entry.create_template()
+            >>> groups = entry.break_template(template, method='clusters', n_residues=3)
+        """
         if method=='combinations':
             groups = set()
             combis = list(combinations(range(template.size), n_residues))
