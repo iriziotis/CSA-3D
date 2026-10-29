@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 import numpy as np
@@ -5,98 +6,169 @@ import pandas as pd
 from copy import deepcopy
 from collections import defaultdict
 from itertools import combinations
+from typing import Dict, List, Optional, Set, Tuple, Generator, Any
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
 from dendrogram_cut import DendrogramCut
 from .config import UNI2PDB, REF_RES_INFO
-from .residue_definitions import RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
+from .residue_definitions import (
+    RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
+)
 from .PdbSite import PdbSite
 from .UniSite import UniSite
 
+logger = logging.getLogger(__name__)
+
 
 class Entry:
-    """M-CSA entry. Contains a list of UniSite objects and a list
-    of PdbSite objects"""
+    """M-CSA entry containing catalytic sites from PDB and UniProt.
 
-    def __init__(self, mcsa_id=None):
-        self.mcsa_id = mcsa_id
-        self.info = None
-        self.unisites = []
-        self.unisites_dict = {}
-        self.pdbsites = []
-        self.pdbsites_dict = {}
-        self.pdb_ids = set()
+    Represents a single M-CSA catalytic mechanism entry, containing both
+    PDB structure sites and UniProt sequence sites. Provides analysis tools
+    including RMSD clustering, template creation, and site comparison.
+
+    Attributes:
+        mcsa_id: Unique M-CSA identifier
+        info: Metadata dictionary (EC, enzyme name, organism, etc.)
+        pdbsites: List of PdbSite objects (3D structures)
+        unisites: List of UniSite objects (sequences)
+        pdb_ids: Set of unique PDB IDs in this entry
+        pdbsites_dict: Dictionary mapping site ID to PdbSite
+        unisites_dict: Dictionary mapping site ID to UniSite
+
+    Example:
+        >>> entry = Entry(mcsa_id=1)
+        >>> len(entry.pdbsites)
+        0
+    """
+
+    def __init__(self, mcsa_id: Optional[int] = None) -> None:
+        """Initialize an M-CSA entry.
+
+        Args:
+            mcsa_id: M-CSA entry identifier. Defaults to None.
+        """
+        self.mcsa_id: Optional[int] = mcsa_id
+        self.info: Optional[Dict[str, Any]] = None
+        self.unisites: List[UniSite] = []
+        self.unisites_dict: Dict[str, UniSite] = {}
+        self.pdbsites: List[PdbSite] = []
+        self.pdbsites_dict: Dict[str, PdbSite] = {}
+        self.pdb_ids: Set[str] = set()
 
     @property
-    def has_multiple_pdb_refs(self):
-        """Checks if entry has more than one PDB reference structures"""
+    def has_multiple_pdb_refs(self) -> bool:
+        """Check if entry has more than one PDB reference structure."""
         refs = set()
         for site in self.pdbsites:
             if site.is_reference:
                 refs.add(site.pdb_id)
-        return len(refs)>1
+        return len(refs) > 1
 
     @property
-    def has_multiple_uniprot_refs(self):
-        """Checks if entry has more than one PDB reference structures"""
+    def has_multiple_uniprot_refs(self) -> bool:
+        """Check if entry has more than one UniProt reference sequence."""
         refs = set()
         for site in self.unisites:
             if site.is_reference:
                 refs.add(site.uniprot_id)
-        return len(refs)>1
+        return len(refs) > 1
 
-    def add(self, site):
-        """Adds catalytic site in the appropriate list depending on its
-        type (PdbSite or UniSite)"""
-        if type(site) == UniSite:
+    def add(self, site: Any) -> bool:
+        """Add a catalytic site (PdbSite or UniSite) to this entry.
+
+        Automatically routes site to appropriate list and updates internal
+        mappings between PDB and UniProt representations.
+
+        Args:
+            site: PdbSite or UniSite object to add
+
+        Returns:
+            True if successful, False if wrong type
+
+        Raises:
+            TypeError: If site is not PdbSite or UniSite (future versions)
+        """
+        if isinstance(site, UniSite):
             self.unisites.append(site)
             self.unisites_dict[site.id] = site
-        elif type(site) == PdbSite:
+        elif isinstance(site, PdbSite):
             self.pdbsites.append(site)
             self.pdbsites_dict[site.id] = site
             self.pdb_ids.add(site.pdb_id)
         else:
-            print('Attempted to add non-Site object in entry')
-            return
+            logger.error(f"Cannot add {type(site).__name__}. Expected PdbSite or UniSite.")
+            return False
+
         self.update_mapped_sites()
         return True
 
-    def get_unisite(self, _id):
-        """Return UniProt active site with the given UniProt accession ID"""
-        if _id in self.unisites_dict:
-            return self.unisites_dict[_id]
-        return
+    def get_unisite(self, _id: str) -> Optional[UniSite]:
+        """Get UniSite by ID.
 
-    def get_pdbsite(self, _id):
-        """Return PDB active site with specific ID"""
-        if _id in self.pdbsites_dict:
-            return self.pdbsites_dict[_id]
-        return
+        Args:
+            _id: UniProt accession ID
 
-    def get_unisites(self):
-        """Return a generator of all UniProt sites"""
+        Returns:
+            UniSite object or None if not found
+        """
+        return self.unisites_dict.get(_id)
+
+    def get_pdbsite(self, _id: str) -> Optional[PdbSite]:
+        """Get PdbSite by ID.
+
+        Args:
+            _id: Site identifier
+
+        Returns:
+            PdbSite object or None if not found
+        """
+        return self.pdbsites_dict.get(_id)
+
+    def get_unisites(self) -> Generator[UniSite, None, None]:
+        """Get all UniSite objects.
+
+        Yields:
+            UniSite: Each UniSite in this entry
+        """
         yield from self.unisites
 
-    def get_pdbsites(self, pdb_id=None, sane_only=False):
-        """Return a generator of PDB active sites that have the same PDB ID,
-        or a generator of all PdbSites"""
-        result = []
-        if not pdb_id:
+    def get_pdbsites(
+        self, pdb_id: Optional[str] = None, sane_only: bool = False
+    ) -> Generator[PdbSite, None, None]:
+        """Get PdbSite objects, optionally filtered.
+
+        Args:
+            pdb_id: Filter by PDB ID. Defaults to None (all sites).
+            sane_only: Only return sites marked as 'sane'. Defaults to False.
+
+        Yields:
+            PdbSite: Matching sites
+        """
+        if pdb_id is None:
             for site in self.pdbsites:
                 if sane_only and not site.is_sane:
                     continue
                 yield site
         else:
-            result = [val for key, val in self.pdbsites_dict.items() if pdb_id in key]
-        for site in result:
-            if sane_only and not site.is_sane:
-                continue
-            yield site
+            result = [
+                val for key, val in self.pdbsites_dict.items() if pdb_id in key
+            ]
+            for site in result:
+                if sane_only and not site.is_sane:
+                    continue
+                yield site
 
-    def update_mapped_sites(self):
-        """Updates the mapping of all UniProt catalytic sites to their
-        respective PDB sites"""
+    def update_mapped_sites(self) -> bool:
+        """Update mappings between PDB and UniProt sites.
+
+        Uses SIFTS mapping to link UniSites to their corresponding PdbSites,
+        enabling cross-representation analysis.
+
+        Returns:
+            True
+        """
         for unisite in self.unisites:
             if unisite.id in UNI2PDB:
                 for sifts_pdb_id in UNI2PDB[unisite.id]:
