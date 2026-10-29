@@ -530,25 +530,58 @@ class Entry:
                     groups[annotation].append(i)
             return groups
 
-    def write_template(self, template, comparisons=None, ca=False, subset=None, cluster_no=None, residues=None, atoms=None, 
-                       no_alt=False, all_fuzzy=False, outdir=None, outfile=None, annotation=''):
-        """
-        Writes template coordinates and constraints in TESS/Jess format
+    def write_template(
+        self,
+        template: PdbSite,
+        comparisons: Optional[pd.DataFrame] = None,
+        ca: bool = False,
+        subset: Optional[List[str]] = None,
+        cluster_no: Optional[int] = None,
+        residues: Optional[List[int]] = None,
+        atoms: Optional[List[str]] = None,
+        no_alt: bool = False,
+        all_fuzzy: bool = False,
+        outdir: Optional[str] = None,
+        outfile: Optional[str] = None,
+        annotation: str = '',
+    ) -> None:
+        """Write template in PDB/TESS format with constraints.
+
+        Exports template structure with geometric constraints for use in
+        docking software (TESS/Jess).
+
         Args:
-            outdir: Output directory
-            outfile: Default 'mcsa_id.cluster_no.template.pdb' 
+            template: Template PdbSite to write
+            comparisons: RMSD comparison data for constraints. Defaults to None.
+            ca: Use CA atoms only. Defaults to False.
+            subset: Limit to specific site IDs. Defaults to None.
+            cluster_no: Cluster identifier. Defaults to None.
+            residues: Specific residue indices to include. Defaults to None.
+            atoms: Specific atoms to include. Defaults to None.
+            no_alt: Exclude alternative residue options. Defaults to False.
+            all_fuzzy: Allow all fuzzy matches. Defaults to False.
+            outdir: Output directory. Defaults to current directory.
+            outfile: Output filename. Auto-generated if None.
+            annotation: Additional annotation comment. Defaults to empty.
+
+        Returns:
+            None (writes file to disk)
         """
-        if type(subset) == list and len(subset)==0:
+        if isinstance(subset, list) and len(subset) == 0:
             subset = None
         if len(template.residues) < 3:
+            logger.warning("Template has fewer than 3 residues, skipping write")
             return
         if not outdir:
             outdir = '.'
         if not outfile:
             cluster = 'all' if cluster_no is None else f'cluster_{cluster_no}'
             outfile = f'{outdir}/csa3d_{str(template.mcsa_id).zfill(4)}.{cluster}.{template.id}.template.pdb'
+
         size = len(subset) if subset else 'ALL'
-        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(template, subset, residues)
+        cluster_ligands, substrate_score, cofactor_score, ion_score, artefact_score = self._get_cluster_ligands(
+            template, subset, residues
+        )
         with open(outfile, 'w') as o:
             remarks = (f'REMARK TEMPLATE\n'
                        f'REMARK CLUSTER {cluster_no}\n'
@@ -605,9 +638,26 @@ class Entry:
                         print(pdb_line, file=o)
             print('END', file=o)
 
-    def _get_cluster_ligands(self, template, subset=None, residues=None):
-        """Returns all ligands from the template and its homologues from the
-        cluster it represents. Ligands must be within 5A away from all template residues"""
+    def _get_cluster_ligands(
+        self,
+        template: PdbSite,
+        subset: Optional[List[str]] = None,
+        residues: Optional[List[int]] = None,
+    ) -> Tuple[str, float, float, float, float]:
+        """Get ligands associated with template cluster.
+
+        Returns ligands from the template and its homologues that are within
+        5Å of any catalytic residue.
+
+        Args:
+            template: Template PdbSite
+            subset: Limit to specific site IDs. Defaults to None.
+            residues: Limit to specific residue indices. Defaults to None.
+
+        Returns:
+            Tuple of (ligands_str, substrate_score, cofactor_score,
+                     ion_score, artefact_score)
+        """
         ligands = []
         substrate_score = 0
         cofactor_score = 0
@@ -651,13 +701,37 @@ class Entry:
         return ';'.join(ligands), np.round(substrate_score/n, 2), \
                np.round(cofactor_score/n, 2), np.round(ion_score/n, 2), np.round(artefact_score/n, 2)
 
-    def _get_template_params(self, template, all_fuzzy=False):
+    def _get_template_params(
+        self, template: PdbSite, all_fuzzy: bool = False
+    ) -> Tuple[Dict[int, Dict[str, int]], Dict[int, str]]:
+        """Get template parameters (matchcodes and alternative residues).
+
+        Args:
+            template: Template PdbSite
+            all_fuzzy: Allow all fuzzy matches. Defaults to False.
+
+        Returns:
+            Tuple of (matchcodes dict, alt_residues dict)
+        """
         alt_residues, backbone_fuzzy = self._get_alt_residues(template, all_fuzzy)
         matchnumbers = self._get_matchnumbers(template, backbone_fuzzy)
         return matchnumbers, alt_residues
-        
-    def _get_alt_residues(self, template, all_fuzzy=False):
-        """Returns a string of alternative residues to be matched in the template"""
+
+    def _get_alt_residues(
+        self, template: PdbSite, all_fuzzy: bool = False
+    ) -> Tuple[Dict[int, str], Dict[int, bool]]:
+        """Get alternative residues for fuzzy matching.
+
+        Determines which amino acids can be matched at each position based on
+        observed substitutions in homologous sites.
+
+        Args:
+            template: Template PdbSite
+            all_fuzzy: Allow all fuzzy matches. Defaults to False.
+
+        Returns:
+            Tuple of (alternatives dict, backbone_fuzzy dict)
+        """
         observed = defaultdict(set)
         expected = defaultdict(set)
         intersection = defaultdict(set)
@@ -685,8 +759,24 @@ class Entry:
                         backbone_fuzzy[i] = False
         return intersection, backbone_fuzzy
 
-    def _get_matchnumbers(self, template, backbone_fuzzy, ca=False):
-        """Returns the Jess match option number for each template atom"""
+    def _get_matchnumbers(
+        self,
+        template: PdbSite,
+        backbone_fuzzy: Dict[int, bool],
+        ca: bool = False,
+    ) -> Dict[int, Dict[str, int]]:
+        """Get Jess/TESS match codes for template atoms.
+
+        Determines the matching flexibility for each atom in the template.
+
+        Args:
+            template: Template PdbSite
+            backbone_fuzzy: Dict indicating backbone fuzzy matching per position
+            ca: Use CA atoms only. Defaults to False.
+
+        Returns:
+            Dictionary mapping residue index to atom name to match code
+        """
         matchnumbers = defaultdict(dict)
         for i, res in enumerate(template):
             resname = res.resname.upper()
@@ -712,30 +802,62 @@ class Entry:
                         matchnumbers[i][atom.name] = TEMPLATE_FUZZY_ATOMS[resname][atom.name][0]
         return matchnumbers
 
-    def get_dist_cutoffs(self, comparisons, subset=None):
-        """Returns the distance threshold weight for each residue"""
-        if type(comparisons) == str:
+    def get_dist_cutoffs(
+        self,
+        comparisons: Union[str, pd.DataFrame],
+        subset: Optional[List[str]] = None,
+    ) -> Optional[Dict[int, float]]:
+        """Get distance cutoffs per residue from comparison data.
+
+        Calculates per-residue distance constraints from RMSD comparisons.
+
+        Args:
+            comparisons: Path to CSV or DataFrame with comparison results
+            subset: Limit to specific site IDs. Defaults to None.
+
+        Returns:
+            Dictionary mapping residue index to distance cutoff, or None if failed
+        """
+        if isinstance(comparisons, str):
             comparisons = pd.read_csv(open(comparisons, 'r'))
         if subset:
             if len(subset) <= 1:
-                return
+                return None
             comparisons = comparisons.query('p_id in @subset and q_id in @subset')
-        per_res = comparisons.loc[~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'].astype('str').str.split(';', expand=True).astype('float32')
+        per_res = comparisons.loc[
+            ~pd.isnull(comparisons['per_res_rms']), 'per_res_rms'
+        ].astype('str').str.split(';', expand=True).astype('float32')
         try:
             cutoffs = dict(per_res.describe().loc[['mean', 'std']].sum())
-        except ValueError:
-            return
-        return cutoffs
+            return cutoffs
+        except ValueError as e:
+            logger.warning(f"Could not calculate distance cutoffs: {e}")
+            return None
 
-    def _get_free_text_annotations(self):
-        """Gets free text role annotations for each reference residue
-        from the M-CSA API file and returns them as a list, preserving
-        the order of the residues as chiral id in the reference catalytic site"""
-        info = json.load(open(REF_RES_INFO))
-        annotations = defaultdict(list)
+    def _get_free_text_annotations(
+        self,
+    ) -> Dict[Tuple[str, int], List[str]]:
+        """Get functional annotations for reference residues.
+
+        Retrieves free-text role annotations from M-CSA API data for each
+        reference catalytic residue.
+
+        Returns:
+            Dictionary mapping (chain, residue_id) to list of annotations
+        """
+        try:
+            info = json.load(open(REF_RES_INFO))
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.error(f"Could not load reference residue info: {e}")
+            return {}
+
+        annotations: Dict[Tuple[str, int], List[str]] = defaultdict(list)
         for res in info:
             if res['mcsa_id'] == self.mcsa_id:
-                chain, resid = res['residue_chains'][0]['assembly_chain_name'], res['residue_chains'][0]['auth_resid']
+                chain = res['residue_chains'][0]['assembly_chain_name']
+                resid = res['residue_chains'][0]['auth_resid']
                 annotations[(chain, resid)].append(res['main_annotation'])
         return annotations
 
+
+__all__ = ['Entry']
