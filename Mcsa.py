@@ -1,3 +1,9 @@
+"""M-CSA database access and entry building.
+
+Provides the main Mcsa class for loading and building enzyme catalytic site
+entries from the Mechanism and Catalytic Site Atlas (M-CSA) database.
+"""
+
 import logging
 import os
 import json
