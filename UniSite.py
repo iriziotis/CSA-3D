@@ -1,46 +1,77 @@
+"""UniProt catalytic site representation for M-CSA."""
+
+from typing import Optional, List, Dict, Any, Generator
 from .residue_definitions import AA_3TO1
 from .UniResidue import UniResidue
 
 
 class UniSite:
-    """M-CSA UniProt catalytic site. Contains lists of UniResidues and mapped PDB
-    catalytic sites (UniSite objects)."""
+    """Catalytic site in UniProt sequence coordinates.
 
-    def __init__(self):
-        self.parent_entry = None
-        self.residues = []
-        self.residues_dict = {}
-        self.mapped_pdbsites = []
-        self.reference_site = None
+    Represents a catalytic site at the sequence level with residue positions
+    and mappings to PDB structures.
 
-    def __str__(self):
-        """Print as pseudo-sequence in one-letter code"""
+    Attributes:
+        parent_entry: Parent Entry object
+        residues: List of UniResidue objects
+        residues_dict: Dictionary mapping full_id to UniResidue
+        mapped_pdbsites: List of mapped PdbSite objects
+        reference_site: Reference site for alignment
+    """
+
+    def __init__(self) -> None:
+        """Initialize UniSite."""
+        self.parent_entry: Optional[Any] = None
+        self.residues: List[UniResidue] = []
+        self.residues_dict: Dict[tuple, UniResidue] = {}
+        self.mapped_pdbsites: List[Any] = []
+        self.reference_site: Optional['UniSite'] = None
+
+    def __str__(self) -> str:
+        """Return pseudo-sequence in one-letter code."""
         return self.sequence
 
-    def __iter__(self):
-        """Iterate over residues"""
+    def __iter__(self) -> Generator[UniResidue, None, None]:
+        """Iterate over residues."""
         yield from self.residues
 
-    def __contains__(self, residue):
-        """Check if residue of specific ID is there"""
+    def __contains__(self, residue: UniResidue) -> bool:
+        """Check if residue is in this site."""
         return residue.full_id in self.residues_dict
 
-    def __getitem__(self, full_id):
-        """Return the child with given ID."""
+    def __getitem__(self, full_id: tuple) -> UniResidue:
+        """Return residue with given full_id."""
         return self.residues_dict[full_id]
 
     # Alternative constructors
 
     @classmethod
-    def build_reference(cls, reslist):
-        """Builds reference active site from a list of UniProt catalytic residues."""
+    def build_reference(cls, reslist: List[UniResidue]) -> 'UniSite':
+        """Build reference site from UniResidue list.
+
+        Args:
+            reslist: List of reference UniResidue objects
+
+        Returns:
+            Reference UniSite object
+        """
         ref = UniSite.from_list(reslist)
         ref.reference_site = ref
         return ref
 
     @classmethod
-    def build(cls, reslist, reference_site=None):
-        """Build UniProt site from a list of residues, and map reference residues"""
+    def build(
+        cls, reslist: List[UniResidue], reference_site: Optional['UniSite'] = None
+    ) -> 'UniSite':
+        """Build UniSite and map to reference.
+
+        Args:
+            reslist: List of UniResidue objects
+            reference_site: Reference site for alignment. Defaults to None.
+
+        Returns:
+            UniSite object
+        """
         site = cls.from_list(reslist)
         if site.is_reference:
             site.reference_site = site
@@ -50,8 +81,15 @@ class UniSite:
         return site
 
     @classmethod
-    def from_list(cls, reslist):
-        """Construct UniSite object directly from residue list"""
+    def from_list(cls, reslist: List[UniResidue]) -> 'UniSite':
+        """Construct UniSite from residue list.
+
+        Args:
+            reslist: List of UniResidue objects
+
+        Returns:
+            UniSite object
+        """
         site = cls()
         reslist = UniSite._cleanup_list(reslist)
         for res in reslist:
@@ -61,97 +99,91 @@ class UniSite:
     # Properties
 
     @property
-    def mcsa_id(self):
-        """Get M-CSA ID of catalytic residues."""
+    def mcsa_id(self) -> Optional[int]:
+        """Get M-CSA ID from first residue."""
         for res in self.residues:
             if res.mcsa_id:
                 return res.mcsa_id
-        return
+        return None
 
     @property
-    def uniprot_id(self):
-        """UniProt site ID is the UniProt id of the sequence"""
-        return self.residues[0].uniprot_id
+    def uniprot_id(self) -> Optional[str]:
+        """Get UniProt accession."""
+        if self.residues:
+            return self.residues[0].uniprot_id
+        return None
 
     @property
-    def id(self):
-        """UniProt site ID is the UniProt id of the sequence"""
+    def id(self) -> Optional[str]:
+        """Get UniProt site ID (same as uniprot_id)."""
         return self.uniprot_id
 
     @property
-    def sequence(self):
-        """Show as pseudo-sequence in one-letter code"""
-        return ''.join([AA_3TO1[res.resname] if (res.is_standard or res.is_gap) else 'X' for res in self])
+    def sequence(self) -> str:
+        """Get pseudo-sequence in one-letter code."""
+        return ''.join(
+            [
+                AA_3TO1.get(res.resname, 'X') if (res.is_standard or res.is_gap) else 'X'
+                for res in self
+            ]
+        )
 
     @property
-    def size(self):
-        """Get site size in residue count"""
+    def size(self) -> int:
+        """Get site size in residue count."""
         return len(self.residues)
 
     @property
-    def acts_on_polymer(self):
-        """Check if it belongs to a family of enzymes whose substrate is a polymer
-        (protein or nucleic)"""
+    def acts_on_polymer(self) -> bool:
+        """Check if enzyme substrate is polymer (protein/nucleic acid)."""
+        if self.parent_entry is None:
+            return False
         return self.parent_entry.info['reaction']['is_polymeric']
 
     @property
-    def is_reference(self):
-        """Check if site is reference site"""
+    def is_reference(self) -> bool:
+        """Check if this is reference site."""
         if self.size > 0:
             return self.residues[0].is_reference
         return False
 
     @property
-    def is_conserved(self):
-        """Check if all residues are conserved by comparing to the reference"""
+    def is_conserved(self) -> bool:
+        """Check if all residues conserved vs reference."""
+        if self.reference_site is None:
+            return self.is_reference
         return str(self) == str(self.reference_site) or self.is_reference
 
     @property
-    def is_conservative_mutation(self, ignore_funcloc_main=True):
-        """Checks if the mutations in the site are conservative. Option to
-        ignore residues that function via main chain"""
+    def is_conservative_mutation(self) -> bool:
+        """Check if mutations are conservative."""
         result = False
         for res in self.residues:
-            if ignore_funcloc_main:
-                for funcloc in res.funclocs:
-                    if 'main' in funcloc:
-                        result = True
-                        continue
             if not res.is_conserved and not res.is_conservative_mutation:
                 return False
             if res.is_conservative_mutation:
                 result = True
         return result
 
-    def get_residues(self):
-        """Iterate over residues"""
-        yield from self.residues
+    def add(self, residue: UniResidue) -> bool:
+        """Add UniResidue to site.
 
-    def get_gaps(self):
-        """Returns an index of the gap positions (non-aligned residues)"""
-        gaps = []
-        for i, res in enumerate(self.residues):
-            if res.is_gap:
-                gaps.append(i)
-        return gaps
+        Args:
+            residue: UniResidue to add
 
-    def add(self, residue):
-        """Add UniProt residue to list"""
-        if type(residue) == UniResidue:
-            self.residues.append(residue)
-            self.residues_dict[residue.full_id] = residue
-        else:
-            print('Attempted to add non-UniRes object in UniSite')
-            return
+        Returns:
+            True if successful
+        """
+        if not isinstance(residue, UniResidue):
+            return False
+        self.residues.append(residue)
+        self.residues_dict[residue.full_id] = residue
         return True
 
     # Private methods
 
-    def _map_reference_residues(self):
-        """Puts each residue in the site in the correct order, according
-        to the reference site, using the individual residue mapping to a
-        reference residue. Wherever a mapping cannot be found, an empty
-        residue is assigned to that position"""
+    def _map_reference_residues(self) -> None:
+        """Map residues to reference positions and fill gaps."""
         if self.reference_site is None:
             return
         for reference_residue in self.reference_site:
@@ -159,37 +191,42 @@ class UniSite:
             for res in self:
                 if reference_residue == res.reference_residue:
                     found = True
+                    break
             if not found:
                 gap = UniResidue()
                 gap.reference_residue = reference_residue
                 self.add(gap)
         self._reorder()
-        return
 
-    def _reorder(self):
-        """Residue reordering routine for _map_reference_residues"""
+    def _reorder(self) -> None:
+        """Reorder residues to match reference ordering."""
         if self.reference_site is None:
             return
         reorder = []
         for i, reference_residue in enumerate(self.reference_site):
             for j, res in enumerate(self):
-                if i == j and reference_residue == res.reference_residue:
-                    reorder.append(i)
-                elif i != j and reference_residue == res.reference_residue:
+                if reference_residue == res.reference_residue:
                     reorder.append(j)
-        self.residues = [self.residues[i] for i in reorder]
-        return
+                    break
+        if len(reorder) == len(self.residues):
+            self.residues = [self.residues[i] for i in reorder]
 
     @staticmethod
-    def _cleanup_list(reslist):
-        """Finds duplicate residues of different funclocs and makes a single
-        one with two funclocs. Returns a new list without redundant residues"""
-        new_reslist = []
-        seen = set()
-        ignore = set()
+    def _cleanup_list(reslist: List[UniResidue]) -> List[UniResidue]:
+        """Remove duplicate residues with different funclocs.
+
+        Args:
+            reslist: List of UniResidue objects
+
+        Returns:
+            Cleaned list without redundant residues
+        """
+        new_reslist: List[UniResidue] = []
+        seen: set = set()
+        ignore: set = set()
         for p in reslist:
             for q in reslist:
-                if p==q or (q.id, p.id) in seen:
+                if p == q or (q.id, p.id) in seen:
                     continue
                 if p.is_equivalent(q, by_chiral_id=False):
                     if p.funclocs != q.funclocs:
@@ -203,3 +240,6 @@ class UniSite:
             if p.id not in ignore and p not in new_reslist:
                 new_reslist.append(p)
         return new_reslist
+
+
+__all__ = ['UniSite']
