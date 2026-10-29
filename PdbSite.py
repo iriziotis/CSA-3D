@@ -1,4 +1,6 @@
+import logging
 import warnings
+from typing import Optional, List, Dict, Tuple, Any, Generator
 import numpy as np
 import Bio.PDB.Selection
 from copy import copy
@@ -9,51 +11,63 @@ from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
 from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
-from Bio.PDB.NeighborSearch import NeighborSearch 
+from Bio.PDB.NeighborSearch import NeighborSearch
 from rmsd import reorder_hungarian
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
 from .config import PDB2EC, PDB2UNI
 from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
 
+logger = logging.getLogger(__name__)
 warnings.simplefilter('ignore', PDBConstructionWarning)
 
+
 class PdbSite:
-    """M-CSA PDB catalytic site. Contains lists of PdbResidues and mapped UniProt
-    catalytic sites (UniSite objects), a 3D structure (Biopython Structure) built
-    from individual PdbResidue structures (Biopython Residue), a parent structure
-    (Biopython Structure), all and close to the site hetero components (possible
-    ligands according to their chemical similarity to the cognate ligand and their
-    centrality in the active site) as Het objects (containing a Biopython Residue
-    structure), as well as a dictionary of annotations extracted from the parent
-    mmCIF assembly structure file and SIFTS"""
+    """M-CSA catalytic site from a PDB structure.
 
-    def __init__(self):
-        self.parent_entry = None
-        self.residues = []
-        self.residues_dict = {}
-        self.mapped_unisites = []
-        self.reference_site = None
-        self.parent_structure = None
-        self.structure = None
-        self.ligands = []
-        self.mmcif_dict = dict()
-        self.is_sane = None
+    Represents a catalytic site in 3D coordinates with all residues,
+    ligands, and structural information extracted from a PDB structure.
 
-    def __str__(self):
-        """Show as pseudo-sequence in one-letter code"""
+    Attributes:
+        parent_entry: Parent Entry object
+        residues: List of PdbResidue objects in the site
+        residues_dict: Dictionary mapping full_id to PdbResidue
+        mapped_unisites: List of UniSite objects at this location
+        reference_site: Reference site this is compared against
+        parent_structure: Full PDB Structure object
+        structure: Site structure (Biopython Structure)
+        ligands: List of Het objects (ligands)
+        mmcif_dict: mmCIF metadata
+        is_sane: Quality flag (bool or None)
+    """
+
+    def __init__(self) -> None:
+        """Initialize a PdbSite."""
+        self.parent_entry: Optional[Any] = None
+        self.residues: List[PdbResidue] = []
+        self.residues_dict: Dict[str, PdbResidue] = {}
+        self.mapped_unisites: List[Any] = []
+        self.reference_site: Optional['PdbSite'] = None
+        self.parent_structure: Optional[str] = None
+        self.structure: Optional[Structure] = None
+        self.ligands: List[Het] = []
+        self.mmcif_dict: Dict[str, Any] = {}
+        self.is_sane: Optional[bool] = None
+
+    def __str__(self) -> str:
+        """Show as pseudo-sequence in one-letter code."""
         return self.sequence
 
-    def __len__(self):
-        """Return size of site (residue count)"""
+    def __len__(self) -> int:
+        """Return size of site (residue count)."""
         return self.size
 
     def __iter__(self):
-        """Iterate over residues"""
+        """Iterate over residues."""
         yield from self.residues
 
-    def __eq__(self, other):
-        """Check if sites contain the same residues (same IDs)"""
+    def __eq__(self, other: Any) -> bool:
+        """Check if sites contain the same residues (same IDs)."""
         if len(self) == len(other):
             for res in other:
                 if res.full_id not in self.residues_dict:
@@ -61,83 +75,39 @@ class PdbSite:
             return True
         return False
 
-    def __contains__(self, residue):
-        """Check if residue is there"""
+    def __contains__(self, residue: PdbResidue) -> bool:
+        """Check if residue is in this site."""
         return residue.full_id in self.residues_dict
 
-    def __getitem__(self, full_id):
+    def __getitem__(self, full_id: str) -> PdbResidue:
         """Return the residue with given ID."""
         return self.residues_dict[full_id]
 
     # Alternative constructors
 
     @classmethod
-    def from_list(cls, reslist, cif_path, parent_entry, annotate=True):
-        """Construct PdbSite object directly from residue list"""
-        mmcif_dict = dict()
-        # First reduce redundant residues with multiple function locations
+    def from_list(
+        cls,
+        reslist: List[PdbResidue],
+        cif_path: str,
+        parent_entry: Any,
+        annotate: bool = True,
+    ) -> Optional['PdbSite']:
+        """Construct PdbSite from residue list.
+
+        Args:
+            reslist: List of PdbResidue objects
+            cif_path: Path to mmCIF structure file
+            parent_entry: Parent Entry object
+            annotate: Extract structural annotations. Defaults to True.
+
+        Returns:
+            PdbSite object or None if construction failed
+        """
+        mmcif_dict: Dict[str, Any] = {}
         reslist = PdbSite._cleanup_list(reslist)
         site = cls()
         site.parent_entry = parent_entry
-        try:
-            if annotate: 
-                parser = MMCIFParser(QUIET=True) 
-                structure = parser.get_structure('', cif_path)
-                mmcif_dict = parser._mmcif_dict
-            else:
-                parser = FastMMCIFParser(QUIET=True)
-                structure = parser.get_structure('', cif_path)
-        except (TypeError, PDBConstructionException):
-            warnings.warn('Could not build site from residue list. Check entry', RuntimeWarning)
-            return
-        for res in reslist:
-            if structure:
-                res.add_structure(structure)
-            site.add(res)
-        if annotate:
-            site.parent_structure = cif_path
-            site.mmcif_dict = mmcif_dict
-            site.find_ligands(structure)
-        return site
-
-    @classmethod
-    def build_reference(cls, reslist, parent_entry, cif_path, annotate=True):
-        """Builds reference active site from a list of PDB catalytic residues.
-        Assumes that the list only contains one active site, so use it only
-        if it is a list of manually annotated catalytic residues"""
-        ref = PdbSite.from_list(reslist, cif_path, parent_entry, annotate)
-        ref.reference_site = ref
-        ref.is_sane = True
-        return ref
-
-    @classmethod
-    def build(cls, seed, reslist, reference_site, parent_entry):
-        """Builds active site from a list of catalytic residues that may form
-        multiple active sites (e.g. all residues annotated as catalytic in a
-        PDB structure). Using a residue as seed, it starts building an active site
-        by checking the euclidean distances of all residues that have the same resid
-        and name. In the end, it maps the site to the reference defined in the args"""
-        site = cls()
-        if seed.structure is None:
-            return
-        for res in reslist:
-            candidate = PdbSite._get_nearest_equivalent(res, seed, reslist, site)
-            if candidate is None:
-                continue
-            if candidate not in site:
-                site.add(candidate)
-        site.reference_site = reference_site
-        site.parent_entry = parent_entry
-        site._map_reference_residues()
-        return site
-
-    @classmethod
-    def build_all(cls, reslist, reference_site, parent_entry, cif_path, annotate=True, redundancy_cutoff=None):
-        """Builds all sites in using as input a list of catalytic residues.
-        Returns a list of PdbSite objects"""
-        # Map structure objects in every residue
-        sites = []
-        mmcif_dict = dict()
         try:
             if annotate:
                 parser = MMCIFParser(QUIET=True)
@@ -146,12 +116,128 @@ class PdbSite:
             else:
                 parser = FastMMCIFParser(QUIET=True)
                 structure = parser.get_structure('', cif_path)
-        except (TypeError, PDBConstructionException):
-            warnings.warn('Could not parse structure {}'.format(cif_path, RuntimeWarning))
+        except (TypeError, PDBConstructionException) as e:
+            logger.warning(f'Could not build site from residue list: {e}')
+            return None
+
+        for res in reslist:
+            if structure:
+                res.add_structure(structure)
+            site.add(res)
+
+        if annotate:
+            site.parent_structure = cif_path
+            site.mmcif_dict = mmcif_dict
+            site.find_ligands(structure)
+        return site
+
+    @classmethod
+    def build_reference(
+        cls,
+        reslist: List[PdbResidue],
+        parent_entry: Any,
+        cif_path: str,
+        annotate: bool = True,
+    ) -> Optional['PdbSite']:
+        """Build reference (canonical) active site.
+
+        Creates the reference site from manually annotated catalytic residues.
+        Should only contain one active site.
+
+        Args:
+            reslist: List of reference PdbResidue objects
+            parent_entry: Parent Entry object
+            cif_path: Path to mmCIF structure file
+            annotate: Extract structural annotations. Defaults to True.
+
+        Returns:
+            Reference PdbSite object or None if failed
+        """
+        ref = PdbSite.from_list(reslist, cif_path, parent_entry, annotate)
+        if ref is None:
+            return None
+        ref.reference_site = ref
+        ref.is_sane = True
+        return ref
+
+    @classmethod
+    def build(
+        cls,
+        seed: PdbResidue,
+        reslist: List[PdbResidue],
+        reference_site: 'PdbSite',
+        parent_entry: Any,
+    ) -> Optional['PdbSite']:
+        """Build active site from seed residue.
+
+        Constructs site by finding all residues spatially equivalent to the seed.
+
+        Args:
+            seed: Seed PdbResidue
+            reslist: List of all catalytic residues
+            reference_site: Reference site to map against
+            parent_entry: Parent Entry object
+
+        Returns:
+            PdbSite object or None if failed
+        """
+        site = cls()
+        if seed.structure is None:
+            return None
+
+        for res in reslist:
+            candidate = PdbSite._get_nearest_equivalent(res, seed, reslist, site)
+            if candidate is None:
+                continue
+            if candidate not in site:
+                site.add(candidate)
+
+        site.reference_site = reference_site
+        site.parent_entry = parent_entry
+        site._map_reference_residues()
+        return site
+
+    @classmethod
+    def build_all(
+        cls,
+        reslist: List[PdbResidue],
+        reference_site: 'PdbSite',
+        parent_entry: Any,
+        cif_path: str,
+        annotate: bool = True,
+        redundancy_cutoff: Optional[float] = None,
+    ) -> List['PdbSite']:
+        """Build all active sites from residue list.
+
+        Constructs all distinct active sites that can be formed from a list
+        of catalytic residues.
+
+        Args:
+            reslist: List of catalytic residues
+            reference_site: Reference site to map against
+            parent_entry: Parent Entry object
+            cif_path: Path to mmCIF structure file
+            annotate: Extract annotations. Defaults to True.
+            redundancy_cutoff: Filter sites by sequence identity. Defaults to None.
+
+        Returns:
+            List of PdbSite objects
+        """
+        sites: List['PdbSite'] = []
+        mmcif_dict: Dict[str, Any] = {}
+        try:
+            if annotate:
+                parser = MMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+                mmcif_dict = parser._mmcif_dict
+            else:
+                parser = FastMMCIFParser(QUIET=True)
+                structure = parser.get_structure('', cif_path)
+        except (TypeError, PDBConstructionException) as e:
+            logger.warning(f'Could not parse structure {cif_path}: {e}')
             return sites
-        # First reduce redundant residues with multiple function locations
+
         reslist = PdbSite._cleanup_list(reslist)
-        # We want all equivalent residues from identical assembly chains
         reslist = PdbSite._get_assembly_residues(reslist, structure)
         # Get seeds to build active sites
         seeds = PdbSite._get_seeds(reslist)
