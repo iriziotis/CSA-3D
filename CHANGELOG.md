@@ -5,6 +5,35 @@ All notable changes to CSA-3D are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-30
+
+### Breaking
+- Core modules now live inside the package: use `from csa3d import Mcsa, Entry, PdbSite, ...`
+  instead of `from Mcsa import Mcsa` (root-level modules removed).
+- Root-level `config.py` removed; reference data is loaded lazily from the active data directory
+  via `csa3d.datasets`.
+- Data layout and sources changed; run `csa3d.setup_data()` again to refresh an existing data directory.
+
+### Added
+- Assembly mmCIF files are downloaded from PDBe on demand by `Mcsa.build()` and cached in the data directory.
+- `setup_data(force=...)`: re-runs skip files already present; failed downloads are retried.
+- Bundled snapshots of the retired PDBe ion/cofactor/crystallisation tables, metals, M-CSA cofactors,
+  RHEA and KEGG reaction components, used as fallbacks when the live sources cannot be reached.
+- `examples/basic_functionality.ipynb`: end-to-end smoke test of the main workflow.
+
+### Fixed
+- `setup_data()` reported SIFTS and PDBe downloads as successful while saving an HTML error page.
+- `Mcsa.build()` crashed when no `redundancy_cutoff` was given.
+- KEGG ligand lookups used the wrong file extension and never matched.
+- Methods dropped during the type-hint refactor (`PdbResidue.copy`, `UniSite.get_residues`,
+  `UniSite.get_gaps`) are restored, and `UniSite` reordering and main-chain conservative-mutation
+  handling match the original behaviour.
+- M-CSA entry metadata and reference residues are fetched from the current API endpoints.
+
+### Documentation
+- README and API reference rewritten around the verified workflow.
+- Jess is described as a 3D template-matching program, with links to iriziotis/jess and althonos/pyjess.
+
 ## [0.2.2] - 2026-10-30
 
 ### Added

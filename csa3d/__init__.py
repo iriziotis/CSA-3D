@@ -1,48 +1,34 @@
-"""CSA-3D: Extract and analyze enzyme catalytic sites from M-CSA."""
+"""CSA-3D: extract and analyse enzyme catalytic sites in 3D from the M-CSA.
 
+    >>> import csa3d
+    >>> csa3d.setup_data()          # one-off download to ~/.csa3d/data
+    >>> db = csa3d.Mcsa()
+    >>> db.build(entry_ids=1)
+"""
+
+from .config import get_data_dir, set_data_dir, validate_config
 from .data_setup import setup_data
-from .config import set_data_dir, get_data_dir
+from .Entry import Entry
+from .Mcsa import Mcsa
+from .PdbResidue import Het, PdbResidue
+from .PdbSite import PdbSite
+from .Superimposer import Superimposer
+from .UniResidue import UniResidue
+from .UniSite import UniSite
 
-__version__ = "0.2.2"
-
-# Add parent directory to path for root-level module imports
-import sys
-from pathlib import Path
-_root_dir = str(Path(__file__).parent.parent)
-if _root_dir not in sys.path:
-    sys.path.insert(0, _root_dir)
-
-# Try to import main classes
-# These are available if data has been set up
-Mcsa = None
-Entry = None
-PdbSite = None
-PdbResidue = None
-UniResidue = None
-UniSite = None
-Superimposer = None
-
-try:
-    from Mcsa import Mcsa
-    from Entry import Entry
-    from PdbSite import PdbSite
-    from PdbResidue import PdbResidue
-    from UniResidue import UniResidue
-    from UniSite import UniSite
-    from Superimposer import Superimposer
-except Exception:
-    # Classes not available yet - will show error when user tries to use them
-    pass
+__version__ = "0.3.0"
 
 __all__ = [
     "setup_data",
     "set_data_dir",
     "get_data_dir",
+    "validate_config",
     "Mcsa",
     "Entry",
     "PdbSite",
     "PdbResidue",
-    "UniResidue",
+    "Het",
     "UniSite",
+    "UniResidue",
     "Superimposer",
 ]

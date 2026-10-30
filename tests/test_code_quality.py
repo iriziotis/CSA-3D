@@ -14,7 +14,7 @@ import pytest
 
 
 # Path to main source files
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR = Path(__file__).parent.parent / "csa3d"
 MAIN_FILES = [
     ROOT_DIR / "Mcsa.py",
     ROOT_DIR / "Entry.py",

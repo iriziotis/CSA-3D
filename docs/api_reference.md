@@ -1,490 +1,173 @@
 # CSA-3D API Reference
 
-Complete API documentation for CSA-3D classes and methods.
-
----
-
-## Module: `csa3d`
-
-Top-level package initialization and utilities.
-
-### Function: `setup_data(data_dir: Optional[str] = None) -> bool`
-
-**Description**: Automatically download and setup CSA-3D data files.
-
-Downloads all required data from official sources and creates proper directory structure. This is the recommended way to initialize CSA-3D for first-time use.
-
-**Parameters:**
-- `data_dir` (str, optional): Directory for data files. Defaults to `~/.csa3d/data`
-
-**Returns:** bool - True if setup successful, False if any downloads failed
-
-**Examples:**
+Everything below is importable from the top-level package:
 
 ```python
-from csa3d import setup_data
-
-# Use default location
-setup_data()
-
-# Use custom location
-setup_data("/custom/data/path")
-
-# With error handling
-if setup_data():
-    print("✓ Data setup complete!")
-else:
-    print("⚠ Some data sources failed - check logs")
+import csa3d
+from csa3d import Mcsa, Entry, PdbSite, PdbResidue, Het, UniSite, UniResidue
 ```
 
-**Downloads:**
-- SIFTS: PDB-UniProt mappings from EBI
-- RHEA: Reaction component data
-- PDBe: Ion, cofactor, and resolution data
-- M-CSA: Catalytic site data
-
-**Notes:**
-- ~50 GB total download size
-- One-time setup required
-- Sets `CSA3D_DATA_DIR` environment variable automatically
-- See `csa3d.data_setup` module for advanced usage
+For a runnable tour of the main workflow, see
+[`examples/basic_functionality.ipynb`](../examples/basic_functionality.ipynb).
 
 ---
 
-### Function: `set_data_dir(data_dir: str) -> None`
+## Data setup and configuration
 
-**Description**: Set the CSA-3D data directory manually.
+### `csa3d.setup_data(data_dir=None, force=False) -> bool`
 
-Use this if you've already downloaded data or prefer manual setup.
+Download and prepare the reference data, then make `data_dir` the active data directory.
 
-**Parameters:**
-- `data_dir` (str): Path to directory containing CSA-3D data files
+- `data_dir`: where to store the data. Defaults to `~/.csa3d/data`, which is found automatically in
+  later sessions.
+- `force`: re-download files that are already present. By default existing files are skipped, so
+  re-running only fetches what is missing.
 
-**Returns:** None
+Returns `True` if every source was set up. Progress is reported through `logging`
+(`logging.basicConfig(level=logging.INFO)` to see it). See the README for the list of sources.
 
-**Raises:** ConfigError if directory does not exist
+### `csa3d.set_data_dir(data_dir: str) -> None`
 
-**Example:**
+Use an existing data directory for this session. Raises `ConfigError` if it does not exist.
+Alternatively, set the environment variable `CSA3D_DATA_DIR`.
+
+### `csa3d.get_data_dir() -> str`
+
+The active data directory: the one set with `set_data_dir()` / `setup_data()`, else `$CSA3D_DATA_DIR`,
+else `~/.csa3d/data`. Raises `ConfigError` if none exists.
+
+### `csa3d.validate_config() -> bool`
+
+Check that the core data files exist in the active data directory; raises `ConfigError` listing any
+that are missing.
+
+### `csa3d.datasets`
+
+Lazily loaded lookup tables (SIFTS mappings, ion/cofactor sets, resolutions, ...), read on first access
+from the active data directory and cached, e.g. `csa3d.datasets.PDB2EC[("1b73", "A")]`.
+
+---
+
+## `Mcsa`: the M-CSA database
 
 ```python
-from csa3d import set_data_dir
-
-set_data_dir("/path/to/csa3d_data")
+db = Mcsa()
 ```
 
----
+Loads the M-CSA catalytic residue annotations and entry metadata from the data directory.
 
-### Function: `get_data_dir() -> str`
+| Attribute | Description |
+|---|---|
+| `entries` | `{mcsa_id: Entry}` for every entry built so far |
+| `catalytic_residue_info` | Raw M-CSA residue records, `{mcsa_id: [records]}`; its keys are all available entry IDs |
+| `mcsa_entry_info` | Raw M-CSA entry metadata, `{mcsa_id: dict}` |
 
-**Description**: Get the current CSA-3D data directory.
+### `build(entry_ids=None, annotate=True, redundancy_cutoff=None, resolution_cutoff=None, verbose=False, no_sites=False) -> bool`
 
-**Returns:** str - Path to data directory
+Build `Entry` objects with their PDB and UniProt catalytic sites. Assembly structures that are not yet in
+the data directory are downloaded from PDBe.
 
-**Example:**
+- `entry_ids`: an M-CSA ID or list of IDs. `None` builds all entries (slow; downloads thousands of structures).
+- `annotate`: find ligands near each site and read structure metadata (resolution, organism, ...).
+- `redundancy_cutoff`: drop sites within this RMSD (Å) of another site in the same structure. With
+  `None`, only identical sites are dropped.
+- `resolution_cutoff`: skip non-reference structures whose resolution is worse than this (Å) or unknown.
+- `verbose`: log each site as it is built.
+- `no_sites`: only build residues, not sites.
 
-```python
-from csa3d import get_data_dir
+Returns `False` if an ID is unknown or the entry has several reference structures (not supported).
 
-data_dir = get_data_dir()
-print(f"Data directory: {data_dir}")
-```
+### `update_pdbs(entry_ids=None) -> None`
 
----
-
-## Module: `Mcsa`
-
-**Description**: Top-level database class for M-CSA entries.
-
-Contains Entry objects and provides methods to load and build entries from M-CSA JSON data. Manages catalytic sites from PDB structures and UniProt sequences.
-
-### Class: `Mcsa`
-
-Main database class for accessing and building M-CSA entries.
-
-**Key Methods:**
-
-#### `__init__()`
-Initialize the Mcsa database.
-
-**Parameters:**
-- None
-
-**Returns:** None
+Download the assembly structures for the given entries (default: all) ahead of time.
 
 ---
 
-#### `build(mcsa_id: int, annotate: bool = False, redundancy_cutoff: float = 0.95, resolution_cutoff: float = 2.5, verbose: bool = False) -> bool`
+## `Entry`: one M-CSA entry
 
-Build a specific M-CSA entry.
+| Attribute | Description |
+|---|---|
+| `mcsa_id` | M-CSA identifier |
+| `info` | M-CSA entry metadata: `enzyme_name`, `all_ecs`, `reaction`, `reference_uniprot_id`, ... |
+| `pdbsites` | All `PdbSite`s (reference site and homologues) |
+| `unisites` | All `UniSite`s |
 
-**Parameters:**
-- `mcsa_id` (int): M-CSA entry identifier
-- `annotate` (bool): Whether to include annotations
-- `redundancy_cutoff` (float): Sequence redundancy threshold
-- `resolution_cutoff` (float): PDB resolution threshold (Å)
-- `verbose` (bool): Print progress information
-
-**Returns:** bool - True if successfully built, False otherwise
-
----
-
-#### `add(entry: Entry) -> bool`
-
-Add an Entry to the database.
-
-**Parameters:**
-- `entry` (Entry): Entry object to add
-
-**Returns:** bool - True if successfully added
+| Method | Description |
+|---|---|
+| `get_pdbsites(pdb_id=None, sane_only=False)` | Iterate over PDB sites, optionally for one PDB ID and/or only sites without missing atoms or other problems |
+| `get_pdbsite(id)`, `get_unisite(id)` | Look up a site by its `id` |
+| `rmsd_matrix(sitelist, ca=False)` | Pairwise RMSD `pandas.DataFrame` (sites with missing functional atoms are skipped unless `ca=True`) |
+| `clustering(matrix, height=None, get_linkage_matrix=False)` | Average-linkage hierarchical clustering; returns `{cluster_id: [site ids]}`. Cuts at 70% of the tree height by default |
+| `clustering_bayesian(matrix, k_max=5, l=1.0, plot_outfile=None)` | Clustering with an automatic, Bayesian choice of the cut |
+| `create_template(ca=False, outdir=None, outfile=None, subset=None, ...)` | Average the conserved sites into a consensus `PdbSite` and write it as a Jess template (unless `no_write=True`) |
+| `write_template(template, ...)` | Write a template file for [Jess](https://github.com/iriziotis/jess) / [PyJess](https://github.com/althonos/pyjess) |
+| `break_template(template, method='clusters', n_residues=3, max_distance=6.0)` | Split a large template into smaller residue groups |
+| `update_mapped_sites()` | Link `UniSite`s and `PdbSite`s using SIFTS |
 
 ---
 
-#### `update_pdbs(pdbs: List[str]) -> None`
+## `PdbSite`: a catalytic site in a PDB structure
 
-Update PDB structures in the database.
+| Attribute / property | Description |
+|---|---|
+| `id` | Unique site ID: PDB ID plus the chain and residue number of each catalytic residue |
+| `pdb_id`, `uniprot_id`, `ec` | Identifiers (UniProt and EC via SIFTS) |
+| `residues` | `PdbResidue`s, in the same order as the reference site (gaps where a residue has no equivalent) |
+| `ligands` | `Het`s within 5 Å of the catalytic residues (when built with `annotate=True`) |
+| `is_reference`, `is_conserved`, `is_conservative_mutation` | Relationship to the entry's reference site |
+| `is_sane` | Whether the site passed sanity checks (see `Entry.get_pdbsites(sane_only=True)`) |
+| `has_missing_functional_atoms` | Whether functional atoms are missing from the structure |
+| `resolution`, `experimental_method`, `organism_name`, `title`, `enzyme`, `assembly_id` | Structure metadata (read from the mmCIF file) |
+| `sequence`, `size` | One-letter pseudo-sequence and residue count |
 
-**Parameters:**
-- `pdbs` (List[str]): List of PDB IDs to update
+### `fit(other, weighted=False, cycles=1, cutoff=999, transform=False, ca=False, ...) -> (rot, tran, rms, rms_all)`
 
-**Returns:** None
+Superimpose `other` (mobile) onto this site (fixed), finding the best atom correspondence within each
+residue (accounting for symmetric atoms and conservative mutations). With `cycles > 1`, atoms further
+than `cutoff` Å are excluded and the fit is repeated. Returns the rotation matrix, translation vector,
+RMSD excluding outliers (`rms`) and RMSD over all atoms (`rms_all`). `transform=True` also moves
+`other`'s coordinates.
 
----
+### Other methods
 
-## Module: `Entry`
-
-**Description**: M-CSA entry representation and analysis.
-
-Provides the Entry class for manipulating enzyme catalytic sites from both PDB structures and UniProt sequences. Includes RMSD calculation, clustering, and template generation methods.
-
-### Class: `Entry`
-
-Represents an M-CSA entry with PDB and UniProt sites.
-
-**Attributes:**
-- `mcsa_id` (int): M-CSA identifier
-- `e_number` (str): EC number
-- `pdbsites` (List[PdbSite]): Catalytic sites from PDB structures
-- `unisites` (List[UniSite]): Catalytic sites from UniProt sequences
-
-**Key Methods:**
-
-#### `__init__(mcsa_id: int, e_number: str) -> None`
-
-Initialize an Entry.
-
-**Parameters:**
-- `mcsa_id` (int): M-CSA entry identifier
-- `e_number` (str): EC enzyme number
-
-**Returns:** None
+| Method | Description |
+|---|---|
+| `per_residue_rms(other, rot=None, tran=None)` | RMSD of each residue after superposition |
+| `get_functional_site(ca=False)` | Copy containing only the functional atoms of each residue |
+| `write_pdb(outdir=None, outfile=None, write_hets=False, func_atoms_only=False)` | Write the site (optionally with ligands) as a PDB file |
+| `get_residues()`, `get_gaps()` | Non-gap residues; gap residues |
+| `get_distances(kind='com')` | Pairwise inter-residue distances |
 
 ---
 
-#### `add(site: Union[PdbSite, UniSite]) -> None`
+## `PdbResidue`: a catalytic residue with coordinates
 
-Add a catalytic site to the entry.
+Key attributes: `resname`, `chain`, `resid`, `auth_resid`, `funclocs` (functional location, e.g.
+side chain or main chain), `is_reference`, `reference_residue`, `structure` (the Biopython residue).
+Properties: `is_gap`, `is_conserved`, `is_conservative_mutation`, `is_standard`, `has_main_chain_function`.
 
-**Parameters:**
-- `site` (Union[PdbSite, UniSite]): Site to add
+## `Het`: a ligand near a catalytic site
 
-**Returns:** None
-
----
-
-#### `rmsd_matrix(sitelist: List[PdbSite]) -> np.ndarray`
-
-Calculate pairwise RMSD matrix for sites.
-
-**Parameters:**
-- `sitelist` (List[PdbSite]): Sites to compare
-
-**Returns:** np.ndarray - 2D RMSD matrix
+Key attributes: `resname`, `chain`, `resid`, `similarity` (fingerprint similarity to the enzyme's
+reaction components, or `None`), `centrality`.
+`type` classifies the component as artefact, polymer, cofactor, metal, ion or ligand; see also
+`is_metal`, `is_ion`, `is_cofactor`, `is_artefact`, `is_polymer`.
 
 ---
 
-#### `clustering(matrix: np.ndarray) -> Dict[int, List[int]]`
+## `UniSite` and `UniResidue`: sites at sequence level
 
-Perform hierarchical clustering on RMSD matrix.
+`UniSite` mirrors `PdbSite` for UniProt sequences: `id` / `uniprot_id`, `residues`, `sequence`,
+`is_reference`, `is_conserved`, `is_conservative_mutation`, `mapped_pdbsites` (after
+`Entry.update_mapped_sites()`), `get_residues()`, `get_gaps()`.
 
-**Parameters:**
-- `matrix` (np.ndarray): RMSD matrix
-
-**Returns:** Dict[int, List[int]] - Cluster ID mapped to site indices
-
----
-
-#### `clustering_bayesian(matrix: np.ndarray, plot_outfile: Optional[str] = None) -> Dict[int, List[int]]`
-
-Perform Bayesian hierarchical clustering.
-
-**Parameters:**
-- `matrix` (np.ndarray): RMSD matrix
-- `plot_outfile` (Optional[str]): Path to save dendrogram
-
-**Returns:** Dict[int, List[int]] - Cluster assignments
+`UniResidue` holds `resname`, `resid`, `funclocs` and `reference_residue`, with `is_gap`,
+`is_conserved` and `is_conservative_mutation`.
 
 ---
 
-#### `create_template(ca: bool = True, outdir: Optional[str] = None, outfile: Optional[str] = None, subset: Optional[List[int]] = None, cluster_no: int = 0, atoms: str = "CA", no_write: bool = False, all_fuzzy: bool = False, no_alt: bool = False) -> PdbSite`
-
-Create a consensus template from catalytic sites.
-
-**Parameters:**
-- `ca` (bool): Use CA atoms only
-- `outdir` (Optional[str]): Output directory
-- `outfile` (Optional[str]): Output filename
-- `subset` (Optional[List[int]]): Site indices to use
-- `cluster_no` (int): Cluster number
-- `atoms` (str): Atom selection ("CA", "CB", etc.)
-- `no_write` (bool): Don't write output file
-- `all_fuzzy` (bool): Include fuzzy residues
-- `no_alt` (bool): Skip alternate conformations
-
-**Returns:** PdbSite - Template structure
-
----
-
-#### `break_template(template: PdbSite, n_residues: int = 7, permutations: bool = False, max_distance: float = 8.0) -> Dict[int, Tuple[List[str], List[str]]]`
-
-Divide template into functional residue groups.
-
-**Parameters:**
-- `template` (PdbSite): Template structure
-- `n_residues` (int): Residues per group
-- `permutations` (bool): Generate permutations
-- `max_distance` (float): Distance threshold (Å)
-
-**Returns:** Dict - Residue group mappings
-
----
-
-## Module: `PdbSite`
-
-**Description**: Protein Data Bank (PDB) structure site representation.
-
-Provides the PdbSite class for managing catalytic sites from PDB structures, including residue extraction, RMSD calculation, and structure fitting.
-
-### Class: `PdbSite`
-
-Represents a catalytic site from a PDB structure.
-
-**Attributes:**
-- `id` (str): Site identifier
-- `pdb_id` (str): PDB structure ID
-- `residues` (List[PdbResidue]): Catalytic residues
-
-**Key Methods:**
-
-#### `__init__(pdb_id: str, site_id: str) -> None`
-
-Initialize a PdbSite.
-
-**Parameters:**
-- `pdb_id` (str): PDB structure identifier
-- `site_id` (str): Site identifier
-
-**Returns:** None
-
----
-
-#### `add(residue: PdbResidue) -> None`
-
-Add a residue to the site.
-
-**Parameters:**
-- `residue` (PdbResidue): Residue to add
-
-**Returns:** None
-
----
-
-#### `fit(other: PdbSite, weighted: bool = False, ca: bool = True, scaling_factor: Optional[float] = None, transform: bool = False) -> Tuple[np.ndarray, np.ndarray, float, float]`
-
-Fit this site to another structure.
-
-**Parameters:**
-- `other` (PdbSite): Target site
-- `weighted` (bool): Use weighted fitting
-- `ca` (bool): Use CA atoms only
-- `scaling_factor` (Optional[float]): Scaling for coordinates
-- `transform` (bool): Apply transformation
-
-**Returns:** Tuple[rotation_matrix, translation_vector, rmsd, rmsd_all]
-
----
-
-#### `write_pdb(outdir: str, outfile: Optional[str] = None, func_atoms_only: bool = False, write_hets: bool = True) -> None`
-
-Write structure to PDB file.
-
-**Parameters:**
-- `outdir` (str): Output directory
-- `outfile` (Optional[str]): Output filename
-- `func_atoms_only` (bool): Write functional atoms only
-- `write_hets` (bool): Include heteroatoms
-
-**Returns:** None
-
----
-
-## Module: `UniSite`
-
-**Description**: UniProt catalytic site representation for M-CSA.
-
-### Class: `UniSite`
-
-Represents a catalytic site sequence from UniProt.
-
-**Attributes:**
-- `uniprot_id` (str): UniProt identifier
-- `residues` (List[UniResidue]): Sequence residues
-
-**Key Methods:**
-
-#### `__init__(uniprot_id: str) -> None`
-
-Initialize a UniSite.
-
-**Parameters:**
-- `uniprot_id` (str): UniProt identifier
-
-**Returns:** None
-
----
-
-#### `add(residue: UniResidue) -> None`
-
-Add a residue to the site.
-
-**Parameters:**
-- `residue` (UniResidue): Residue to add
-
-**Returns:** None
-
----
-
-## Module: `PdbResidue`
-
-**Description**: PDB catalytic residue representation for M-CSA.
-
-### Class: `PdbResidue`
-
-Represents a residue from a PDB structure.
-
-**Attributes:**
-- `residue_name` (str): Three-letter residue code
-- `residue_number` (int): Position in structure
-- `chain` (str): Chain identifier
-- `atoms` (Dict): Atom coordinates
-
-**Key Methods:**
-
-#### `__init__(residue_name: str, residue_number: int, chain: str, ins_code: str = "") -> None`
-
-Initialize a PdbResidue.
-
-**Parameters:**
-- `residue_name` (str): Three-letter code
-- `residue_number` (int): Sequence number
-- `chain` (str): Chain ID
-- `ins_code` (str): Insertion code
-
-**Returns:** None
-
----
-
-## Module: `UniResidue`
-
-**Description**: UniProt sequence residue representation for M-CSA catalytic sites.
-
-### Class: `UniResidue`
-
-Represents a residue from a UniProt sequence.
-
-**Attributes:**
-- `residue_name` (str): Single or three-letter code
-- `position` (int): Position in sequence
-- `is_conserved` (bool): Conservation status
-- `function` (str): Functional role
-
-**Key Methods:**
-
-#### `__init__(residue_name: str, position: int) -> None`
-
-Initialize a UniResidue.
-
-**Parameters:**
-- `residue_name` (str): Amino acid identifier
-- `position` (int): Position in sequence
-
-**Returns:** None
-
----
-
-## Configuration Module
-
-### Class: `DataPaths`
-
-Manages data file paths for CSA-3D.
-
-**Methods:**
-
-#### `set_data_dir(data_dir: str) -> None`
-
-Set the data directory explicitly.
-
-**Parameters:**
-- `data_dir` (str): Path to data directory
-
-**Returns:** None
-
----
-
-#### `get_data_dir() -> Path`
-
-Get the configured data directory.
-
-**Returns:** Path - Data directory path
-
----
-
-## Environment Variables
-
-### CSA3D_DATA_DIR
-
-Path to directory containing M-CSA data files.
-
-**Default locations:**
-- `~/.csa3d/data`
-- `/nfs/research/thornton/...` (EBI specific)
-- User-specified via environment variable
-
-**Example:**
-```bash
-export CSA3D_DATA_DIR=/path/to/data
-```
-
----
-
-## Common Data Types
-
-### Dictionary Types
-
-- **Clusters**: `Dict[int, List[int]]` - Maps cluster ID to site indices
-- **Templates**: `Dict[int, Tuple[List[str], List[str]]]` - Residue groups
-- **Mappings**: `Dict[str, str]` or similar - Data lookups
-
-### Array Types
-
-- **RMSD Matrix**: `np.ndarray` - 2D array of pairwise distances
-- **Coordinates**: `np.ndarray` - 3D atom positions
-- **Transformation**: `Tuple[np.ndarray, np.ndarray]` - Rotation and translation
-
----
-
-## See Also
-
-- [README.md](../README.md) - Installation and quick start
-- [Architecture Guide](./architecture.md) - System design
-- [Examples](../examples/README.md) - Usage examples
-- [Contributing Guide](../CONTRIBUTING.md) - Development guidelines
+## See also
+
+- [README](../README.md): installation, data setup and usage
+- [Architecture guide](./architecture.md)
+- [Examples](../examples/README.md)

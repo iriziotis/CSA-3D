@@ -39,7 +39,7 @@ class DataPaths:
         Raises:
             ConfigError: If directory does not exist
         """
-        path = Path(data_dir)
+        path = Path(data_dir).expanduser()
         if not path.is_dir():
             raise ConfigError(f"Data directory does not exist: {data_dir}")
         self._data_dir = path
@@ -79,11 +79,10 @@ class DataPaths:
 
         # No valid path found
         raise ConfigError(
-            "No CSA-3D data directory found. "
-            "Please either:\n"
-            "  1. Set environment variable: export CSA3D_DATA_DIR=/path/to/data\n"
-            "  2. Call: csa3d.config.set_data_dir('/path/to/data')\n"
-            "  3. Run: csa3d.config.setup_data() to download datasets\n"
+            "No CSA-3D data directory found. Either:\n"
+            "  1. Run csa3d.setup_data() to download the data (to ~/.csa3d/data by default)\n"
+            "  2. Call csa3d.set_data_dir('/path/to/data') for an existing data directory\n"
+            "  3. Set the environment variable CSA3D_DATA_DIR=/path/to/data\n"
             f"Searched in: {', '.join(_DEFAULT_PATHS)}"
         )
 
@@ -115,7 +114,7 @@ class DataPaths:
             raise ConfigError(
                 f"Missing required data files in {data_dir}:\n"
                 + "\n".join(f"  - {f}" for f in missing)
-                + "\nRun: csa3d.config.setup_data() to download"
+                + "\nRun csa3d.setup_data() to download them"
             )
         return True
 

@@ -1,113 +1,38 @@
 #!/usr/bin/env python3
-"""
-CSA-3D Clustering Analysis Example
+"""Cluster the catalytic sites of an M-CSA entry by 3D geometry.
 
-This example demonstrates:
-1. Loading an entry
-2. Calculating RMSD between catalytic sites
-3. Clustering sites by structure similarity
-4. Visualizing clustering results
+Usage: python clustering_analysis.py [MCSA_ID]
 """
 
-import os
-from pathlib import Path
+import sys
+
+import numpy as np
+
+import csa3d
 
 
-def clustering_analysis():
-    """Demonstrate RMSD clustering workflow."""
-    try:
-        from Mcsa import Mcsa
-    except ImportError:
-        print("Error: Could not import Mcsa module")
-        print("Make sure you are running this from the CSA-3D root directory")
-        return
+def main(mcsa_id: int = 1) -> None:
+    db = csa3d.Mcsa()  # assumes csa3d.setup_data() has been run
+    db.build(entry_ids=mcsa_id)
+    entry = db.entries[mcsa_id]
 
-    print("=" * 60)
-    print("CSA-3D Clustering Analysis Example")
-    print("=" * 60)
+    sites = [site for site in entry.get_pdbsites(sane_only=True)
+             if site.is_conserved or site.is_conservative_mutation]
+    print(f"{len(sites)} conserved sites in M-CSA {mcsa_id}")
 
-    # Initialize database
-    print("\n1. Initializing M-CSA database...")
-    try:
-        db = Mcsa()
-        print("   ✓ Database initialized")
-    except Exception as e:
-        print(f"   ✗ Error: {e}")
-        return
+    matrix = entry.rmsd_matrix(sites)
+    pairwise = matrix.values[np.triu_indices(len(matrix), k=1)]
+    print(f"Pairwise RMSD: min {pairwise.min():.2f}, mean {pairwise.mean():.2f}, "
+          f"max {pairwise.max():.2f} Å")
 
-    # Build entry with multiple sites
-    print("\n2. Building entry with catalytic sites...")
-    try:
-        # Use entry with good coverage
-        entry_id = 1
-        success = db.build(entry_id, annotate=False)
-        if not success:
-            print(f"   ✗ Could not build entry {entry_id}")
-            return
+    print("\nHierarchical clustering (cut at 70% of tree height):")
+    for cluster_id, site_ids in entry.clustering(matrix).items():
+        print(f"  cluster {cluster_id}: {len(site_ids)} sites, e.g. {site_ids[0]}")
 
-        entry = db.entries[entry_id]
-        print(f"   ✓ Entry {entry_id} loaded")
-        print(f"   - EC number: {entry.e_number}")
-        print(f"   - Total PDB sites: {len(entry.pdbsites)}")
-
-    except Exception as e:
-        print(f"   ✗ Error building entry: {e}")
-        return
-
-    # Filter sites (conserved or conservative mutations)
-    print("\n3. Filtering conserved sites...")
-    try:
-        conserved_sites = [
-            site for site in entry.pdbsites
-            if site.is_conserved or site.is_conservative_mutation
-        ]
-        print(f"   ✓ Found {len(conserved_sites)} conserved/conservative sites")
-
-        if len(conserved_sites) < 2:
-            print("   - Not enough sites for clustering (need >= 2)")
-            return
-    except Exception as e:
-        print(f"   ✗ Error filtering sites: {e}")
-        return
-
-    # Calculate RMSD matrix
-    print("\n4. Calculating RMSD matrix...")
-    try:
-        rmsd_matrix = entry.rmsd_matrix(conserved_sites)
-        print(f"   ✓ RMSD matrix calculated")
-        print(f"   - Shape: {rmsd_matrix.shape}")
-        print(f"   - Min: {rmsd_matrix.min():.3f} Å")
-        print(f"   - Max: {rmsd_matrix.max():.3f} Å")
-        print(f"   - Mean: {rmsd_matrix.mean():.3f} Å")
-
-    except Exception as e:
-        print(f"   ✗ Error calculating RMSD: {e}")
-        return
-
-    # Perform clustering
-    print("\n5. Performing hierarchical clustering...")
-    try:
-        clusters = entry.clustering_bayesian(rmsd_matrix)
-        print(f"   ✓ Clustering completed")
-        print(f"   - Number of clusters: {len(clusters)}")
-
-        for cluster_id, site_indices in clusters.items():
-            print(f"   - Cluster {cluster_id + 1}: {len(site_indices)} sites")
-
-    except Exception as e:
-        print(f"   ✗ Error during clustering: {e}")
-        print("   Note: Clustering requires external dependencies")
-        return
-
-    # Summary
-    print("\n" + "=" * 60)
-    print("Clustering analysis completed!")
-    print("\nTip: Use the clustering results to:")
-    print("  - Identify structurally similar catalytic sites")
-    print("  - Create templates for each cluster")
-    print("  - Study catalytic mechanism variations")
-    print("=" * 60)
+    print("\nBayesian cut of the same tree:")
+    for cluster_id, site_ids in entry.clustering_bayesian(matrix).items():
+        print(f"  cluster {cluster_id}: {len(site_ids)} sites")
 
 
 if __name__ == "__main__":
-    clustering_analysis()
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)

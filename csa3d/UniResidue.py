@@ -3,11 +3,7 @@
 
 from typing import Optional, List, Tuple, Generator, Any, Dict
 
-# Handle imports from both package and root-level contexts
-try:
-    from residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
-except ImportError:
-    from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
+from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
 
 
 class UniResidue:

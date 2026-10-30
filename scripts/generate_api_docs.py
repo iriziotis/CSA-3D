@@ -125,7 +125,7 @@ def generate_api_docs(source_dir: Path, output_file: Path) -> None:
 def main():
     """Main entry point."""
     root_dir = Path(__file__).parent
-    source_dir = root_dir
+    source_dir = root_dir / "csa3d"
 
     output_file = root_dir / "docs" / "api_reference.md"
     output_file.parent.mkdir(exist_ok=True)
