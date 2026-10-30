@@ -174,9 +174,9 @@ except Exception as e:
 # Crystallization artefact HETs set
 try:
     with open(crystallization_hets_csv, 'r') as f:
-        CRYSTALLIZATION_HETS = {line.strip() for line in f}
-except FileNotFoundError as e:
-    print(f"Warning: {e}")
+        CRYSTALLIZATION_HETS = {line.strip() for line in f if line.strip()}
+except Exception as e:
+    print(f"Warning: Could not load {crystallization_hets_csv}: {e}")
     CRYSTALLIZATION_HETS = set()
 
 # Ions sets
@@ -187,14 +187,15 @@ try:
     with open(pdbe_ions_csv, 'r') as f:
         next(f)
         for line in csv.reader(f):
-            if line[3] == 'METAL':
-                METALS.add(line[0])
-            if line[3] == 'REACTIVE_NONMETAL':
-                REACTIVE_NONMETALS.add(line[0])
-            if line[3] == 'NOBLE_GAS':
-                NOBLE_GASES.add(line[0])
-except FileNotFoundError as e:
-    print(f"Warning: {e}")
+            if len(line) >= 4:
+                if line[3] == 'METAL':
+                    METALS.add(line[0])
+                if line[3] == 'REACTIVE_NONMETAL':
+                    REACTIVE_NONMETALS.add(line[0])
+                if line[3] == 'NOBLE_GAS':
+                    NOBLE_GASES.add(line[0])
+except Exception as e:
+    print(f"Warning: Could not load {pdbe_ions_csv}: {e}")
 
 # PDB ID - co-factors mapping
 PDBID_COFACTORS = defaultdict(set)
@@ -202,9 +203,10 @@ try:
     with open(pdbe_cofactors_csv, 'r') as f:
         next(f)
         for line in csv.reader(f, quotechar='"'):
-            PDBID_COFACTORS[line[0]].add(line[4])
-except FileNotFoundError as e:
-    print(f"Warning: {e}")
+            if len(line) >= 5:
+                PDBID_COFACTORS[line[0]].add(line[4])
+except Exception as e:
+    print(f"Warning: Could not load {pdbe_cofactors_csv}: {e}")
 
 # MCSA EC - co-factors mapping
 MCSA_EC_COFACTORS = defaultdict(set)
@@ -212,15 +214,16 @@ try:
     with open(mcsa_cofactors_csv, 'r') as f:
         next(f)
         for line in csv.reader(f, quotechar='"'):
-            for ec in line[4].split(';'):
-                MCSA_EC_COFACTORS[ec].add(line[1])
-except FileNotFoundError as e:
-    print(f"Warning: {e}")
+            if len(line) >= 5:
+                for ec in line[4].split(';'):
+                    MCSA_EC_COFACTORS[ec].add(line[1])
+except Exception as e:
+    print(f"Warning: Could not load {mcsa_cofactors_csv}: {e}")
 
 # PDB_ID - resolution
 try:
     with open(pdb_resolution, 'r') as f:
-        PDBID_RESOLUTION = {line[0].strip().lower(): line[1].strip() for line in csv.reader(f, delimiter=';')}
-except FileNotFoundError as e:
-    print(f"Warning: {e}")
+        PDBID_RESOLUTION = {line[0].strip().lower(): line[1].strip() for line in csv.reader(f, delimiter=';') if len(line) >= 2}
+except Exception as e:
+    print(f"Warning: Could not load {pdb_resolution}: {e}")
     PDBID_RESOLUTION = {}
