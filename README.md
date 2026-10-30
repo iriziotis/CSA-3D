@@ -1,337 +1,220 @@
 # CSA-3D: 3D Analysis of Enzyme Catalytic Sites
 
-A Python package for extracting, analyzing, and manipulating enzyme catalytic sites in three dimensions from the **Mechanism and Catalytic Site Atlas (M-CSA)** hosted at [EMBL-EBI](https://www.ebi.ac.uk/thornton-srv/m-csa/).
+CSA-3D extracts, compares and manipulates enzyme catalytic sites in three dimensions,
+using the catalytic residue annotations of the
+[Mechanism and Catalytic Site Atlas (M-CSA)](https://www.ebi.ac.uk/thornton-srv/m-csa/).
 
-## What is CSA-3D?
+With CSA-3D you can:
 
-CSA-3D enables computational biochemists and structural biologists to:
+- **Extract** the catalytic site of every PDB structure (and UniProt sequence) homologous to an M-CSA entry
+- **Compare** catalytic sites by structural superposition and RMSD
+- **Cluster** sites by geometry to explore conformational and functional variation
+- **Build 3D templates** that summarise an active site, for use with the template-matching software
+  [Jess](https://github.com/iriziotis/jess) / [PyJess](https://github.com/althonos/pyjess)
+- **Annotate** ligands, cofactors and metal ions found in catalytic sites
 
-- **Extract** catalytic site geometries from PDB structures and UniProt sequences
-- **Compare** active sites across homologous proteins using RMSD clustering
-- **Create** structure templates for enzyme active sites with geometric constraints
-- **Analyze** ligand proximity and chemical similarity in active sites
-- **Visualize** and export catalytic site information in multiple formats
-
-This package was developed to support research on enzyme mechanisms and is particularly useful for:
-- Comparative structural analysis of enzyme families
-- Active site template generation for molecular docking
-- Catalytic site conservation studies
-- Structure-guided annotation of enzyme function
-
-**See also**: [CSA-3D paper](https://www.sciencedirect.com/science/article/pii/S0022283622000912)
+See the [CSA-3D paper](https://doi.org/10.1016/j.jmb.2022.167488) for the method and applications.
 
 ## Installation
 
-### Requirements
-
-- Python 3.8 or higher
-- ~50 GB of disk space for complete M-CSA dataset (can work with subsets)
-
-### Installation from PyPI
+Requires Python 3.8 or later.
 
 ```bash
 pip install csa3d
 ```
 
-### Installation from Source
+or, from source:
 
 ```bash
-git clone https://github.com/your-username/csa3d.git
-cd csa3d
-pip install -e ".[dev]"
+git clone https://github.com/iriziotis/CSA-3D.git
+cd CSA-3D
+pip install -e .
 ```
 
-### Development Installation
-
-For development with testing and documentation tools:
-
-```bash
-pip install -e ".[dev,docs]"
-```
-
-## Quick Start
-
-### 1. Automatic Data Setup (Recommended)
-
-Download and setup M-CSA data automatically:
+## Quick start
 
 ```python
-from csa3d import setup_data
+import csa3d
 
-# Downloads and compiles required data to ~/.csa3d/data (~50 GB)
-# Automatically compiles latest RHEA data from source
-# Includes bundled datasets that are no longer publicly available
-# Set up specific location with:
-# setup_data("/path/to/csa3d_data")
-success = setup_data()
+# 1. One-off: download the reference data (~400 MB) to ~/.csa3d/data
+csa3d.setup_data()
 
-if success:
-    print("✓ Data setup complete!")
-```
-
-Or via command line:
-```bash
-python -m csa3d.data_setup /path/to/csa3d_data
-```
-
-### 2. Manual Data Configuration
-
-If you prefer to download data manually:
-
-**Option A: Environment variable**
-```bash
-export CSA3D_DATA_DIR="/path/to/csa3d_data"
-```
-
-**Option B: Set in code**
-```python
-from csa3d import set_data_dir
-set_data_dir("/path/to/csa3d_data")
-```
-
-### 3. Load and Inspect Active Sites
-
-```python
-from csa3d import Mcsa
-
-# Initialize the database
-db = Mcsa()
-
-# Build a specific entry (e.g., M-CSA ID 1)
-db.build(entry_ids=1, annotate=True)
-
-# Iterate over entries
-for entry in db:
-    print(f"Entry {entry.mcsa_id}: {len(entry.pdbsites)} PDB sites")
-    
-    # Get information
-    print(f"  EC Number: {entry.info['ec']}")
-    print(f"  Enzyme: {entry.info['enzyme_name']}")
-    
-    # Inspect active sites
-    for site in entry.get_pdbsites(sane_only=True):
-        print(f"    PDB: {site.pdb_id}, {len(site.residues)} residues")
-        print(f"    Resolution: {site.resolution} Å")
-```
-
-### 4. Clustering and Template Creation
-
-```python
-# Build multiple entries
-db.build(entry_ids=[1, 2, 3], annotate=True)
-entry = db.entries[1]
-
-# Calculate RMSD between all active sites
-sites = list(entry.get_pdbsites(sane_only=True))
-rmsd_matrix = entry.rmsd_matrix(sites)
-
-# Cluster sites by similarity
-clusters = entry.clustering(rmsd_matrix, height=1.5)
-
-print(f"Found {len(clusters)} clusters")
-for cluster_id, site_ids in clusters.items():
-    print(f"  Cluster {cluster_id}: {len(site_ids)} sites")
-
-# Create a template from conserved sites
-template = entry.create_template(outdir="./templates")
-print(f"Template created: {template.id}")
-```
-
-## Data Requirements
-
-CSA-3D requires data from several external sources. The setup process automatically:
-- Downloads latest M-CSA catalytic residue annotations from the official API
-- Compiles fresh RHEA reaction data from the latest RHEA source files
-- Compiles KEGG enzyme-compound mappings using KEGG REST API
-- Uses bundled datasets that are no longer publicly available (M-CSA cofactors, metals reference)
-- Downloads other datasets from official sources when available
-
-### Core M-CSA Data
-- `mcsa/catalytic_residues_homologues.json` - **Downloaded from API** - Homologous catalytic residues
-- `mcsa/catalytic_residues_references.json` - **Downloaded from API** - Reference catalytic residues
-- `mcsa/entry_info/mcsa_entry_info.*.json` - Entry metadata
-- `mcsa/mcsa_cofactors.csv` - **Bundled** - M-CSA cofactors (retired from public domain)
-
-### PDB Data
-- `pdbe/assembly_cif/cif/` - PDB assembly structures (mmCIF format)
-- `pdbe/pdb_ions.csv` - Ion classification
-- `pdbe/pdb_cofactors.csv` - Cofactor information
-- `pdbe/crystallization_hets.csv` - Crystallization artifacts
-- `pdbe/metals.csv` - **Bundled** - Metals reference data (retired from public domain)
-
-### Sequence/Mapping Data (SIFTS)
-- `sifts/uniprot_pdb.csv` - UniProt to PDB mapping
-- `sifts/pdb_chain_uniprot.csv` - PDB to UniProt mapping
-- `sifts/pdb_chain_enzyme.csv` - PDB to EC number mapping
-
-### Reaction Data
-- `rhea/rhea_reaction_components.csv` - RHEA reaction components (freshly compiled from latest source)
-- `kegg/kegg_reaction_components.csv` - **Compiled from KEGG REST API** - KEGG enzyme reactions
-- `pdbe/resolu.idx` - PDB resolution index
-
-### Molecule Data
-- `kegg/sdf/` - KEGG small molecules
-- `chebi/sdf/` - ChEBI compounds
-- `pdbe/het_sdf/` - PDB heteroatom structures
-
-To download all data:
-```python
-from csa3d.config import setup_data
-setup_data("/path/to/csa3d_data")
-```
-
-This will automatically:
-1. Copy bundled datasets (`mcsa_cofactors.csv`, `metals.csv`) from the package
-2. Download required datasets from official sources
-
-Alternatively, download manually from:
-- M-CSA: https://www.ebi.ac.uk/thornton-srv/m-csa/download/
-- PDBe: https://www.ebi.ac.uk/pdbe/download/
-- SIFTS: https://www.ebi.ac.uk/pdbe/docs/sifts/
-- KEGG: https://www.kegg.jp/
-- RHEA: https://www.rhea-db.org/
-
-## Usage Examples
-
-### Comparing Two Active Sites
-
-```python
-from csa3d import Mcsa
-
-db = Mcsa()
+# 2. Load M-CSA and build an entry
+db = csa3d.Mcsa()
 db.build(entry_ids=1)
 entry = db.entries[1]
+print(entry.info["enzyme_name"], entry.info["all_ecs"])
 
+# 3. Explore its catalytic sites
+for site in entry.get_pdbsites(sane_only=True):
+    print(site.id, site.pdb_id, site.resolution, [res.resname for res in site.residues])
+```
+
+In later sessions you can skip step 1: `csa3d.Mcsa()` finds data in `~/.csa3d/data` automatically.
+For a complete, runnable walkthrough see [`examples/basic_functionality.ipynb`](examples/basic_functionality.ipynb).
+
+## Data
+
+### Setting up
+
+`csa3d.setup_data()` downloads and prepares everything CSA-3D needs, then makes that directory the
+active one. It is safe to re-run: files already present are skipped, so a re-run only retries what
+failed. Pass `force=True` to refresh everything.
+
+```python
+csa3d.setup_data()                    # default location: ~/.csa3d/data
+csa3d.setup_data("/data/csa3d")       # or any location you choose
+```
+
+To see progress, enable logging first: `import logging; logging.basicConfig(level=logging.INFO)`.
+From the command line: `python -m csa3d.data_setup /data/csa3d`.
+
+### Using a custom location
+
+The default location is found automatically. For any other location, tell CSA-3D where the data lives
+at the start of each session, in one of two ways:
+
+```python
+csa3d.set_data_dir("/data/csa3d")
+```
+
+```bash
+export CSA3D_DATA_DIR=/data/csa3d
+```
+
+### Protein structures
+
+Biological assembly structures (mmCIF) are **downloaded from PDBe on demand** when `Mcsa.build()`
+needs them, and cached in `<data dir>/pdbe/assembly_cif/cif/`. The first build of an entry with many
+homologous structures therefore takes longer. To fetch structures up front (e.g. before working
+offline), use `db.update_pdbs(entry_ids=[1, 2, 3])`, or `db.update_pdbs()` for all of M-CSA.
+
+### What gets downloaded
+
+| File (under the data directory) | Source |
+|---|---|
+| `mcsa/catalytic_residues_homologues.json` | M-CSA API: catalytic residues in homologous structures (~325 MB) |
+| `mcsa/catalytic_residues_references.json` | M-CSA API: catalytic residues of reference structures |
+| `mcsa/entry_info/mcsa_entry_info.*.json` | M-CSA API: entry metadata (enzyme name, EC, reaction) |
+| `sifts/*.csv` | [SIFTS](https://www.ebi.ac.uk/pdbe/docs/sifts/): PDB–UniProt–EC mappings |
+| `pdbe/resolu.idx` | wwPDB: resolution of every PDB entry |
+| `rhea/rhea_reaction_components.csv` | Compiled from the latest [RHEA](https://www.rhea-db.org/) release |
+| `kegg/kegg_reaction_components.csv` | Compiled from the [KEGG](https://www.kegg.jp/) REST API |
+| `pdbe/assembly_cif/cif/*.cif` | PDBe, fetched on demand by `Mcsa.build()` |
+
+Some datasets are no longer published, so snapshots **ship with the package** and are copied into the
+data directory: `mcsa/mcsa_cofactors.csv`, `pdbe/pdb_ions.csv`, `pdbe/pdb_cofactors.csv`,
+`pdbe/crystallization_hets.csv` and `pdbe/metals.csv`. RHEA and KEGG also fall back to bundled
+snapshots if their servers cannot be reached.
+
+Ligand similarity scoring (`Het.similarity`) additionally uses small-molecule structure files in
+`pdbe/het_sdf/`, `chebi/sdf/` and `kegg/sdf/`, which `setup_data()` does not download. Without them,
+`similarity` is `None`; everything else works.
+
+## Usage
+
+The examples below continue from the quick start (`entry = db.entries[1]`).
+
+### Inspect a catalytic site
+
+Each entry has one **reference site** (the structure annotated by M-CSA curators) and many homologous
+sites mapped onto it.
+
+```python
+reference = next(site for site in entry.get_pdbsites() if site.is_reference)
+print(reference.pdb_id, reference.uniprot_id, reference.ec, reference.resolution)
+
+for res in reference.residues:
+    print(res.resname, res.chain, res.auth_resid, res.funclocs)
+
+for het in reference.ligands:          # ligands within 5 Å of the catalytic residues
+    print(het.resname, het.type)
+```
+
+Use `entry.get_pdbsites(sane_only=True)` to skip sites with missing atoms or other problems.
+
+### Compare two sites
+
+```python
 sites = list(entry.get_pdbsites(sane_only=True))
-if len(sites) >= 2:
-    site1, site2 = sites[0], sites[1]
-    
-    # Structural alignment
-    rotation, translation, rmsd_ca, rmsd_all = site1.fit(site2, weighted=True)
-    print(f"RMSD (backbone): {rmsd_ca:.2f} Å")
-    print(f"RMSD (all atoms): {rmsd_all:.2f} Å")
+rot, tran, rms, rms_all = sites[0].fit(sites[1], weighted=True)
+print(f"RMSD {rms:.2f} Å (all atoms: {rms_all:.2f} Å)")
 ```
 
-### Writing Templates for Docking
+`fit()` superimposes the second (mobile) site onto the first (fixed) one. `rms` excludes atoms rejected
+as outliers during iterative fitting (`cycles`, `cutoff`); `rms_all` includes every atom.
+
+### Cluster sites by geometry
 
 ```python
-# Create template with specific parameters
-template = entry.create_template(
-    ca=False,                    # Use all heavy atoms
-    outdir="./templates",
-    outfile="myenzyme.template.pdb",
-    all_fuzzy=False,            # Use conservative fuzzy matching
-    no_alt=False                # Include alternative residue options
-)
-
-# Template can be used with docking software like TESS/Jess
+matrix = entry.rmsd_matrix(sites)      # pandas DataFrame of pairwise RMSDs
+clusters = entry.clustering(matrix)    # {cluster_id: [site ids]}
+for cluster_id, site_ids in clusters.items():
+    print(cluster_id, len(site_ids))
 ```
 
-### Batch Processing
+`clustering()` uses average-linkage hierarchical clustering, cut at 70% of the tree height unless you
+pass `height=`.
+
+### Build a 3D template
 
 ```python
-from csa3d import Mcsa
+template = entry.create_template(outdir="templates")
+```
 
-db = Mcsa()
+This averages the conserved sites into a consensus geometry and writes a template file to
+`templates/`. Templates are input for [Jess](https://github.com/iriziotis/jess), a 3D template-matching
+program that searches protein structures for arrangements of atoms resembling the template, or for
+its Python interface [PyJess](https://github.com/althonos/pyjess). Use `ca=True` for C-alpha templates
+and `subset=[...]` to build from selected sites only (e.g. one cluster).
 
-# Build all entries (takes time)
-entry_ids = list(db.catalytic_residue_info.keys())
-db.build(entry_ids=entry_ids[:10], verbose=True)  # First 10
+### Export structures
 
-# Analyze
+```python
+reference.write_pdb(outdir="sites", write_hets=True)   # catalytic residues (and ligands) as PDB
+```
+
+### Sequence-level sites
+
+```python
+for unisite in entry.unisites:
+    print(unisite.id, unisite.sequence, unisite.is_conserved)
+```
+
+### Build several entries
+
+```python
+db.build(entry_ids=[1, 2, 3], resolution_cutoff=2.5)
 for entry in db:
-    n_sites = len(entry.pdbsites)
-    n_clusters = len(entry.clustering(entry.rmsd_matrix(list(entry.get_pdbsites()))))
-    print(f"{entry.mcsa_id}: {n_sites} sites, {n_clusters} clusters")
+    print(entry.mcsa_id, len(entry.pdbsites))
 ```
 
-## Key Classes
+`db.build()` with no arguments builds all of M-CSA (~1000 entries); this downloads many thousands of
+structures and takes a long time.
 
-### Mcsa
-Main database class. Load and manage M-CSA entries.
-```python
-db = Mcsa()
-db.build(entry_ids=1)  # Build specific entry
-entry = db.entries[1]  # Access Entry object
-```
+## Main classes
 
-### Entry
-Represents one M-CSA entry containing PDB and UniProt active sites.
-```python
-entry.pdbsites           # List of PdbSite objects
-entry.unisites           # List of UniSite objects
-entry.create_template()  # Generate template
-entry.clustering()       # RMSD-based clustering
-```
+| Class | Represents | Key members |
+|---|---|---|
+| `Mcsa` | The M-CSA database | `build()`, `entries`, `update_pdbs()` |
+| `Entry` | One M-CSA entry | `info`, `pdbsites`, `unisites`, `get_pdbsites()`, `rmsd_matrix()`, `clustering()`, `create_template()` |
+| `PdbSite` | A catalytic site in a PDB structure | `residues`, `ligands`, `fit()`, `write_pdb()`, `is_reference`, `is_conserved` |
+| `PdbResidue` | A catalytic residue with coordinates | `resname`, `chain`, `auth_resid`, `funclocs`, `structure` |
+| `Het` | A ligand, cofactor or ion near a site | `resname`, `type`, `similarity` |
+| `UniSite`, `UniResidue` | The same, at sequence level | `sequence`, `is_conserved` |
 
-### PdbSite
-A catalytic site from a PDB structure.
-```python
-site.pdb_id              # PDB identifier
-site.residues            # Catalytic residues
-site.ligands             # Proximal ligands
-site.fit(other_site)     # Structural alignment
-```
-
-### UniSite
-A catalytic site from UniProt sequence.
-```python
-site.uniprot_id          # UniProt accession
-site.residues            # Catalytic residues
-```
-
-## Configuration
-
-### Environment Variables
-
-- `CSA3D_DATA_DIR` - Path to M-CSA data directory (default: auto-detect)
-
-### Configuration File
-
-Create `~/.csa3d/config.yml`:
-```yaml
-data_dir: /path/to/csa3d_data
-```
-
-### In Code
-
-```python
-from csa3d import config
-
-config.set_data_dir("/path/to/data")
-config.validate_config()  # Check if valid
-print(config.get_data_dir())
-```
-
-## Documentation
-
-- [Architecture Guide](docs/architecture.md) - System design and data flow
-- [API Reference](https://csa3d.readthedocs.io) - Full API documentation
-- [Examples](examples/) - Jupyter notebooks and scripts
+All are importable directly from `csa3d`, e.g. `from csa3d import Mcsa, PdbSite`.
+See [docs/api_reference.md](docs/api_reference.md) for the full API.
 
 ## Testing
 
-Run tests with pytest:
 ```bash
+pip install -e ".[dev]"
 pytest tests/
 ```
 
-Run with coverage:
-```bash
-pytest --cov=csa3d tests/
-```
-
-## Performance Considerations
-
-- **First run** is slow (~minutes) as PDB structures are parsed and cached
-- **RMSD clustering** on large site sets can be memory-intensive
-- **Template creation** involves fitting multiple structures (depends on cluster size)
-
-Tips:
-- Use `sane_only=True` to filter low-quality sites
-- Process entries in batches
-- Use `resolution_cutoff` to filter low-resolution structures
-- Cache parsed entries with pickle for reuse
+Running [`examples/basic_functionality.ipynb`](examples/basic_functionality.ipynb) end to end checks the
+main workflow against real data.
 
 ## Citation
 
@@ -339,7 +222,7 @@ If you use CSA-3D in your research, please cite:
 
 ```bibtex
 @article{Riziotis2022,
-    title={CSA-3D: {A} framework to manipulate enzyme catalytic sites in three dimensions},
+    title={Conformational Variation in Enzyme Catalysis: A Structural Study on Catalytic Residues},
     author={Riziotis, Ioannis and others},
     journal={Journal of Molecular Biology},
     volume={434},
@@ -354,43 +237,20 @@ If you use CSA-3D in your research, please cite:
 
 ## Contributing
 
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Make changes and add tests
-4. Run quality checks: `make lint`
-5. Submit a pull request
-
-## Issues & Support
-
-- **Bug reports**: [GitHub Issues](https://github.com/your-username/csa3d/issues)
-- **Questions**: Create a discussion or post an issue
-- **Feature requests**: Open an issue with `[FEATURE]` prefix
+Contributions are welcome. Please open an issue or pull request on
+[GitHub](https://github.com/iriziotis/CSA-3D); see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache License 2.0 - see LICENSE file for details
+Apache License 2.0; see [LICENSE](LICENSE).
 
 ## Contact
 
 - **Author**: Ioannis Riziotis
 - **Email**: riziotis@ebi.ac.uk
-- **Affiliation**: EMBL-EBI, Wellcome Trust Genome Campus, Cambridge, UK
+- **Bug reports**: [GitHub Issues](https://github.com/iriziotis/CSA-3D/issues)
 
-## Acknowledgments
-
-CSA-3D is built on top of several excellent packages:
-- [Biopython](https://biopython.org/) - Biological computation
-- [NumPy](https://numpy.org/) - Numerical computing
-- [SciPy](https://scipy.org/) - Scientific computing
-- [scikit-learn](https://scikit-learn.org/) - Machine learning
-- [RDKit](https://www.rdkit.org/) - Cheminformatics
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and breaking changes.
-
----
-
-**Questions?** See [docs/faq.md](docs/faq.md) or open an issue.
+CSA-3D builds on [Biopython](https://biopython.org/), [NumPy](https://numpy.org/),
+[SciPy](https://scipy.org/), [pandas](https://pandas.pydata.org/), [scikit-learn](https://scikit-learn.org/),
+[RDKit](https://www.rdkit.org/) and [rmsd](https://github.com/charnley/rmsd).
+See [CHANGELOG.md](CHANGELOG.md) for version history.

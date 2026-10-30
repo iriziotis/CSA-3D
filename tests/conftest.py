@@ -121,7 +121,7 @@ def mcsa_db() -> Optional:
         Mcsa instance or None if data unavailable
     """
     try:
-        from Mcsa import Mcsa
+        from csa3d import Mcsa
         db = Mcsa()
         return db
     except Exception as e:

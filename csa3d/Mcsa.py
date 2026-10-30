@@ -7,28 +7,18 @@ entries from the Mechanism and Catalytic Site Atlas (M-CSA) database.
 import logging
 import os
 import json
-import warnings
-import subprocess
 from collections import defaultdict
 from glob import glob
 from typing import Dict, List, Optional, Union
 from natsort import natsorted
 
-# Handle imports from both package and root-level contexts
-try:
-    from config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
-    from Entry import Entry
-    from PdbSite import PdbSite
-    from UniSite import UniSite
-    from PdbResidue import PdbResidue
-    from UniResidue import UniResidue
-except ImportError:
-    from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
-    from .Entry import Entry
-    from .PdbSite import PdbSite
-    from .UniSite import UniSite
-    from .PdbResidue import PdbResidue
-    from .UniResidue import UniResidue
+from . import datasets
+from .data_setup import fetch_assembly
+from .Entry import Entry
+from .PdbSite import PdbSite
+from .UniSite import UniSite
+from .PdbResidue import PdbResidue
+from .UniResidue import UniResidue
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +50,9 @@ class Mcsa:
     def __init__(self) -> None:
         """Initialize the M-CSA database."""
         self.entries: Dict[int, Entry] = {}
-        self.mcsa_entry_info: Dict[int, dict] = self._get_mcsa_entry_info(MCSA_ENTRY_INFO)
-        self.catalytic_residue_info: Dict[int, list] = self._get_residue_info(CAT_RES_INFO)
+        self.mcsa_entry_info: Dict[int, dict] = self._get_mcsa_entry_info(datasets.MCSA_ENTRY_INFO)
+        self.catalytic_residue_info: Dict[int, list] = self._get_residue_info(datasets.CAT_RES_INFO)
+        self.pdb_assemblies: Dict[str, int] = self._get_pdb_assemblies(self.catalytic_residue_info)
         self.pdb_residues: Dict[int, Dict[str, List]] = defaultdict(lambda: defaultdict(list))
         self.uni_residues: Dict[int, Dict[str, List]] = defaultdict(lambda: defaultdict(list))
         self.ref_pdb_residues: Dict[int, List] = defaultdict(list)
@@ -90,10 +81,10 @@ class Mcsa:
                 (build all). Defaults to None.
             annotate: Extract metadata (EC, organism, resolution, etc.).
                 Defaults to True.
-            redundancy_cutoff: Filter sites above this sequence identity.
-                Defaults to None (no filter).
-            resolution_cutoff: Filter structures below this resolution (Å).
-                Defaults to None (no filter).
+            redundancy_cutoff: Drop sites within this RMSD (Å) of another site in
+                the same structure. Defaults to None (only identical sites are dropped).
+            resolution_cutoff: Skip non-reference structures with resolution worse
+                than this (Å), or with no resolution. Defaults to None (no filter).
             verbose: Print progress for each site. Defaults to False.
             no_sites: Skip site building (only build residues). Defaults to False.
 
@@ -165,35 +156,28 @@ class Mcsa:
         logger.debug(f"Added entry {entry.mcsa_id} to database")
         return True
 
-    def update_pdbs(self) -> None:
-        """Download PDB assembly structures from PDBe.
+    def update_pdbs(self, entry_ids: Optional[Union[int, List[int]]] = None) -> None:
+        """Pre-download assembly mmCIF files from PDBe.
 
-        Updates the assembly directory with mmCIF files for all structures
-        referenced in the M-CSA database. Skips files already present.
+        ``build()`` already downloads missing assemblies on demand; use this to
+        fetch everything up front (e.g. before working offline). Files already
+        present in the data directory are skipped.
 
-        Note:
-            This requires network access to PDBe FTP servers and only works
-            on systems with the NFS mount configured. Use for local setup only.
+        Args:
+            entry_ids: M-CSA ID(s) whose structures to fetch. Defaults to all.
         """
-        pdbs = set()
-        for entry, json_res in self.catalytic_residue_info.items():
-            for res in json_res:
-                for res_chain in res['residue_chains']:
-                    pdb_id = res_chain['pdb_id']
-                    assembly = res_chain['assembly'] if res_chain['assembly'] else 1
-                    pdbs.add((pdb_id, assembly))
-        for pdb in pdbs:
-            pdb_id, assembly = pdb[0], pdb[1]
-            filename_in = '{}-assembly{}.cif.gz'.format(pdb_id, assembly)
-            filename_out = '{}-assembly-{}.cif'.format(pdb_id, assembly)
-            if os.path.isfile(os.path.join(ASSEMBLIES_DIR, filename_out)):
-                continue
-            print('Getting PDB entry {}, assembly {}'.format(pdb_id, assembly))
-            scp_path = '/nfs/production/gerard/pdbe/ftp/pdb/data/assemblies/mmCIF/divided/{}/{}'.format(pdb_id[1:3], filename_in)
-            filename_out = '{}.gz'.format(filename_out)
-            cmd = "cp {} {}/{}".format(scp_path, ASSEMBLIES_DIR, filename_out)
-            subprocess.call(cmd.split(" "))
-        return
+        if entry_ids is None:
+            entry_ids = list(self.catalytic_residue_info)
+        elif not isinstance(entry_ids, list):
+            entry_ids = [entry_ids]
+        pdb_ids = {
+            res_chain['pdb_id']
+            for entry_id in entry_ids
+            for res in self.catalytic_residue_info.get(entry_id, [])
+            for res_chain in res['residue_chains']
+        }
+        for pdb_id in sorted(pdb_ids):
+            self._get_cif_path(pdb_id)
 
     # Properties
 
@@ -223,7 +207,7 @@ class Mcsa:
                 # Resolution cutoff
                 if resolution_cutoff and not residue.is_reference:
                     try:
-                        resolution = float(PDBID_RESOLUTION.get(residue.pdb_id, -1.0))
+                        resolution = float(datasets.PDBID_RESOLUTION.get(residue.pdb_id, -1.0))
                     except ValueError:
                         resolution = -1.0
                     if resolution == -1.0 or resolution > resolution_cutoff:
@@ -272,8 +256,8 @@ class Mcsa:
             entry_id: M-CSA entry ID
             annotate: Extract structural annotations (resolution, method, etc.).
                 Defaults to True.
-            redundancy_cutoff: Filter sites with sequence identity above
-                threshold. Defaults to None (no filter).
+            redundancy_cutoff: Drop sites within this RMSD (Å) of another site in
+                the same structure. Defaults to None (only identical sites are dropped).
             verbose: Print each site as it's built. Defaults to False.
         """
         try:
@@ -377,27 +361,29 @@ class Mcsa:
         return json_residues
 
     @staticmethod
-    def _get_cif_path(pdb_id: str) -> Optional[str]:
-        """Get path to mmCIF structure file for a PDB entry.
+    def _get_pdb_assemblies(residue_info: Dict[int, list]) -> Dict[str, int]:
+        """Map each PDB ID to the assembly number M-CSA annotates it in."""
+        assemblies: Dict[str, int] = {}
+        for json_residues in residue_info.values():
+            for res in json_residues:
+                for res_chain in res['residue_chains']:
+                    assemblies.setdefault(res_chain['pdb_id'], res_chain.get('assembly') or 1)
+        return assemblies
 
-        Locates the biological assembly mmCIF file for the given PDB ID.
-        Returns None if file not found (issues a warning).
+    def _get_cif_path(self, pdb_id: str) -> Optional[str]:
+        """Path to the assembly mmCIF for a PDB entry, downloading it if missing.
 
-        Args:
-            pdb_id: PDB identifier (e.g., '1abc')
-
-        Returns:
-            Path to mmCIF file, or None if not found
-
-        Warns:
-            RuntimeWarning: If file cannot be located
+        Returns None (with a warning) if the file is absent and cannot be fetched.
         """
-        path_pattern = os.path.join(ASSEMBLIES_DIR, f'{pdb_id}-assembly-*.cif')
-        matches = glob(path_pattern)
+        assemblies_dir = datasets.ASSEMBLIES_DIR
+        matches = glob(os.path.join(assemblies_dir, f'{pdb_id}-assembly-*.cif'))
         if matches:
             return matches[0]
-        logger.warning(f'Could not find mmCIF file for {pdb_id}')
-        return None
+        path = fetch_assembly(pdb_id, self.pdb_assemblies.get(pdb_id, 1), assemblies_dir)
+        if path is None:
+            logger.warning(f'Could not find or download mmCIF file for {pdb_id}')
+            return None
+        return str(path)
 
 
 __all__ = ['Mcsa']

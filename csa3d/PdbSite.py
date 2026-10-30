@@ -20,17 +20,10 @@ from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarni
 from Bio.PDB.NeighborSearch import NeighborSearch
 from rmsd import reorder_hungarian
 
-# Handle imports from both package and root-level contexts
-try:
-    from residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
-    from config import PDB2EC, PDB2UNI
-    from PdbResidue import PdbResidue, Het
-    from Superimposer import Superimposer
-except ImportError:
-    from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
-    from .config import PDB2EC, PDB2UNI
-    from .PdbResidue import PdbResidue, Het
-    from .Superimposer import Superimposer
+from . import datasets
+from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
+from .PdbResidue import PdbResidue, Het
+from .Superimposer import Superimposer
 
 logger = logging.getLogger(__name__)
 warnings.simplefilter('ignore', PDBConstructionWarning)
@@ -232,7 +225,8 @@ class PdbSite:
             parent_entry: Parent Entry object
             cif_path: Path to mmCIF structure file
             annotate: Extract annotations. Defaults to True.
-            redundancy_cutoff: Filter sites by sequence identity. Defaults to None.
+            redundancy_cutoff: Drop sites within this RMSD (Å) of another site in the
+                same structure. Defaults to None (only identical sites are dropped).
 
         Returns:
             List of PdbSite objects
@@ -259,7 +253,7 @@ class PdbSite:
         for seed in seeds:
             sites.append(cls.build(seed, reslist, reference_site, parent_entry))
         # Reduce redundancy
-        sites = PdbSite._remove_redundant_sites(sites, cutoff=redundancy_cutoff)
+        sites = PdbSite._remove_redundant_sites(sites, cutoff=redundancy_cutoff or 0)
         # Add ligands and annotations
         if annotate and structure:
             for site in sites:
@@ -294,7 +288,7 @@ class PdbSite:
         for res in self.residues:
             if res.chain:
                 try:
-                    return PDB2UNI[(self.pdb_id, res.chain[0])]
+                    return datasets.PDB2UNI[(self.pdb_id, res.chain[0])]
                 except KeyError:
                     continue
         return
@@ -302,13 +296,14 @@ class PdbSite:
     @property
     def ec(self):
         """Get EC number from SIFTS"""
+        pdb2ec = datasets.PDB2EC
         for res in self.residues:
             if res.chain:
                 try:
-                    return PDB2EC[(self.pdb_id, res.chain[0])]
+                    return pdb2ec[(self.pdb_id, res.chain[0])]
                 except KeyError:
                     try:
-                        return PDB2EC[(self.pdb_id, res.alt_chain[0])]
+                        return pdb2ec[(self.pdb_id, res.alt_chain[0])]
                     except KeyError:
                         continue
         return

@@ -2,13 +2,8 @@
 
 from typing import Optional, List, Dict, Any, Generator
 
-# Handle imports from both package and root-level contexts
-try:
-    from residue_definitions import AA_3TO1
-    from UniResidue import UniResidue
-except ImportError:
-    from .residue_definitions import AA_3TO1
-    from .UniResidue import UniResidue
+from .residue_definitions import AA_3TO1
+from .UniResidue import UniResidue
 
 
 class UniSite:
@@ -162,14 +157,25 @@ class UniSite:
 
     @property
     def is_conservative_mutation(self) -> bool:
-        """Check if mutations are conservative."""
+        """Check if mutations are conservative, ignoring residues that act via the main chain."""
         result = False
         for res in self.residues:
+            for funcloc in res.funclocs:
+                if 'main' in funcloc:
+                    result = True
             if not res.is_conserved and not res.is_conservative_mutation:
                 return False
             if res.is_conservative_mutation:
                 result = True
         return result
+
+    def get_residues(self) -> Generator[UniResidue, None, None]:
+        """Iterate over residues"""
+        yield from self.residues
+
+    def get_gaps(self) -> List[int]:
+        """Returns an index of the gap positions (non-aligned residues)"""
+        return [i for i, res in enumerate(self.residues) if res.is_gap]
 
     def add(self, residue: UniResidue) -> bool:
         """Add UniResidue to site.
@@ -209,13 +215,11 @@ class UniSite:
         if self.reference_site is None:
             return
         reorder = []
-        for i, reference_residue in enumerate(self.reference_site):
+        for reference_residue in self.reference_site:
             for j, res in enumerate(self):
                 if reference_residue == res.reference_residue:
                     reorder.append(j)
-                    break
-        if len(reorder) == len(self.residues):
-            self.residues = [self.residues[i] for i in reorder]
+        self.residues = [self.residues[i] for i in reorder]
 
     @staticmethod
     def _cleanup_list(reslist: List[UniResidue]) -> List[UniResidue]:

@@ -3,7 +3,7 @@
 import logging
 import os
 import warnings
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Generator, Union
 import numpy as np
 from copy import copy
 from Bio.PDB.Structure import Structure
@@ -16,53 +16,15 @@ from rdkit.Chem.rdmolfiles import MolFromMolFile
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
 
-# Handle imports from both package and root-level contexts
-try:
-    from residue_definitions import (
-        AA_3TO1,
-        STANDARD_RESIDUES,
-        NUCLEIC,
-        EQUIVALENT_RESIDUES,
-        EQUIVALENT_ATOMS,
-        RESIDUE_DEFINITIONS,
-    )
-    from config import (
-        METALS,
-        REACTIVE_NONMETALS,
-        NOBLE_GASES,
-        PDBID_COFACTORS,
-        MCSA_EC_COFACTORS,
-        CRYSTALLIZATION_HETS,
-        PDB2EC,
-        KEGG_EC_REACTION,
-        RHEA_EC_REACTION,
-        HET_MOLS_DIR,
-        CHEBI_MOLS_DIR,
-        KEGG_MOLS_DIR,
-    )
-except ImportError:
-    from .residue_definitions import (
-        AA_3TO1,
-        STANDARD_RESIDUES,
-        NUCLEIC,
-        EQUIVALENT_RESIDUES,
-        EQUIVALENT_ATOMS,
-        RESIDUE_DEFINITIONS,
-    )
-    from .config import (
-        METALS,
-        REACTIVE_NONMETALS,
-        NOBLE_GASES,
-        PDBID_COFACTORS,
-        MCSA_EC_COFACTORS,
-        CRYSTALLIZATION_HETS,
-        PDB2EC,
-        KEGG_EC_REACTION,
-        RHEA_EC_REACTION,
-        HET_MOLS_DIR,
-        CHEBI_MOLS_DIR,
-        KEGG_MOLS_DIR,
-    )
+from . import datasets
+from .residue_definitions import (
+    AA_3TO1,
+    STANDARD_RESIDUES,
+    NUCLEIC,
+    EQUIVALENT_RESIDUES,
+    EQUIVALENT_ATOMS,
+    RESIDUE_DEFINITIONS,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -180,6 +142,14 @@ class PdbResidue:
         self_com = self.structure.center_of_mass(geometric)
         other_com = other.structure.center_of_mass(geometric)
         return float(np.linalg.norm(self_com - other_com))
+
+    # Public methods
+
+    def copy(self, include_structure: bool = False) -> 'PdbResidue':
+        """Returns a copy of the residue. If include_structure is False,
+        then structure is not copied."""
+        res = copy(self)
+        if include_structure:
             try:
                 res.structure = self.structure.copy()
                 res.structure.set_parent(self.structure.get_parent())
@@ -505,17 +475,17 @@ class Het(PdbResidue):
     @property
     def is_metal(self) -> bool:
         """Check if component is single-atom metal"""
-        return self.resname in METALS
+        return self.resname in datasets.METALS
 
     @property
     def is_reactive_nonmetal(self) -> bool:
         """Check if component is a metal or a reactive non metal"""
-        return self.resname in REACTIVE_NONMETALS
+        return self.resname in datasets.REACTIVE_NONMETALS
 
     @property
     def is_noble_gas(self) -> bool:
         """Check if component is a noble gas atom"""
-        return self.resname in NOBLE_GASES
+        return self.resname in datasets.NOBLE_GASES
 
     @property
     def is_ion(self) -> bool:
@@ -525,14 +495,15 @@ class Het(PdbResidue):
     @property
     def is_cofactor(self) -> bool:
         """Check if component is annotated as cofactor for this pdb in PDBe or M-CSA"""
-        return self.resname in PDBID_COFACTORS[self.pdb_id] or self.resname in MCSA_EC_COFACTORS[self.parent_site.ec]
+        return (self.resname in datasets.PDBID_COFACTORS[self.pdb_id]
+                or self.resname in datasets.MCSA_EC_COFACTORS[self.parent_site.ec])
 
     @property
     def is_artefact(self) -> bool:
         """Check if component is likely to be a crystallographic artefact"""
         if self.cannot_be_artefact == True:
             return False
-        return (self.resname in CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
+        return (self.resname in datasets.CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
 
     @property
     def type(self) -> str:
@@ -600,7 +571,7 @@ class Het(PdbResidue):
         """
         if self.is_polymer:
             return None, None
-        bound = f'{HET_MOLS_DIR}/{self.resname}.sdf'
+        bound = f'{datasets.HET_MOLS_DIR}/{self.resname}.sdf'
         max_score = 0.0
         match = None
         components = self.get_reaction()
@@ -642,30 +613,20 @@ class Het(PdbResidue):
         components = []
         try:
             for component in self.parent_site.parent_entry.info['reaction']['compounds']:
-                components.append('{}/ChEBI_{}.sdf'.format(CHEBI_MOLS_DIR, component['chebi_id']))
+                components.append('{}/ChEBI_{}.sdf'.format(datasets.CHEBI_MOLS_DIR, component['chebi_id']))
         except KeyError:
             pass
         return components
 
     def _get_kegg_reaction(self) -> List[str]:
         """Gets component filenames of the corresponding KEGG reaction."""
-        components = []
-        try:
-            for component in KEGG_EC_REACTION[self.parent_site.ec]:
-                components.append('{}/KEGG_{}.mol'.format(KEGG_MOLS_DIR, component))
-        except KeyError:
-            pass
-        return components
+        return ['{}/KEGG_{}.sdf'.format(datasets.KEGG_MOLS_DIR, component)
+                for component in datasets.KEGG_EC_REACTION.get(self.parent_site.ec, [])]
 
     def _get_rhea_reaction(self) -> List[str]:
-        """Gets component filenames of the corresponding KEGG reaction."""
-        components = []
-        try:
-            for component in RHEA_EC_REACTION[self.parent_site.ec]:
-                components.append('{}/ChEBI_{}.sdf'.format(CHEBI_MOLS_DIR, component))
-        except KeyError:
-            pass
-        return components
+        """Gets component filenames of the corresponding RHEA reaction."""
+        return ['{}/ChEBI_{}.sdf'.format(datasets.CHEBI_MOLS_DIR, component)
+                for component in datasets.RHEA_EC_REACTION.get(self.parent_site.ec, [])]
 
 
 __all__ = ['PdbResidue', 'Het']

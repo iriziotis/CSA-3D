@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "csa3d"
-version = "0.2.2"
+version = "0.3.0"
 description = "Extract and analyze enzyme catalytic sites in 3D from the Mechanism and Catalytic Site Atlas (M-CSA)"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -64,14 +64,16 @@ examples = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-username/csa3d"
-Documentation = "https://csa3d.readthedocs.io"
-Repository = "https://github.com/your-username/csa3d"
-"Issue Tracker" = "https://github.com/your-username/csa3d/issues"
+Homepage = "https://github.com/iriziotis/CSA-3D"
+Documentation = "https://github.com/iriziotis/CSA-3D#readme"
+Repository = "https://github.com/iriziotis/CSA-3D"
+"Issue Tracker" = "https://github.com/iriziotis/CSA-3D/issues"
 
 [tool.setuptools]
 packages = ["csa3d", "csa3d.config", "csa3d._vendor"]
-py-modules = ["Mcsa", "Entry", "PdbSite", "PdbResidue", "UniResidue", "UniSite", "Superimposer", "config"]
+
+[tool.setuptools.package-data]
+csa3d = ["bundled_data/*.csv"]
 
 [tool.black]
 line-length = 100

@@ -13,28 +13,18 @@ import pandas as pd
 from copy import deepcopy
 from collections import defaultdict
 from itertools import combinations
-from typing import Dict, List, Optional, Set, Tuple, Generator, Any
+from typing import Dict, List, Optional, Set, Tuple, Generator, Any, Union
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
 
-# Handle imports from both package and root-level contexts
-try:
-    from _vendor.dendrogram_cut import DendrogramCut
-    from config import UNI2PDB, REF_RES_INFO
-    from residue_definitions import (
-        RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
-    )
-    from PdbSite import PdbSite
-    from UniSite import UniSite
-except ImportError:
-    from ._vendor.dendrogram_cut import DendrogramCut
-    from .config import UNI2PDB, REF_RES_INFO
-    from .residue_definitions import (
-        RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
-    )
-    from .PdbSite import PdbSite
-    from .UniSite import UniSite
+from . import datasets
+from ._vendor.dendrogram_cut import DendrogramCut
+from .residue_definitions import (
+    RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1
+)
+from .PdbSite import PdbSite
+from .UniSite import UniSite
 
 logger = logging.getLogger(__name__)
 
@@ -187,9 +177,10 @@ class Entry:
         Returns:
             True
         """
+        uni2pdb = datasets.UNI2PDB
         for unisite in self.unisites:
-            if unisite.id in UNI2PDB:
-                for sifts_pdb_id in UNI2PDB[unisite.id]:
+            if unisite.id in uni2pdb:
+                for sifts_pdb_id in uni2pdb[unisite.id]:
                     if sifts_pdb_id in self.pdb_ids:
                         pdbsites = self.get_pdbsites(sifts_pdb_id)
                         for pdbsite in pdbsites:
@@ -488,7 +479,7 @@ class Entry:
         """Break template into smaller residue groups.
 
         Divides a large template into smaller, manageable subsets for
-        more focused analysis or docking.
+        more focused analysis or template matching.
 
         Args:
             template: Template PdbSite to break
@@ -563,10 +554,11 @@ class Entry:
         outfile: Optional[str] = None,
         annotation: str = '',
     ) -> None:
-        """Write template in PDB/TESS format with constraints.
+        """Write template in Jess template (PDB-like) format with constraints.
 
-        Exports template structure with geometric constraints for use in
-        docking software (TESS/Jess).
+        Exports the template with per-atom distance constraints for 3D template
+        matching with Jess (https://github.com/iriziotis/jess) or PyJess
+        (https://github.com/althonos/pyjess).
 
         Args:
             template: Template PdbSite to write
@@ -864,7 +856,8 @@ class Entry:
             Dictionary mapping (chain, residue_id) to list of annotations
         """
         try:
-            info = json.load(open(REF_RES_INFO))
+            with open(datasets.REF_RES_INFO) as f:
+                info = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"Could not load reference residue info: {e}")
             return {}

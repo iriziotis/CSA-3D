@@ -1,501 +1,297 @@
-"""Automatic data setup and download for CSA-3D.
+"""Download and prepare the reference data CSA-3D needs.
 
-Downloads and organizes required data files from official sources.
-Includes bundled datasets that have been retired from the public domain.
+Run once per data directory:
+
+    >>> import csa3d
+    >>> csa3d.setup_data()                    # defaults to ~/.csa3d/data
+    >>> csa3d.setup_data("/path/to/data")     # or a location of your choice
+
+Files that are already present are skipped, so re-running only fetches what is
+missing (pass ``force=True`` to refresh everything). Assembly structures are not
+downloaded here: ``Mcsa.build()`` fetches the ones it needs on demand.
 """
 
 import csv
+import gzip
 import json
 import logging
-import os
 import shutil
-import subprocess
+import sys
 import tarfile
 import tempfile
+import urllib.error
+import urllib.request
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
-import urllib.request
-import urllib.error
-from urllib.parse import urljoin
+from typing import Dict, Optional, Union
+
+from .config.settings import set_data_dir
 
 logger = logging.getLogger(__name__)
 
+BUNDLED_DATA_DIR = Path(__file__).parent / "bundled_data"
+
+SIFTS_URL = "https://ftp.ebi.ac.uk/pub/databases/msd/sifts/flatfiles/csv/{}.csv.gz"
+RESOLUTION_URL = "https://files.wwpdb.org/pub/pdb/derived_data/index/resolu.idx"
+RHEA_RD_URL = "https://ftp.expasy.org/databases/rhea/ctfiles/rhea-rd.tar.gz"
+RHEA_TSV_URL = "https://ftp.expasy.org/databases/rhea/tsv/{}"
+MCSA_API_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/api/"
+PDBE_ASSEMBLY_URL = "https://www.ebi.ac.uk/pdbe/static/entry/download/{}-assembly-{}.cif.gz"
+
+
+def _looks_like_html(path: Path) -> bool:
+    with open(path, "rb") as f:
+        head = f.read(512).lstrip().lower()
+    return head.startswith(b"<!doctype html") or head.startswith(b"<html")
+
+
+def _is_present(path: Path) -> bool:
+    return path.is_file() and path.stat().st_size > 0 and not _looks_like_html(path)
+
+
+def download_file(url: str, output_path: Path, decompress: bool = False) -> bool:
+    """Download ``url`` to ``output_path``, optionally gunzipping it.
+
+    Writes to a temporary file first and rejects HTML error pages, so a failed
+    download never leaves a corrupt file behind.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    part = output_path.with_name(output_path.name + ".part")
+    try:
+        logger.info(f"Downloading {url}")
+        with urllib.request.urlopen(url, timeout=120) as response, open(part, "wb") as out:
+            source = gzip.GzipFile(fileobj=response) if decompress else response
+            shutil.copyfileobj(source, out)
+        if not _is_present(part):
+            raise ValueError("server returned an empty file or an HTML page instead of data")
+        part.replace(output_path)
+        return True
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        logger.warning(f"Failed to download {url}: {e}")
+        part.unlink(missing_ok=True)
+        return False
+
+
+def fetch_assembly(pdb_id: str, assembly: int, dest_dir: Union[str, Path]) -> Optional[Path]:
+    """Return the PDBe assembly mmCIF for ``pdb_id``, downloading it if needed."""
+    output = Path(dest_dir) / f"{pdb_id}-assembly-{assembly}.cif"
+    if _is_present(output):
+        return output
+    if download_file(PDBE_ASSEMBLY_URL.format(pdb_id, assembly), output, decompress=True):
+        return output
+    return None
+
 
 class DataDownloader:
-    """Download and setup CSA-3D data files."""
+    """Populate a CSA-3D data directory."""
 
-    # Data source URLs
-    SIFTS_URL = "https://www.ebi.ac.uk/pdbe/download/sifts/csv/"
-    KEGG_URL = "https://rest.kegg.jp/get/"
-    RHEA_URL = "https://www.rhea-db.org/download/rhea/"
-    RHEA_FTP_URL = "https://ftp.expasy.org/databases/rhea/ctfiles/"
-    RHEA_TSV_URL = "https://ftp.expasy.org/databases/rhea/tsv/"
-    PDBE_URL = "https://www.ebi.ac.uk/pdbe/download/"
-    MCSA_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/download/"
-    MCSA_API_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/api/"
-
-    def __init__(self, data_dir: Path):
-        """Initialize data downloader.
-
-        Args:
-            data_dir: Root directory for CSA-3D data
-        """
-        self.data_dir = Path(data_dir)
+    def __init__(self, data_dir: Union[str, Path], force: bool = False):
+        self.data_dir = Path(data_dir).expanduser()
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        # Path to bundled data files in the repository
-        self.bundled_data_dir = Path(__file__).parent.parent / "data"
+        self.force = force
 
-    def download_file(self, url: str, output_path: Path) -> bool:
-        """Download a file from URL.
-
-        Args:
-            url: URL to download from
-            output_path: Path to save file
-
-        Returns:
-            True if successful, False otherwise
-        """
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        try:
-            logger.info(f"Downloading {url} → {output_path}")
-            urllib.request.urlretrieve(url, output_path)
-            logger.info(f"✓ Downloaded {output_path.name}")
+    def _needed(self, path: Path) -> bool:
+        if self.force or not _is_present(path):
             return True
-        except urllib.error.URLError as e:
-            logger.warning(f"✗ Failed to download {url}: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error downloading {url}: {e}")
-            return False
+        logger.info(f"Already present, skipping: {path.relative_to(self.data_dir)}")
+        return False
 
-    def copy_bundled_file(self, filename: str, output_path: Path) -> bool:
-        """Copy a bundled data file from the repository.
+    def _fetch(self, url: str, rel_path: str, decompress: bool = False) -> bool:
+        path = self.data_dir / rel_path
+        return not self._needed(path) or download_file(url, path, decompress)
 
-        Args:
-            filename: Name of file in bundled data directory
-            output_path: Path to save file
-
-        Returns:
-            True if successful, False otherwise
-        """
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        source = self.bundled_data_dir / filename
-
-        if not source.exists():
-            logger.warning(f"✗ Bundled file not found: {source}")
-            return False
-
-        try:
-            logger.info(f"Copying {filename} → {output_path}")
-            shutil.copy2(source, output_path)
-            logger.info(f"✓ Copied {output_path.name}")
+    def _copy_bundled(self, filename: str, rel_path: str) -> bool:
+        path = self.data_dir / rel_path
+        if not self._needed(path):
             return True
-        except Exception as e:
-            logger.error(f"Error copying {filename}: {e}")
-            return False
-
-    def compile_rhea_reactions(self, temp_dir: Path) -> Optional[Path]:
-        """Compile RHEA reactions from downloaded data.
-
-        Downloads RHEA .rd files, EC mappings, and directions, then compiles
-        the reaction_components.csv file.
-
-        Args:
-            temp_dir: Temporary directory for intermediate files
-
-        Returns:
-            Path to compiled CSV file if successful, None otherwise
-        """
-        try:
-            logger.info("Compiling RHEA reaction data from source files...")
-
-            # Download files
-            rhea_dir = temp_dir / "rhea_download"
-            rhea_dir.mkdir(parents=True, exist_ok=True)
-
-            # Download rhea-rd.tar.gz
-            rd_tar = rhea_dir / "rhea-rd.tar.gz"
-            if not self.download_file(
-                urljoin(self.RHEA_FTP_URL, "rhea-rd.tar.gz"), rd_tar
-            ):
-                return None
-
-            # Download rhea2ec.tsv
-            rhea2ec_file = rhea_dir / "rhea2ec.tsv"
-            if not self.download_file(
-                urljoin(self.RHEA_TSV_URL, "rhea2ec.tsv"), rhea2ec_file
-            ):
-                return None
-
-            # Download rhea-directions.tsv
-            directions_file = rhea_dir / "rhea-directions.tsv"
-            if not self.download_file(
-                urljoin(self.RHEA_TSV_URL, "rhea-directions.tsv"), directions_file
-            ):
-                return None
-
-            # Extract tar file
-            logger.info("Extracting RHEA reaction files...")
-            with tarfile.open(rd_tar, "r:gz") as tar:
-                tar.extractall(rhea_dir)
-
-            # Compile reactions using the compilation script logic
-            logger.info("Compiling reaction components...")
-            output_csv = rhea_dir / "rhea_reaction_components.csv"
-
-            # Map directional reaction IDs to master IDs
-            directional2master = {}
-            with open(directions_file, "r") as f:
-                next(f)
-                for line in csv.reader(f, delimiter="\t"):
-                    master = line[0]
-                    lr = line[1]
-                    rl = line[2]
-                    directional2master[lr] = master
-                    directional2master[rl] = master
-
-            # Map ECs to master IDs
-            master2ec = defaultdict(set)
-            with open(rhea2ec_file, "r") as f:
-                next(f)
-                for line in csv.reader(f, delimiter="\t"):
-                    master = line[2]
-                    ec = line[3]
-                    master2ec[master].add(ec)
-
-            # Extract reactions from .rd files
-            reactions = defaultdict(set)
-            rd_files_dir = rhea_dir / "rd"
-            if rd_files_dir.exists():
-                for rd_file in sorted(rd_files_dir.glob("*.rd")):
-                    rhea_id = rd_file.stem
-                    with open(rd_file, "r") as f:
-                        for line in f:
-                            if line.startswith("CHEBI:"):
-                                chebi_id = line.strip().split(":")[-1]
-                                reactions[rhea_id].add(chebi_id)
-
-            # Write output CSV
-            with open(output_csv, "w") as f:
-                f.write("RHEA_MASTER_ID,RHEA_DIRECTIONAL_ID,EC,CHEBI_IDS\n")
-                for k, v in sorted(reactions.items()):
-                    master = directional2master.get(k, int(k) - 1)
-                    ecs = master2ec.get(str(master), set())
-                    for ec in sorted(ecs):
-                        f.write(f"{master},{k},{ec},{';'.join(sorted(v))}\n")
-
-            logger.info(f"✓ Compiled {len(reactions)} RHEA reactions")
-            return output_csv
-
-        except Exception as e:
-            logger.error(f"Error compiling RHEA data: {e}")
-            return None
-
-    def compile_kegg_reactions(self) -> Optional[Path]:
-        """Compile KEGG reaction components using Biopython REST API.
-
-        Returns:
-            Path to compiled CSV file if successful, None otherwise
-        """
-        try:
-            logger.info("Compiling KEGG reaction data from REST API...")
-
-            try:
-                from Bio.KEGG import REST
-            except ImportError:
-                logger.error("Biopython not installed. Cannot compile KEGG data.")
-                logger.info("Install with: pip install biopython")
-                return None
-
-            # Get EC-compound mappings from KEGG
-            kegg_dir = self.data_dir / "kegg"
-            kegg_dir.mkdir(parents=True, exist_ok=True)
-            output_csv = kegg_dir / "kegg_reaction_components.csv"
-
-            logger.info("Querying KEGG REST API for enzyme-compound mappings...")
-            request = REST.kegg_link("compound", "enzyme").readlines()
-
-            ec_compounds = defaultdict(list)
-            for line in request:
-                line = line.strip().split("\t")
-                ec = line[0].split(":")[-1]
-                compound = line[1].split(":")[-1]
-                ec_compounds[ec].append(compound)
-
-            # Write output CSV
-            with open(output_csv, "w") as f:
-                f.write("EC,KEGG_COMPOUNDS\n")
-                for ec in sorted(ec_compounds.keys()):
-                    compounds = sorted(set(ec_compounds[ec]))
-                    f.write(f"{ec},{';'.join(compounds)}\n")
-
-            logger.info(f"✓ Compiled {len(ec_compounds)} KEGG EC entries")
-            return output_csv
-
-        except Exception as e:
-            logger.error(f"Error compiling KEGG data: {e}")
-            return None
-
-    def download_mcsa_catalytic_residues(self) -> bool:
-        """Download M-CSA catalytic residue data from API.
-
-        Downloads homologues residue annotations from the M-CSA API.
-
-        Returns:
-            True if successful
-        """
-        try:
-            logger.info("Downloading M-CSA catalytic residue data from API...")
-            mcsa_dir = self.data_dir / "mcsa"
-            mcsa_dir.mkdir(parents=True, exist_ok=True)
-
-            # Download homologues residues
-            homologues_url = urljoin(self.MCSA_API_URL, "homologues_residues.json")
-            homologues_file = mcsa_dir / "catalytic_residues_homologues.json"
-
-            logger.info("Downloading homologues residues...")
-            if not self.download_file(homologues_url, homologues_file):
-                logger.warning("Failed to download homologues residues")
-                return False
-
-            logger.info("✓ Downloaded M-CSA catalytic residue data")
-            return True
-
-        except Exception as e:
-            logger.error(f"Error downloading M-CSA data: {e}")
-            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(BUNDLED_DATA_DIR / filename, path)
+        logger.info(f"Copied bundled {filename}")
+        return True
 
     def setup_sifts(self) -> bool:
-        """Setup SIFTS (PDB-UniProt mappings).
-
-        Downloads from EBI PDBe SIFTS data.
-
-        Returns:
-            True if successful
-        """
-        logger.info("Setting up SIFTS data...")
-        sifts_dir = self.data_dir / "sifts"
-        sifts_dir.mkdir(parents=True, exist_ok=True)
-
-        files = {
-            "uniprot_pdb.csv": "uniprot_pdb.csv",
-            "pdb_chain_uniprot.csv": "pdb_chain_uniprot.csv",
-            "pdb_chain_enzyme.csv": "pdb_chain_enzyme.csv",
-        }
-
-        success = True
-        for filename, remote_name in files.items():
-            url = urljoin(self.SIFTS_URL, remote_name)
-            output = sifts_dir / filename
-            if not self.download_file(url, output):
-                success = False
-
-        return success
-
-    def setup_kegg(self) -> bool:
-        """Setup KEGG reaction data.
-
-        Attempts to compile fresh KEGG data using Biopython REST API.
-        Falls back to bundled data if compilation fails.
-
-        Returns:
-            True if successful
-        """
-        logger.info("Setting up KEGG data...")
-        kegg_dir = self.data_dir / "kegg"
-        kegg_dir.mkdir(parents=True, exist_ok=True)
-        output = kegg_dir / "kegg_reaction_components.csv"
-
-        # Try to compile fresh data
-        try:
-            compiled_file = self.compile_kegg_reactions()
-            if compiled_file and compiled_file.exists():
-                return True
-        except Exception as e:
-            logger.warning(f"Failed to compile fresh KEGG data: {e}")
-
-        # Fall back to bundled data
-        logger.info("Falling back to bundled KEGG data...")
-        return self.copy_bundled_file("kegg_reaction_components.csv", output)
-
-    def setup_rhea(self) -> bool:
-        """Setup RHEA reaction data.
-
-        Attempts to download and compile the latest RHEA data from source.
-        Falls back to bundled pre-compiled data if download fails.
-
-        Returns:
-            True if successful
-        """
-        logger.info("Setting up RHEA data...")
-        rhea_dir = self.data_dir / "rhea"
-        rhea_dir.mkdir(parents=True, exist_ok=True)
-        output = rhea_dir / "rhea_reaction_components.csv"
-
-        # Try to download and compile fresh data
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                compiled_file = self.compile_rhea_reactions(Path(temp_dir))
-                if compiled_file and compiled_file.exists():
-                    shutil.copy2(compiled_file, output)
-                    logger.info(f"✓ Successfully compiled fresh RHEA data")
-                    return True
-        except Exception as e:
-            logger.warning(f"Failed to compile fresh RHEA data: {e}")
-
-        # Fall back to bundled data
-        logger.info("Falling back to bundled RHEA data...")
-        return self.copy_bundled_file("rhea_reaction_components.csv", output)
+        """SIFTS residue-level PDB <-> UniProt <-> EC mappings."""
+        return all([
+            self._fetch(SIFTS_URL.format(name), f"sifts/{name}.csv", decompress=True)
+            for name in ("uniprot_pdb", "pdb_chain_uniprot", "pdb_chain_enzyme")
+        ])
 
     def setup_pdbe(self) -> bool:
-        """Setup PDBe data (ions, cofactors, resolution).
+        """Resolution index (wwPDB) and bundled ligand/ion classification tables.
 
-        Returns:
-            True if successful
+        The PDBe ion, cofactor and crystallisation-artefact tables are no longer
+        published, so snapshots ship with the package.
         """
-        logger.info("Setting up PDBe data...")
-        pdbe_dir = self.data_dir / "pdbe"
-        pdbe_dir.mkdir(parents=True, exist_ok=True)
-
-        files = {
-            "pdb_ions.csv": "pdb_ions.csv",
-            "pdb_cofactors.csv": "pdb_cofactors.csv",
-            "resolu.idx": "resolu.idx",
-        }
-
-        success = True
-        for filename, remote_name in files.items():
-            url = urljoin(self.PDBE_URL, remote_name)
-            output = pdbe_dir / filename
-            if not self.download_file(url, output):
-                success = False
-
-        return success
+        bundled = ("pdb_ions.csv", "pdb_cofactors.csv", "crystallization_hets.csv", "metals.csv")
+        return all(
+            [self._fetch(RESOLUTION_URL, "pdbe/resolu.idx")]
+            + [self._copy_bundled(name, f"pdbe/{name}") for name in bundled]
+        )
 
     def setup_mcsa(self) -> bool:
-        """Setup M-CSA catalytic site data.
+        """M-CSA catalytic residues, entry metadata and (bundled) cofactors."""
+        return all([
+            self._fetch(MCSA_API_URL + "homologues_residues.json",
+                        "mcsa/catalytic_residues_homologues.json"),
+            self._fetch(MCSA_API_URL + "residues/?format=json",
+                        "mcsa/catalytic_residues_references.json"),
+            self._fetch_mcsa_entry_info(),
+            self._copy_bundled("mcsa_cofactors.csv", "mcsa/mcsa_cofactors.csv"),
+        ])
 
-        Downloads latest catalytic residue annotations from M-CSA API.
-        Uses bundled cofactor data that has been retired from public domain.
+    def _fetch_mcsa_entry_info(self) -> bool:
+        entry_dir = self.data_dir / "mcsa" / "entry_info"
+        if not self.force and any(entry_dir.glob("mcsa_entry_info.*.json")):
+            logger.info("Already present, skipping: mcsa/entry_info/")
+            return True
+        page = 1
+        url: Optional[str] = MCSA_API_URL + "entries/?format=json&page=1"
+        while url:
+            path = entry_dir / f"mcsa_entry_info.{page:02d}.json"
+            if not download_file(url, path):
+                return False
+            with open(path) as f:
+                url = json.load(f).get("next")
+            page += 1
+        return True
 
-        Returns:
-            True if successful
+    def setup_rhea(self) -> bool:
+        """RHEA EC -> ChEBI reaction components, compiled from the latest release.
+
+        Falls back to a bundled snapshot if RHEA cannot be reached.
         """
-        logger.info("Setting up M-CSA data...")
-        mcsa_dir = self.data_dir / "mcsa"
-        mcsa_dir.mkdir(parents=True, exist_ok=True)
+        output = self.data_dir / "rhea" / "rhea_reaction_components.csv"
+        if not self._needed(output):
+            return True
+        with tempfile.TemporaryDirectory() as tmp:
+            if _compile_rhea(Path(tmp), output):
+                return True
+        logger.warning("Using bundled RHEA snapshot instead")
+        return self._copy_bundled("rhea_reaction_components.csv", "rhea/rhea_reaction_components.csv")
 
-        success = True
+    def setup_kegg(self) -> bool:
+        """KEGG EC -> compound mapping from the KEGG REST API.
 
-        # Download latest catalytic residue data from API
-        if not self.download_mcsa_catalytic_residues():
-            logger.warning("Failed to download M-CSA catalytic residue data from API")
-            success = False
-
-        # Use bundled cofactor data
-        output = mcsa_dir / "mcsa_cofactors.csv"
-        if not self.copy_bundled_file("mcsa_cofactors.csv", output):
-            success = False
-
-        return success
-
-    def setup_metals(self) -> bool:
-        """Setup metals reference data.
-
-        Uses bundled metals list that has been retired from the public domain.
-
-        Returns:
-            True if successful
+        Falls back to a bundled snapshot if KEGG cannot be reached.
         """
-        logger.info("Setting up metals reference data...")
-        pdbe_dir = self.data_dir / "pdbe"
-        pdbe_dir.mkdir(parents=True, exist_ok=True)
+        output = self.data_dir / "kegg" / "kegg_reaction_components.csv"
+        if not self._needed(output):
+            return True
+        if _compile_kegg(output):
+            return True
+        logger.warning("Using bundled KEGG snapshot instead")
+        return self._copy_bundled("kegg_reaction_components.csv", "kegg/kegg_reaction_components.csv")
 
-        output = pdbe_dir / "metals.csv"
-        return self.copy_bundled_file("metals.csv", output)
-
-    def setup_crystallization_hets(self) -> bool:
-        """Setup crystallization artifacts reference data.
-
-        Uses bundled crystallization HETs list.
-
-        Returns:
-            True if successful
-        """
-        logger.info("Setting up crystallization HETs reference data...")
-        pdbe_dir = self.data_dir / "pdbe"
-        pdbe_dir.mkdir(parents=True, exist_ok=True)
-
-        output = pdbe_dir / "crystallization_hets.csv"
-        return self.copy_bundled_file("crystallization_hets.csv", output)
-
-
-    def setup_all(self, skip_optional: bool = False) -> dict:
-        """Setup all data files.
-
-        Args:
-            skip_optional: Skip optional data sources (KEGG)
-
-        Returns:
-            Dictionary with setup status for each source
-        """
-        logger.info(f"Starting automatic CSA-3D data setup to {self.data_dir}")
-
-        results = {}
-        results["sifts"] = self.setup_sifts()
-        results["rhea"] = self.setup_rhea()
-        results["pdbe"] = self.setup_pdbe()
-        results["mcsa"] = self.setup_mcsa()
-        results["metals"] = self.setup_metals()
-        results["crystallization_hets"] = self.setup_crystallization_hets()
-
-        if not skip_optional:
-            results["kegg"] = self.setup_kegg()
-
-        # Summary
-        logger.info("\n" + "=" * 60)
-        logger.info("Data Setup Summary:")
-        for source, success in results.items():
-            status = "✓ Complete" if success else "✗ Failed/Skipped"
-            logger.info(f"  {source.upper()}: {status}")
-        logger.info("=" * 60)
-
+    def setup_all(self) -> Dict[str, bool]:
+        """Run every setup step and return {source: success}."""
+        logger.info(f"Setting up CSA-3D data in {self.data_dir}")
+        results = {
+            "sifts": self.setup_sifts(),
+            "pdbe": self.setup_pdbe(),
+            "mcsa": self.setup_mcsa(),
+            "rhea": self.setup_rhea(),
+            "kegg": self.setup_kegg(),
+        }
+        for source, ok in results.items():
+            logger.info(f"  {source.upper():6s} {'ok' if ok else 'FAILED'}")
         return results
 
 
-def setup_data(data_dir: Optional[str] = None) -> bool:
-    """Setup CSA-3D data automatically.
+def _compile_rhea(tmp: Path, output: Path) -> bool:
+    rd_tar, rhea2ec, directions = tmp / "rhea-rd.tar.gz", tmp / "rhea2ec.tsv", tmp / "rhea-directions.tsv"
+    if not (download_file(RHEA_RD_URL, rd_tar)
+            and download_file(RHEA_TSV_URL.format("rhea2ec.tsv"), rhea2ec)
+            and download_file(RHEA_TSV_URL.format("rhea-directions.tsv"), directions)):
+        return False
+    try:
+        with tarfile.open(rd_tar, "r:gz") as tar:
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(tmp, filter="data")
+            else:
+                tar.extractall(tmp)
+
+        directional2master = {}
+        with open(directions) as f:
+            next(f)
+            for row in csv.reader(f, delimiter="\t"):
+                directional2master[row[1]] = row[0]
+                directional2master[row[2]] = row[0]
+
+        master2ec = defaultdict(set)
+        with open(rhea2ec) as f:
+            next(f)
+            for row in csv.reader(f, delimiter="\t"):
+                master2ec[row[2]].add(row[3])
+
+        reactions = defaultdict(set)
+        for rd_file in (tmp / "rd").glob("*.rd"):
+            with open(rd_file) as f:
+                for line in f:
+                    if line.startswith("CHEBI:"):
+                        reactions[rd_file.stem].add(line.strip().split(":")[-1])
+
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with open(output, "w") as f:
+            f.write("RHEA_MASTER_ID,RHEA_DIRECTIONAL_ID,EC,CHEBI_IDS\n")
+            # Numeric order matters: the loader keeps the last reaction per EC.
+            for rhea_id in sorted(reactions, key=int):
+                master = directional2master.get(rhea_id, str(int(rhea_id) - 1))
+                for ec in sorted(master2ec.get(master, ())):
+                    f.write(f"{master},{rhea_id},{ec},{';'.join(sorted(reactions[rhea_id]))}\n")
+        logger.info(f"Compiled {len(reactions)} RHEA reactions")
+        return True
+    except (OSError, tarfile.TarError, ValueError, IndexError) as e:
+        logger.warning(f"Could not compile RHEA data: {e}")
+        return False
+
+
+def _compile_kegg(output: Path) -> bool:
+    from Bio.KEGG import REST
+
+    try:
+        lines = REST.kegg_link("compound", "enzyme").readlines()
+    except (urllib.error.URLError, OSError) as e:
+        logger.warning(f"Could not query KEGG: {e}")
+        return False
+
+    ec_compounds = defaultdict(set)
+    for line in lines:
+        parts = line.strip().split("\t")
+        if len(parts) == 2:
+            ec_compounds[parts[0].split(":")[-1]].add(parts[1].split(":")[-1])
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "w") as f:
+        f.write("EC,KEGG_COMPOUNDS\n")
+        for ec in sorted(ec_compounds):
+            f.write(f"{ec},{';'.join(sorted(ec_compounds[ec]))}\n")
+    logger.info(f"Compiled {len(ec_compounds)} KEGG EC entries")
+    return True
+
+
+def setup_data(data_dir: Optional[Union[str, Path]] = None, force: bool = False) -> bool:
+    """Download and prepare CSA-3D data, then make it the active data directory.
 
     Args:
-        data_dir: Directory for data files. Defaults to ~/.csa3d/data
+        data_dir: Where to store the data. Defaults to ``~/.csa3d/data``, which
+            CSA-3D finds automatically in later sessions. For any other location,
+            call ``csa3d.set_data_dir(path)`` or set ``CSA3D_DATA_DIR`` in new sessions.
+        force: Re-download files even if they are already present.
 
     Returns:
-        True if setup successful
+        True if every source was set up successfully.
     """
-    if data_dir is None:
-        data_dir = str(Path.home() / ".csa3d" / "data")
-
-    logger.info(f"Setting up CSA-3D data in: {data_dir}")
-
-    downloader = DataDownloader(Path(data_dir))
-    results = downloader.setup_all()
-
-    success = all(results.values())
-    if success:
-        logger.info(f"\n✓ Data setup complete!")
-        logger.info(f"Set environment variable: export CSA3D_DATA_DIR={data_dir}")
-    else:
-        logger.warning("\n⚠ Some data sources failed to download")
-        logger.info("Please check logs above and retry")
-
-    return success
+    data_dir = Path(data_dir).expanduser() if data_dir else Path.home() / ".csa3d" / "data"
+    results = DataDownloader(data_dir, force=force).setup_all()
+    set_data_dir(str(data_dir))
+    failed = [source for source, ok in results.items() if not ok]
+    if failed:
+        logger.warning(f"Setup incomplete; failed sources: {', '.join(failed)}. "
+                       "Re-run setup_data() to retry only the missing files.")
+    return not failed
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s: %(message)s"
-    )
-    setup_data()
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    sys.exit(0 if setup_data(sys.argv[1] if len(sys.argv) > 1 else None) else 1)

@@ -1,92 +1,35 @@
 #!/usr/bin/env python3
-"""
-Basic CSA-3D Usage Example
+"""Basic CSA-3D workflow: build an M-CSA entry and inspect its catalytic sites.
 
-This example demonstrates the fundamental workflow for using CSA-3D:
-1. Initializing the database
-2. Building entries
-3. Accessing catalytic sites
+Usage: python basic_usage.py [MCSA_ID]
 """
 
-# Note: This example requires the M-CSA data files to be available.
-# Set the CSA3D_DATA_DIR environment variable to point to your data directory,
-# or place data in ~/.csa3d/data
+import sys
 
-def basic_workflow():
-    """Demonstrate basic CSA-3D workflow."""
-    try:
-        from Mcsa import Mcsa
-    except ImportError:
-        print("Error: Could not import Mcsa module")
-        print("Make sure you are running this from the CSA-3D root directory")
-        return
+import csa3d
 
-    print("=" * 60)
-    print("CSA-3D Basic Usage Example")
-    print("=" * 60)
 
-    # Initialize the database
-    print("\n1. Initializing M-CSA database...")
-    try:
-        db = Mcsa()
-        print(f"   ✓ Database initialized")
-    except Exception as e:
-        print(f"   ✗ Error initializing database: {e}")
-        print(f"   Make sure CSA3D_DATA_DIR is set correctly")
-        return
+def main(mcsa_id: int = 1) -> None:
+    csa3d.setup_data()  # one-off download; skips files already present
 
-    # Build a specific entry
-    print("\n2. Building an entry (ID: 1)...")
-    try:
-        success = db.build(1, annotate=False)
-        if success:
-            entry = db.entries[1]
-            print(f"   ✓ Entry 1 built successfully")
-            print(f"   - EC number: {entry.e_number}")
-            print(f"   - PDB sites: {len(entry.pdbsites)}")
-            print(f"   - UniProt sites: {len(entry.unisites)}")
-        else:
-            print(f"   ✗ Failed to build entry 1")
-            return
-    except Exception as e:
-        print(f"   ✗ Error building entry: {e}")
-        return
+    db = csa3d.Mcsa()
+    db.build(entry_ids=mcsa_id)
+    entry = db.entries[mcsa_id]
+    print(f"M-CSA {mcsa_id}: {entry.info['enzyme_name']} (EC {', '.join(entry.info['all_ecs'])})")
+    print(f"{len(entry.pdbsites)} PDB sites, {len(entry.unisites)} UniProt sites\n")
 
-    # Access catalytic sites
-    print("\n3. Accessing catalytic sites...")
-    try:
-        for i, site in enumerate(entry.pdbsites[:3], 1):
-            print(f"   PDB Site {i}:")
-            print(f"   - ID: {site.id}")
-            print(f"   - Structure: {site.pdb_id}")
-            print(f"   - Residues: {len(site)}")
-            if i >= 3:
-                break
+    reference = next(site for site in entry.get_pdbsites() if site.is_reference)
+    print(f"Reference site {reference.id} ({reference.resolution} Å)")
+    for res in reference.residues:
+        print(f"  {res.resname} {res.chain}{res.auth_resid}")
 
-        if len(entry.unisites) > 0:
-            print(f"\n   UniProt Sites: {len(entry.unisites)} total")
-    except Exception as e:
-        print(f"   ✗ Error accessing sites: {e}")
-        return
-
-    # Calculate RMSD matrix (if multiple sites)
-    print("\n4. Calculating RMSD matrix...")
-    try:
-        if len(entry.pdbsites) > 1:
-            sites = entry.pdbsites[:5]  # Use first 5 sites
-            matrix = entry.rmsd_matrix(sites)
-            print(f"   ✓ RMSD matrix calculated")
-            print(f"   - Matrix shape: {matrix.shape}")
-            print(f"   - Matrix range: {matrix.min():.2f} to {matrix.max():.2f}")
-        else:
-            print(f"   - Only {len(entry.pdbsites)} site(s) available")
-    except Exception as e:
-        print(f"   ✗ Error calculating RMSD: {e}")
-
-    print("\n" + "=" * 60)
-    print("Example completed successfully!")
-    print("=" * 60)
+    print("\nHomologous sites (first 5):")
+    sites = [site for site in entry.get_pdbsites(sane_only=True) if not site.is_reference]
+    for site in sites[:5]:
+        _, _, rms, _ = reference.fit(site)
+        status = "conserved" if site.is_conserved else "mutated"
+        print(f"  {site.id:40s} {site.sequence}  {status:9s} RMSD {rms:.2f} Å")
 
 
 if __name__ == "__main__":
-    basic_workflow()
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
