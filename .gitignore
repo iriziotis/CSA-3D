@@ -16,3 +16,6 @@ jj
 test/
 logs/
 out/
+dist/
+build/
+*.egg-info/
