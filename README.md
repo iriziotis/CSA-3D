@@ -51,28 +51,43 @@ pip install -e ".[dev,docs]"
 
 ## Quick Start
 
-### 1. Configure Data Directory
+### 1. Automatic Data Setup (Recommended)
 
-First, you need to set up the M-CSA data files. You can either:
+Download and setup M-CSA data automatically:
 
-**Option A: Download automatically (recommended)**
 ```python
-from csa3d import config
-config.setup_data("/path/to/csa3d_data")  # Downloads ~50 GB
+from csa3d import setup_data
+
+# Downloads ~50 GB of data to ~/.csa3d/data
+# Set up specific location with:
+# setup_data("/path/to/csa3d_data")
+success = setup_data()
+
+if success:
+    print("✓ Data setup complete!")
 ```
 
-**Option B: Set environment variable**
+Or via command line:
+```bash
+python -m csa3d.data_setup /path/to/csa3d_data
+```
+
+### 2. Manual Data Configuration
+
+If you prefer to download data manually:
+
+**Option A: Environment variable**
 ```bash
 export CSA3D_DATA_DIR="/path/to/csa3d_data"
 ```
 
-**Option C: Set in code**
+**Option B: Set in code**
 ```python
-from csa3d import config
-config.set_data_dir("/path/to/csa3d_data")
+from csa3d import set_data_dir
+set_data_dir("/path/to/csa3d_data")
 ```
 
-### 2. Load and Inspect Active Sites
+### 3. Load and Inspect Active Sites
 
 ```python
 from csa3d import Mcsa
@@ -97,7 +112,7 @@ for entry in db:
         print(f"    Resolution: {site.resolution} Å")
 ```
 
-### 3. Clustering and Template Creation
+### 4. Clustering and Template Creation
 
 ```python
 # Build multiple entries
