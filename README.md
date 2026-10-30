@@ -140,13 +140,15 @@ print(f"Template created: {template.id}")
 ## Data Requirements
 
 CSA-3D requires data from several external sources. The setup process automatically:
+- Downloads latest M-CSA catalytic residue annotations from the official API
 - Compiles fresh RHEA reaction data from the latest RHEA source files
-- Uses bundled datasets that are no longer publicly available (M-CSA, metals reference)
+- Compiles KEGG enzyme-compound mappings using KEGG REST API
+- Uses bundled datasets that are no longer publicly available (M-CSA cofactors, metals reference)
 - Downloads other datasets from official sources when available
 
 ### Core M-CSA Data
-- `mcsa/catalytic_residues_homologues.json` - Homologous catalytic residues
-- `mcsa/catalytic_residues_references.json` - Reference catalytic residues
+- `mcsa/catalytic_residues_homologues.json` - **Downloaded from API** - Homologous catalytic residues
+- `mcsa/catalytic_residues_references.json` - **Downloaded from API** - Reference catalytic residues
 - `mcsa/entry_info/mcsa_entry_info.*.json` - Entry metadata
 - `mcsa/mcsa_cofactors.csv` - **Bundled** - M-CSA cofactors (retired from public domain)
 
@@ -164,7 +166,7 @@ CSA-3D requires data from several external sources. The setup process automatica
 
 ### Reaction Data
 - `rhea/rhea_reaction_components.csv` - RHEA reaction components (freshly compiled from latest source)
-- `kegg/kegg_reaction_components.csv` - KEGG enzyme reactions
+- `kegg/kegg_reaction_components.csv` - **Compiled from KEGG REST API** - KEGG enzyme reactions
 - `pdbe/resolu.idx` - PDB resolution index
 
 ### Molecule Data
