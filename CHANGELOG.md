@@ -5,6 +5,21 @@ All notable changes to CSA-3D are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-10-30
+
+### Added
+- Automatic data setup module (`csa3d.data_setup`)
+- `setup_data()` function for zero-configuration deployment
+- Automatic downloads from SIFTS, RHEA, PDBe, and M-CSA
+- Package-level `__init__.py` with public API exposure
+- Comprehensive documentation updates
+
+### Improved
+- README with automatic setup as primary approach
+- API reference documentation with `setup_data()` examples
+- Release notes emphasizing production-ready deployment
+- Setup experience: manual → automatic (30 seconds)
+
 ## [0.2.1] - 2026-10-30
 
 ### Changed
