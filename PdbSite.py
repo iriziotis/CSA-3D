@@ -68,7 +68,7 @@ class PdbSite:
         """Return size of site (residue count)."""
         return self.size
 
-    def __iter__(self):
+    def __iter__(self) -> Generator[PdbResidue, None, None]:
         """Iterate over residues."""
         yield from self.residues
 
@@ -442,7 +442,8 @@ class PdbSite:
 
     # Methods
 
-    def copy(self, include_structure=True):
+    def copy(self, include_structure: bool = True) -> 'PdbSite':
+        """Return a copy of this PdbSite."""
         """Returns a copy of the site"""
         site = PdbSite()
         for res in self:
@@ -457,7 +458,8 @@ class PdbSite:
         site.mmcif_dict = self.mmcif_dict
         return site
 
-    def add(self, residue):
+    def add(self, residue: PdbResidue) -> None:
+        """Add a residue to the site."""
         """Add PdbResidue object to site (in the residues list and dict)"""
         residue = residue.copy()
         if type(residue) == PdbResidue:
@@ -487,7 +489,8 @@ class PdbSite:
                 self.structure[0][chain_id].add(residue.structure)
         return True
 
-    def get_distances(self, kind='com'):
+    def get_distances(self, kind: str = 'com') -> List[float]:
+        """Get pairwise distances between residues in site."""
         """Calculates all intra-site residue distances and returns a
         numpy array"""
         dists = []
@@ -503,11 +506,13 @@ class PdbSite:
                 seen.add((p.full_id, q.full_id))
         return np.array(dists)
 
-    def get_residues(self):
+    def get_residues(self) -> List[PdbResidue]:
+        """Return list of residues (excluding gaps)."""
         """To iterate over catalytic residues"""
         yield from self.residues
 
-    def get_gaps(self):
+    def get_gaps(self) -> List[PdbResidue]:
+        """Get residues that are gaps in alignment."""
         """Returns an index of the gap positions (non-aligned residues)"""
         gaps = []
         for i, res in enumerate(self.residues):
@@ -515,7 +520,8 @@ class PdbSite:
                 gaps.append(i)
         return gaps
 
-    def contains_equivalent(self, res):
+    def contains_equivalent(self, res: PdbResidue) -> bool:
+        """Check if site contains equivalent residue."""
         """Checks if the site contains a catalytic residue of the basic info
         (name, resid, auth_resid), and either the same chiral_id or chain"""
         for sres in self:
@@ -524,7 +530,8 @@ class PdbSite:
                 return True
         return False
 
-    def has_identical_residues(self, other):
+    def has_identical_residues(self, other: 'PdbSite') -> bool:
+        """Check if this site shares identical residues with other."""
         """Checks if two sites have the same residues, although their order might be
         different. Used to cleanup redundant symmetrical active sites like
         HIV-protease"""
@@ -533,7 +540,8 @@ class PdbSite:
                 return False
         return True
 
-    def get_chiral_residues(self):
+    def get_chiral_residues(self) -> List[PdbResidue]:
+        """Get chiral residues from site."""
         """Gets chiral residues from the site if there are any (residues that have
         the same resname, resid, auth_resid but different chains)"""
         identicals = set()
@@ -547,7 +555,8 @@ class PdbSite:
         return identicals
     
 
-    def find_ligands(self, structure, radius=5):
+    def find_ligands(self, structure: Structure, radius: float = 5.0) -> List[Het]:
+        """Find ligands/ligand-like HETs within specified radius."""
         """
         Searches the parent structure for hetero components close to the
         catalytic residues, by searching around the atoms of catalytic residues
@@ -605,7 +614,15 @@ class PdbSite:
                     self.add(ligand)
         return 
 
-    def write_pdb(self, outdir=None, outfile=None, write_hets=False, func_atoms_only=False, include_dummy_atoms=False, subset=None):
+    def write_pdb(
+        self,
+        outdir: Optional[str] = None,
+        outfile: Optional[str] = None,
+        write_hets: bool = False,
+        func_atoms_only: bool = False,
+        include_dummy_atoms: bool = False,
+        subset: Optional[List[int]] = None
+    ) -> None:
         """
         Writes site coordinates in PDB format
         Args:
@@ -690,7 +707,7 @@ class PdbSite:
             print('END', file=o)
 
 
-    def get_functional_site(self, ca=False):
+    def get_functional_site(self, ca: bool = False) -> 'PdbSite':
         """Returns site only containing functional atoms"""
         site = self.copy(include_structure=True)
         for res in list(site.residues)[::-1]:
@@ -715,8 +732,21 @@ class PdbSite:
         return site
 
 
-    def fit(self, other, weighted=False, cycles=1, cutoff=999, scaling_factor=None, transform=False, 
-            mutate=True, reorder=True, allow_symmetrics=True, ca=False, exclude=None, get_array=False):
+    def fit(
+        self,
+        other: 'PdbSite',
+        weighted: bool = False,
+        cycles: int = 1,
+        cutoff: float = 999,
+        scaling_factor: Optional[float] = None,
+        transform: bool = False,
+        mutate: bool = True,
+        reorder: bool = True,
+        allow_symmetrics: bool = True,
+        ca: bool = False,
+        exclude: Optional[List[int]] = None,
+        get_array: bool = False
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[float], Optional[float]]:
         """Iteratively fits two catalytic sites (self: fixed site, other: mobile site)
         using the Kabsch algorithm from the rmsd module (https://github.com/charnley/rmsd).
         Can also find the optimal atom alignment in each residue, considering
@@ -787,7 +817,13 @@ class PdbSite:
             return rot, tran, rms, rms_all, p_coords, q_trans
         return rot, tran, rms, rms_all
 
-    def per_residue_rms(self, other, rot=None, tran=None, transform=False):
+    def per_residue_rms(
+        self,
+        other: 'PdbSite',
+        rot: Optional[np.ndarray] = None,
+        tran: Optional[np.ndarray] = None,
+        transform: bool = False
+    ) -> np.ndarray:
         """Calculates the RMSD of each residue in two superimposed sites.
         If superposition rotation matrix and translation vector are not given,
         RMSD is calculated without transformation. Otherwise, fitting is performed
