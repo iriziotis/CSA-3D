@@ -5,7 +5,6 @@ import os
 import warnings
 from typing import Optional, List, Dict, Any, Tuple
 import numpy as np
-from ._vendor import parity_core
 from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
@@ -14,6 +13,8 @@ from Bio.PDB.Residue import Residue
 from Bio.PDB.Atom import Atom
 from Bio.PDB.Polypeptide import is_aa
 from rdkit.Chem.rdmolfiles import MolFromMolFile
+from rdkit.Chem import AllChem
+from rdkit import DataStructs
 from .residue_definitions import (
     AA_3TO1,
     STANDARD_RESIDUES,
@@ -564,9 +565,12 @@ class Het(PdbResidue):
         return None, None
 
     def generate_parity(self) -> Tuple[Optional[float], Optional[str]]:
-        """Calculates parity score for each cognate reaction component and
-        for the best match, it returns the score, the match ID, and the type
-        (Reactant or Product)."""
+        """Calculate Tanimoto similarity score for cognate reaction components.
+
+        Computes molecular fingerprint similarity (Tanimoto) between the bound
+        molecule and each cognate reaction component, returning the best match
+        score and its ID.
+        """
         if self.is_polymer:
             return None, None
         bound = f'{HET_MOLS_DIR}/{self.resname}.sdf'
@@ -575,17 +579,33 @@ class Het(PdbResidue):
         components = self.get_reaction()
         if not components:
             return None, None
+
+        try:
+            bound_mol = MolFromMolFile(bound)
+            if bound_mol is None or bound_mol.GetNumAtoms() == 0:
+                return None, None
+            bound_fp = AllChem.GetMorganFingerprintAsBitVect(bound_mol, 2, nBits=1024)
+        except Exception:
+            return None, None
+
         for cognate in components:
             try:
-                score = parity_core.generate_parity(bound, cognate, quiet=True)
-            except Exception as e:
+                cognate_mol = MolFromMolFile(cognate)
+                if cognate_mol is None or cognate_mol.GetNumAtoms() == 0:
+                    continue
+                cognate_fp = AllChem.GetMorganFingerprintAsBitVect(cognate_mol, 2, nBits=1024)
+                score = DataStructs.TanimotoSimilarity(bound_fp, cognate_fp)
+            except Exception:
                 continue
+
             if score >= max_score:
                 max_score = score
                 match = cognate.split('/')[-1].split('.')[0]
+
             # Check if cognate and bound component are single-atom molecules
-            if self.is_polymer or (MolFromMolFile(bound).GetNumAtoms() == 1 and MolFromMolFile(cognate).GetNumAtoms() == 1):
+            if self.is_polymer or (bound_mol.GetNumAtoms() == 1 and cognate_mol.GetNumAtoms() == 1):
                 self.cannot_be_artefact = True
+
         return np.round(max_score, 2), match
 
     # Private methods
