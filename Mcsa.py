@@ -13,12 +13,22 @@ from collections import defaultdict
 from glob import glob
 from typing import Dict, List, Optional, Union
 from natsort import natsorted
-from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
-from .Entry import Entry
-from .PdbSite import PdbSite
-from .UniSite import UniSite
-from .PdbResidue import PdbResidue
-from .UniResidue import UniResidue
+
+# Handle imports from both package and root-level contexts
+try:
+    from config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
+    from Entry import Entry
+    from PdbSite import PdbSite
+    from UniSite import UniSite
+    from PdbResidue import PdbResidue
+    from UniResidue import UniResidue
+except ImportError:
+    from .config import CAT_RES_INFO, MCSA_ENTRY_INFO, ASSEMBLIES_DIR, PDBID_RESOLUTION
+    from .Entry import Entry
+    from .PdbSite import PdbSite
+    from .UniSite import UniSite
+    from .PdbResidue import PdbResidue
+    from .UniResidue import UniResidue
 
 logger = logging.getLogger(__name__)
 

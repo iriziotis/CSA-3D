@@ -10,3 +10,6 @@ __all__ = [
     "set_data_dir",
     "get_data_dir",
 ]
+
+# Note: The Mcsa class is available at the package root level.
+# Import with: from Mcsa import Mcsa (after setting up data with csa3d.setup_data())

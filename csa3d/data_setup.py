@@ -241,7 +241,7 @@ class DataDownloader:
     def download_mcsa_catalytic_residues(self) -> bool:
         """Download M-CSA catalytic residue data from API.
 
-        Downloads homologues and reference residue annotations from the M-CSA API.
+        Downloads homologues residue annotations from the M-CSA API.
 
         Returns:
             True if successful
@@ -258,15 +258,6 @@ class DataDownloader:
             logger.info("Downloading homologues residues...")
             if not self.download_file(homologues_url, homologues_file):
                 logger.warning("Failed to download homologues residues")
-                return False
-
-            # Download reference residues
-            reference_url = urljoin(self.MCSA_API_URL, "references_residues.json")
-            reference_file = mcsa_dir / "catalytic_residues_references.json"
-
-            logger.info("Downloading reference residues...")
-            if not self.download_file(reference_url, reference_file):
-                logger.warning("Failed to download reference residues")
                 return False
 
             logger.info("✓ Downloaded M-CSA catalytic residue data")
