@@ -5,7 +5,7 @@ import os
 import warnings
 from typing import Optional, List, Dict, Any, Tuple
 import numpy as np
-import parity_core
+from ._vendor import parity_core
 from copy import copy
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model

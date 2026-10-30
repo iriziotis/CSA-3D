@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Set, Tuple, Generator, Any
 from scipy.spatial.distance import squareform, pdist
 from scipy.cluster.hierarchy import linkage, cut_tree
 from sklearn.cluster import KMeans
-from dendrogram_cut import DendrogramCut
+from ._vendor.dendrogram_cut import DendrogramCut
 from .config import UNI2PDB, REF_RES_INFO
 from .residue_definitions import (
     RESIDUE_DEFINITIONS, TEMPLATE_FUZZY_RESIDUES, TEMPLATE_FUZZY_ATOMS, AA_3TO1

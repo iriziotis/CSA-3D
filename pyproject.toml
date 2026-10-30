@@ -34,8 +34,6 @@ dependencies = [
     "scikit-learn>=0.24.0",
     "rdkit>=2021.09.0",
     "natsort>=8.0.0",
-    "dendrogram-cut>=0.1.0",
-    "parity-core>=0.5.0",
     "rmsd>=1.4.0",
 ]
 
@@ -68,7 +66,7 @@ Repository = "https://github.com/your-username/csa3d"
 "Issue Tracker" = "https://github.com/your-username/csa3d/issues"
 
 [tool.setuptools]
-packages = ["csa3d", "csa3d.config"]
+packages = ["csa3d", "csa3d.config", "csa3d._vendor"]
 
 [tool.black]
 line-length = 100
