@@ -13,7 +13,7 @@ With CSA-3D you can:
   [Jess](https://github.com/iriziotis/jess) / [PyJess](https://github.com/althonos/pyjess)
 - **Annotate** ligands, cofactors and metal ions found in catalytic sites
 
-See the [CSA-3D paper](https://doi.org/10.1016/j.jmb.2022.167488) for the method and applications.
+See the [CSA-3D paper](https://doi.org/10.1016/j.jmb.2022.167517) for the method and applications.
 
 ## Installation
 
@@ -221,17 +221,17 @@ main workflow against real data.
 If you use CSA-3D in your research, please cite:
 
 ```bibtex
-@article{Riziotis2022,
-    title={Conformational Variation in Enzyme Catalysis: A Structural Study on Catalytic Residues},
-    author={Riziotis, Ioannis and others},
-    journal={Journal of Molecular Biology},
-    volume={434},
-    number={5},
-    pages={167488},
-    year={2022},
-    issn={0022-2836},
-    doi={10.1016/j.jmb.2022.167488},
-    url={https://www.sciencedirect.com/science/article/pii/S0022283622000912}
+@article{RIZIOTIS2022167517,
+    title = {Conformational Variation in Enzyme Catalysis: A Structural Study on Catalytic Residues},
+    journal = {Journal of Molecular Biology},
+    volume = {434},
+    number = {7},
+    pages = {167517},
+    year = {2022},
+    issn = {0022-2836},
+    doi = {https://doi.org/10.1016/j.jmb.2022.167517},
+    url = {https://www.sciencedirect.com/science/article/pii/S0022283622000912},
+    author = {Ioannis G. Riziotis and António J.M. Ribeiro and Neera Borkakoti and Janet M. Thornton}
 }
 ```
 
