@@ -6,8 +6,6 @@ from typing import Dict, Optional
 
 # Default data directory locations to try
 _DEFAULT_PATHS = [
-    "/Users/riziotis/ebi/phd/data",
-    "/nfs/research/thornton/riziotis/research/phd/data",
     str(Path.home() / ".csa3d" / "data"),
 ]
 
