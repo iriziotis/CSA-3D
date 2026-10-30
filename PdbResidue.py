@@ -15,28 +15,55 @@ from Bio.PDB.Polypeptide import is_aa
 from rdkit.Chem.rdmolfiles import MolFromMolFile
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
-from .residue_definitions import (
-    AA_3TO1,
-    STANDARD_RESIDUES,
-    NUCLEIC,
-    EQUIVALENT_RESIDUES,
-    EQUIVALENT_ATOMS,
-    RESIDUE_DEFINITIONS,
-)
-from .config import (
-    METALS,
-    REACTIVE_NONMETALS,
-    NOBLE_GASES,
-    PDBID_COFACTORS,
-    MCSA_EC_COFACTORS,
-    CRYSTALLIZATION_HETS,
-    PDB2EC,
-    KEGG_EC_REACTION,
-    RHEA_EC_REACTION,
-    HET_MOLS_DIR,
-    CHEBI_MOLS_DIR,
-    KEGG_MOLS_DIR,
-)
+
+# Handle imports from both package and root-level contexts
+try:
+    from residue_definitions import (
+        AA_3TO1,
+        STANDARD_RESIDUES,
+        NUCLEIC,
+        EQUIVALENT_RESIDUES,
+        EQUIVALENT_ATOMS,
+        RESIDUE_DEFINITIONS,
+    )
+    from config import (
+        METALS,
+        REACTIVE_NONMETALS,
+        NOBLE_GASES,
+        PDBID_COFACTORS,
+        MCSA_EC_COFACTORS,
+        CRYSTALLIZATION_HETS,
+        PDB2EC,
+        KEGG_EC_REACTION,
+        RHEA_EC_REACTION,
+        HET_MOLS_DIR,
+        CHEBI_MOLS_DIR,
+        KEGG_MOLS_DIR,
+    )
+except ImportError:
+    from .residue_definitions import (
+        AA_3TO1,
+        STANDARD_RESIDUES,
+        NUCLEIC,
+        EQUIVALENT_RESIDUES,
+        EQUIVALENT_ATOMS,
+        RESIDUE_DEFINITIONS,
+    )
+    from .config import (
+        METALS,
+        REACTIVE_NONMETALS,
+        NOBLE_GASES,
+        PDBID_COFACTORS,
+        MCSA_EC_COFACTORS,
+        CRYSTALLIZATION_HETS,
+        PDB2EC,
+        KEGG_EC_REACTION,
+        RHEA_EC_REACTION,
+        HET_MOLS_DIR,
+        CHEBI_MOLS_DIR,
+        KEGG_MOLS_DIR,
+    )
+
 
 logger = logging.getLogger(__name__)
 

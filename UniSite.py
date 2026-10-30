@@ -1,8 +1,14 @@
 """UniProt catalytic site representation for M-CSA."""
 
 from typing import Optional, List, Dict, Any, Generator
-from .residue_definitions import AA_3TO1
-from .UniResidue import UniResidue
+
+# Handle imports from both package and root-level contexts
+try:
+    from residue_definitions import AA_3TO1
+    from UniResidue import UniResidue
+except ImportError:
+    from .residue_definitions import AA_3TO1
+    from .UniResidue import UniResidue
 
 
 class UniSite:
