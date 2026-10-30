@@ -4,9 +4,14 @@ Downloads and organizes required data files from official sources.
 Includes bundled datasets that have been retired from the public domain.
 """
 
+import csv
 import logging
 import os
 import shutil
+import subprocess
+import tarfile
+import tempfile
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 import urllib.request
@@ -23,6 +28,8 @@ class DataDownloader:
     SIFTS_URL = "https://www.ebi.ac.uk/pdbe/download/sifts/csv/"
     KEGG_URL = "https://rest.kegg.jp/get/"
     RHEA_URL = "https://www.rhea-db.org/download/rhea/"
+    RHEA_FTP_URL = "https://ftp.expasy.org/databases/rhea/ctfiles/"
+    RHEA_TSV_URL = "https://ftp.expasy.org/databases/rhea/tsv/"
     PDBE_URL = "https://www.ebi.ac.uk/pdbe/download/"
     MCSA_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/download/"
 
@@ -87,6 +94,103 @@ class DataDownloader:
             logger.error(f"Error copying {filename}: {e}")
             return False
 
+    def compile_rhea_reactions(self, temp_dir: Path) -> Optional[Path]:
+        """Compile RHEA reactions from downloaded data.
+
+        Downloads RHEA .rd files, EC mappings, and directions, then compiles
+        the reaction_components.csv file.
+
+        Args:
+            temp_dir: Temporary directory for intermediate files
+
+        Returns:
+            Path to compiled CSV file if successful, None otherwise
+        """
+        try:
+            logger.info("Compiling RHEA reaction data from source files...")
+
+            # Download files
+            rhea_dir = temp_dir / "rhea_download"
+            rhea_dir.mkdir(parents=True, exist_ok=True)
+
+            # Download rhea-rd.tar.gz
+            rd_tar = rhea_dir / "rhea-rd.tar.gz"
+            if not self.download_file(
+                urljoin(self.RHEA_FTP_URL, "rhea-rd.tar.gz"), rd_tar
+            ):
+                return None
+
+            # Download rhea2ec.tsv
+            rhea2ec_file = rhea_dir / "rhea2ec.tsv"
+            if not self.download_file(
+                urljoin(self.RHEA_TSV_URL, "rhea2ec.tsv"), rhea2ec_file
+            ):
+                return None
+
+            # Download rhea-directions.tsv
+            directions_file = rhea_dir / "rhea-directions.tsv"
+            if not self.download_file(
+                urljoin(self.RHEA_TSV_URL, "rhea-directions.tsv"), directions_file
+            ):
+                return None
+
+            # Extract tar file
+            logger.info("Extracting RHEA reaction files...")
+            with tarfile.open(rd_tar, "r:gz") as tar:
+                tar.extractall(rhea_dir)
+
+            # Compile reactions using the compilation script logic
+            logger.info("Compiling reaction components...")
+            output_csv = rhea_dir / "rhea_reaction_components.csv"
+
+            # Map directional reaction IDs to master IDs
+            directional2master = {}
+            with open(directions_file, "r") as f:
+                next(f)
+                for line in csv.reader(f, delimiter="\t"):
+                    master = line[0]
+                    lr = line[1]
+                    rl = line[2]
+                    directional2master[lr] = master
+                    directional2master[rl] = master
+
+            # Map ECs to master IDs
+            master2ec = defaultdict(set)
+            with open(rhea2ec_file, "r") as f:
+                next(f)
+                for line in csv.reader(f, delimiter="\t"):
+                    master = line[2]
+                    ec = line[3]
+                    master2ec[master].add(ec)
+
+            # Extract reactions from .rd files
+            reactions = defaultdict(set)
+            rd_files_dir = rhea_dir / "rd"
+            if rd_files_dir.exists():
+                for rd_file in sorted(rd_files_dir.glob("*.rd")):
+                    rhea_id = rd_file.stem
+                    with open(rd_file, "r") as f:
+                        for line in f:
+                            if line.startswith("CHEBI:"):
+                                chebi_id = line.strip().split(":")[-1]
+                                reactions[rhea_id].add(chebi_id)
+
+            # Write output CSV
+            with open(output_csv, "w") as f:
+                f.write("RHEA_MASTER_ID,RHEA_DIRECTIONAL_ID,EC,CHEBI_IDS\n")
+                for k, v in sorted(reactions.items()):
+                    master = directional2master.get(k, int(k) - 1)
+                    ecs = master2ec.get(str(master), set())
+                    for ec in sorted(ecs):
+                        f.write(f"{master},{k},{ec},{';'.join(sorted(v))}\n")
+
+            logger.info(f"✓ Compiled {len(reactions)} RHEA reactions")
+            return output_csv
+
+        except Exception as e:
+            logger.error(f"Error compiling RHEA data: {e}")
+            return None
+
     def setup_sifts(self) -> bool:
         """Setup SIFTS (PDB-UniProt mappings).
 
@@ -133,7 +237,8 @@ class DataDownloader:
     def setup_rhea(self) -> bool:
         """Setup RHEA reaction data.
 
-        Uses bundled compiled data that requires the raw RHEA .rd files.
+        Attempts to download and compile the latest RHEA data from source.
+        Falls back to bundled pre-compiled data if download fails.
 
         Returns:
             True if successful
@@ -141,8 +246,21 @@ class DataDownloader:
         logger.info("Setting up RHEA data...")
         rhea_dir = self.data_dir / "rhea"
         rhea_dir.mkdir(parents=True, exist_ok=True)
-
         output = rhea_dir / "rhea_reaction_components.csv"
+
+        # Try to download and compile fresh data
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                compiled_file = self.compile_rhea_reactions(Path(temp_dir))
+                if compiled_file and compiled_file.exists():
+                    shutil.copy2(compiled_file, output)
+                    logger.info(f"✓ Successfully compiled fresh RHEA data")
+                    return True
+        except Exception as e:
+            logger.warning(f"Failed to compile fresh RHEA data: {e}")
+
+        # Fall back to bundled data
+        logger.info("Falling back to bundled RHEA data...")
         return self.copy_bundled_file("rhea_reaction_components.csv", output)
 
     def setup_pdbe(self) -> bool:
