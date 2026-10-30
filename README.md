@@ -58,7 +58,8 @@ Download and setup M-CSA data automatically:
 ```python
 from csa3d import setup_data
 
-# Downloads required data to ~/.csa3d/data (~50 GB)
+# Downloads and compiles required data to ~/.csa3d/data (~50 GB)
+# Automatically compiles latest RHEA data from source
 # Includes bundled datasets that are no longer publicly available
 # Set up specific location with:
 # setup_data("/path/to/csa3d_data")
@@ -138,7 +139,10 @@ print(f"Template created: {template.id}")
 
 ## Data Requirements
 
-CSA-3D requires data from several external sources. Some datasets have been retired from the public domain and are **bundled with this package** for convenience.
+CSA-3D requires data from several external sources. The setup process automatically:
+- Compiles fresh RHEA reaction data from the latest RHEA source files
+- Uses bundled datasets that are no longer publicly available (M-CSA, metals reference)
+- Downloads other datasets from official sources when available
 
 ### Core M-CSA Data
 - `mcsa/catalytic_residues_homologues.json` - Homologous catalytic residues
@@ -159,7 +163,7 @@ CSA-3D requires data from several external sources. Some datasets have been reti
 - `sifts/pdb_chain_enzyme.csv` - PDB to EC number mapping
 
 ### Reaction Data
-- `rhea/rhea_reaction_components.csv` - **Bundled** - RHEA reaction components (requires raw .rd files to recompile)
+- `rhea/rhea_reaction_components.csv` - RHEA reaction components (freshly compiled from latest source)
 - `kegg/kegg_reaction_components.csv` - KEGG enzyme reactions
 - `pdbe/resolu.idx` - PDB resolution index
 
