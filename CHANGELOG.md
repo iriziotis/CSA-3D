@@ -5,6 +5,19 @@ All notable changes to CSA-3D are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-10-30
+
+### Changed
+- Replaced parity-core dependency with RDKit Tanimoto similarity for molecular comparison
+- Integrated full dendrogram-cut implementation with PAC-Bayesian cluster selection
+- Enhanced clustering capabilities with automatic optimal cluster detection
+
+### Improved
+- Molecular chirality analysis now uses standard cheminformatics metrics (Morgan fingerprints)
+- Hierarchical clustering now supports pac_bayesian_cut() for automatic k selection
+- Added visualization capabilities (dendrogram plots, heatmaps, silhouette analysis)
+- All clustering visualization dependencies now optional [clustering] group
+
 ## [0.2.0] - 2026-10-30
 
 ### Added
