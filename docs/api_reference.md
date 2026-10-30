@@ -4,6 +4,93 @@ Complete API documentation for CSA-3D classes and methods.
 
 ---
 
+## Module: `csa3d`
+
+Top-level package initialization and utilities.
+
+### Function: `setup_data(data_dir: Optional[str] = None) -> bool`
+
+**Description**: Automatically download and setup CSA-3D data files.
+
+Downloads all required data from official sources and creates proper directory structure. This is the recommended way to initialize CSA-3D for first-time use.
+
+**Parameters:**
+- `data_dir` (str, optional): Directory for data files. Defaults to `~/.csa3d/data`
+
+**Returns:** bool - True if setup successful, False if any downloads failed
+
+**Examples:**
+
+```python
+from csa3d import setup_data
+
+# Use default location
+setup_data()
+
+# Use custom location
+setup_data("/custom/data/path")
+
+# With error handling
+if setup_data():
+    print("✓ Data setup complete!")
+else:
+    print("⚠ Some data sources failed - check logs")
+```
+
+**Downloads:**
+- SIFTS: PDB-UniProt mappings from EBI
+- RHEA: Reaction component data
+- PDBe: Ion, cofactor, and resolution data
+- M-CSA: Catalytic site data
+
+**Notes:**
+- ~50 GB total download size
+- One-time setup required
+- Sets `CSA3D_DATA_DIR` environment variable automatically
+- See `csa3d.data_setup` module for advanced usage
+
+---
+
+### Function: `set_data_dir(data_dir: str) -> None`
+
+**Description**: Set the CSA-3D data directory manually.
+
+Use this if you've already downloaded data or prefer manual setup.
+
+**Parameters:**
+- `data_dir` (str): Path to directory containing CSA-3D data files
+
+**Returns:** None
+
+**Raises:** ConfigError if directory does not exist
+
+**Example:**
+
+```python
+from csa3d import set_data_dir
+
+set_data_dir("/path/to/csa3d_data")
+```
+
+---
+
+### Function: `get_data_dir() -> str`
+
+**Description**: Get the current CSA-3D data directory.
+
+**Returns:** str - Path to data directory
+
+**Example:**
+
+```python
+from csa3d import get_data_dir
+
+data_dir = get_data_dir()
+print(f"Data directory: {data_dir}")
+```
+
+---
+
 ## Module: `Mcsa`
 
 **Description**: Top-level database class for M-CSA entries.
