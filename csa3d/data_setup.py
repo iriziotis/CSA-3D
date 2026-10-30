@@ -1,10 +1,12 @@
 """Automatic data setup and download for CSA-3D.
 
 Downloads and organizes required data files from official sources.
+Includes bundled datasets that have been retired from the public domain.
 """
 
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 import urllib.request
@@ -32,6 +34,8 @@ class DataDownloader:
         """
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Path to bundled data files in the repository
+        self.bundled_data_dir = Path(__file__).parent.parent / "data"
 
     def download_file(self, url: str, output_path: Path) -> bool:
         """Download a file from URL.
@@ -55,6 +59,32 @@ class DataDownloader:
             return False
         except Exception as e:
             logger.error(f"Unexpected error downloading {url}: {e}")
+            return False
+
+    def copy_bundled_file(self, filename: str, output_path: Path) -> bool:
+        """Copy a bundled data file from the repository.
+
+        Args:
+            filename: Name of file in bundled data directory
+            output_path: Path to save file
+
+        Returns:
+            True if successful, False otherwise
+        """
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        source = self.bundled_data_dir / filename
+
+        if not source.exists():
+            logger.warning(f"✗ Bundled file not found: {source}")
+            return False
+
+        try:
+            logger.info(f"Copying {filename} → {output_path}")
+            shutil.copy2(source, output_path)
+            logger.info(f"✓ Copied {output_path.name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error copying {filename}: {e}")
             return False
 
     def setup_sifts(self) -> bool:
@@ -144,7 +174,7 @@ class DataDownloader:
     def setup_mcsa(self) -> bool:
         """Setup M-CSA catalytic site data.
 
-        Downloads from M-CSA database.
+        Uses bundled data files that have been retired from the public domain.
 
         Returns:
             True if successful
@@ -153,9 +183,23 @@ class DataDownloader:
         mcsa_dir = self.data_dir / "mcsa"
         mcsa_dir.mkdir(parents=True, exist_ok=True)
 
-        url = urljoin(self.MCSA_URL, "mcsa_cofactors.csv")
         output = mcsa_dir / "mcsa_cofactors.csv"
-        return self.download_file(url, output)
+        return self.copy_bundled_file("mcsa_cofactors.csv", output)
+
+    def setup_metals(self) -> bool:
+        """Setup metals reference data.
+
+        Uses bundled metals list that has been retired from the public domain.
+
+        Returns:
+            True if successful
+        """
+        logger.info("Setting up metals reference data...")
+        pdbe_dir = self.data_dir / "pdbe"
+        pdbe_dir.mkdir(parents=True, exist_ok=True)
+
+        output = pdbe_dir / "metals.csv"
+        return self.copy_bundled_file("metals.csv", output)
 
     def setup_all(self, skip_optional: bool = False) -> dict:
         """Setup all data files.
@@ -173,6 +217,7 @@ class DataDownloader:
         results["rhea"] = self.setup_rhea()
         results["pdbe"] = self.setup_pdbe()
         results["mcsa"] = self.setup_mcsa()
+        results["metals"] = self.setup_metals()
 
         if not skip_optional:
             results["kegg"] = self.setup_kegg()

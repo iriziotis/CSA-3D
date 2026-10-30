@@ -58,7 +58,8 @@ Download and setup M-CSA data automatically:
 ```python
 from csa3d import setup_data
 
-# Downloads ~50 GB of data to ~/.csa3d/data
+# Downloads required data to ~/.csa3d/data (~50 GB)
+# Includes bundled datasets that are no longer publicly available
 # Set up specific location with:
 # setup_data("/path/to/csa3d_data")
 success = setup_data()
@@ -137,18 +138,20 @@ print(f"Template created: {template.id}")
 
 ## Data Requirements
 
-CSA-3D requires data from several external sources:
+CSA-3D requires data from several external sources. Some datasets have been retired from the public domain and are **bundled with this package** for convenience.
 
 ### Core M-CSA Data
 - `mcsa/catalytic_residues_homologues.json` - Homologous catalytic residues
 - `mcsa/catalytic_residues_references.json` - Reference catalytic residues
 - `mcsa/entry_info/mcsa_entry_info.*.json` - Entry metadata
+- `mcsa/mcsa_cofactors.csv` - **Bundled** - M-CSA cofactors (retired from public domain)
 
 ### PDB Data
 - `pdbe/assembly_cif/cif/` - PDB assembly structures (mmCIF format)
 - `pdbe/pdb_ions.csv` - Ion classification
 - `pdbe/pdb_cofactors.csv` - Cofactor information
 - `pdbe/crystallization_hets.csv` - Crystallization artifacts
+- `pdbe/metals.csv` - **Bundled** - Metals reference data (retired from public domain)
 
 ### Sequence/Mapping Data (SIFTS)
 - `sifts/uniprot_pdb.csv` - UniProt to PDB mapping
@@ -170,6 +173,10 @@ To download all data:
 from csa3d.config import setup_data
 setup_data("/path/to/csa3d_data")
 ```
+
+This will automatically:
+1. Copy bundled datasets (`mcsa_cofactors.csv`, `metals.csv`) from the package
+2. Download required datasets from official sources
 
 Alternatively, download manually from:
 - M-CSA: https://www.ebi.ac.uk/thornton-srv/m-csa/download/
