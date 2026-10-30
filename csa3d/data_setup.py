@@ -416,6 +416,22 @@ class DataDownloader:
         output = pdbe_dir / "metals.csv"
         return self.copy_bundled_file("metals.csv", output)
 
+    def setup_crystallization_hets(self) -> bool:
+        """Setup crystallization artifacts reference data.
+
+        Uses bundled crystallization HETs list.
+
+        Returns:
+            True if successful
+        """
+        logger.info("Setting up crystallization HETs reference data...")
+        pdbe_dir = self.data_dir / "pdbe"
+        pdbe_dir.mkdir(parents=True, exist_ok=True)
+
+        output = pdbe_dir / "crystallization_hets.csv"
+        return self.copy_bundled_file("crystallization_hets.csv", output)
+
+
     def setup_all(self, skip_optional: bool = False) -> dict:
         """Setup all data files.
 
@@ -433,6 +449,7 @@ class DataDownloader:
         results["pdbe"] = self.setup_pdbe()
         results["mcsa"] = self.setup_mcsa()
         results["metals"] = self.setup_metals()
+        results["crystallization_hets"] = self.setup_crystallization_hets()
 
         if not skip_optional:
             results["kegg"] = self.setup_kegg()
