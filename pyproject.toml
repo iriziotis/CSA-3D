@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "csa3d"
-version = "0.1.0"
+version = "0.2.0"
 description = "Extract and analyze enzyme catalytic sites in 3D from the Mechanism and Catalytic Site Atlas (M-CSA)"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -13,7 +13,7 @@ authors = [
 ]
 keywords = ["enzymes", "catalysis", "structural-biology", "M-CSA", "active-sites"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
