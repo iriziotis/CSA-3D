@@ -159,7 +159,7 @@ class PdbResidue:
                 res.structure = None
         return res
 
-    def add_structure(self, structure):
+    def add_structure(self, structure: 'Union[Residue, Structure]') -> bool:
         """
         Map residue to Biopython residue object
 
@@ -205,7 +205,7 @@ class PdbResidue:
         else:
             return False
 
-    def add_dummy_structure(self):
+    def add_dummy_structure(self) -> bool:
         """Adds a dummy atom of zero coordinates to mark a gap in visualisation
         software"""
         dummy_atom = Atom('DUM', np.zeros(3), 0, 1, ' ', 'DUM', -999)
@@ -216,7 +216,7 @@ class PdbResidue:
         self.dummy_structure = dummy_residue
         return True
 
-    def get_distance(self, other, kind='com'):
+    def get_distance(self, other: 'PdbResidue', kind: str = 'com') -> float:
         if self.structure is None or other.structure is None:
             return np.nan
         if kind == 'com':
@@ -233,7 +233,7 @@ class PdbResidue:
             except KeyError:
                 return self.get_distance(other, kind='com')
 
-    def is_equivalent(self, other, by_chiral_id=True, by_chain=False):
+    def is_equivalent(self, other: 'PdbResidue', by_chiral_id: bool = True, by_chain: bool = False) -> bool:
         """Check if residues share the same pdb_id, chiral_id, name, resid
         and auth_resid"""
         basic = self.reference_residue == other.reference_residue
@@ -248,7 +248,7 @@ class PdbResidue:
             return basic and chains
         return basic
 
-    def get_func_atoms(self, allow_symmetrics=True):
+    def get_func_atoms(self, allow_symmetrics: bool = True) -> Tuple[np.ndarray, np.ndarray]:
         """Gets atoms and coordinates for superposition and atom reordering
         calculations
 
@@ -290,17 +290,17 @@ class PdbResidue:
         return atoms, coords
 
     @property
-    def id(self):
+    def id(self) -> Tuple[Optional[str], str, str, Optional[int], Optional[int]]:
         """ID of a residue as a tuple, not including chiral_id. Might be ambiguous"""
         return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid
 
     @property
-    def full_id(self):
+    def full_id(self) -> Tuple[Optional[str], str, str, Optional[int], Optional[int], Optional[int]]:
         """ID of a residue as a tuple, including chiral_id. Always unique"""
         return self.pdb_id, self.resname, self.chain, self.resid, self.auth_resid, self.chiral_id
 
     @property
-    def corrected_auth_resid(self):
+    def corrected_auth_resid(self) -> Optional[int]:
         """Correction of auth_resid for PDB files where identical assembly chains are
         identified by incrementing the auth_resid by 1000,2000 etc."""
         if not self.auth_resid:
@@ -310,18 +310,18 @@ class PdbResidue:
         return int(str(self.auth_resid)[1:]) + (ord(self.chain) - 65) * 1000
 
     @property
-    def is_gap(self):
+    def is_gap(self) -> bool:
         """Check if residue is empty (no alignment with reference)"""
         return self.resname == '' and self.chain == '' and \
                self.resid is None and self.auth_resid is None
 
     @property
-    def is_conserved(self):
+    def is_conserved(self) -> bool:
         """Check if residue are conserved by comparing to the reference"""
         return self.resname == self.reference_residue.resname or self.is_reference
 
     @property
-    def is_conservative_mutation(self):
+    def is_conservative_mutation(self) -> bool:
         """Checks if residue is functionally equivalent to its reference"""
         if self.resname in EQUIVALENT_RESIDUES:
             if self.reference_residue.resname in EQUIVALENT_RESIDUES[self.resname]:
@@ -329,19 +329,19 @@ class PdbResidue:
         return False
 
     @property
-    def is_standard(self):
+    def is_standard(self) -> bool:
         """Checks if residue is one of the 20 standard ones"""
         return self.resname.upper() in STANDARD_RESIDUES and \
                'ptm' not in self.funclocs and \
                (self.reference_residue is None or self.reference_residue.ptm_resname == '')
 
     @property
-    def has_double_funcloc(self):
+    def has_double_funcloc(self) -> bool:
         """Checks if residue has two function locations"""
         return len(self.funclocs) > 1
 
     @property
-    def has_main_chain_function(self):
+    def has_main_chain_function(self) -> bool:
         """Checks if residue has main chain function"""
         for funcloc in self.funclocs:
             if 'main' in funcloc.lower():
@@ -349,7 +349,7 @@ class PdbResidue:
         return False
 
     @classmethod
-    def from_json(cls, residue, chiral_id=None):
+    def from_json(cls, residue: Dict[str, Any], chiral_id: Optional[int] = None) -> Generator['PdbResidue', None, None]:
         """Constructs a list of PdbResidue objects using information directly from
         the M-CSA homologues json file. Input is a top-level residue entry in the json.
         """
@@ -376,7 +376,7 @@ class PdbResidue:
         return
 
     @staticmethod
-    def transform_chain(chain, to_dash=False):
+    def transform_chain(chain: str, to_dash: bool = False) -> str:
         """
         Transforms the chain field from X-n to XY and reverse.
         Useful for chain IDs found in PDB assembly structures.
@@ -408,8 +408,17 @@ class Het(PdbResidue):
         centrality: the mean minimum distance of the het to the catalytic
     """
 
-    def __init__(self, mcsa_id=None, pdb_id=None, resname='', resid=None,
-                 chain='', structure=None, parent_site=None, calculate_scores=True):
+    def __init__(
+        self,
+        mcsa_id: Optional[int] = None,
+        pdb_id: Optional[str] = None,
+        resname: str = '',
+        resid: Optional[int] = None,
+        chain: str = '',
+        structure: Optional[Residue] = None,
+        parent_site: Optional[Any] = None,
+        calculate_scores: bool = True
+    ) -> None:
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
         self.structure = None
         self.parent_site = parent_site
@@ -425,13 +434,13 @@ class Het(PdbResidue):
             self.similarity, self.best_match = self.get_similarity()
             self.centrality = self.get_centrality()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.resname
 
     # Alternative constructors 
 
     @classmethod
-    def polymer(cls, reslist, mcsa_id=None, pdb_id=None, chain='', parent_site=None):
+    def polymer(cls, reslist: List[Residue], mcsa_id: Optional[int] = None, pdb_id: Optional[str] = None, chain: str = '', parent_site: Optional[Any] = None) -> 'Het':
         """Alternative constructor for polymers. Takes a residue list and returns
         a polymer ligand"""
         poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, 
@@ -447,57 +456,58 @@ class Het(PdbResidue):
     # Properties
 
     @property
-    def is_polymer(self):
+    def is_polymer(self) -> Optional[bool]:
         """Check if component is a peptide or nucleic macromolecule"""
         if self.structure:
             return type(self.structure) == Chain
-        return
+        return None
 
     @property
-    def is_peptide(self):
+    def is_peptide(self) -> Optional[bool]:
         """Check if component comes from a polypeptide"""
         if self.structure:
             return self.is_polymer and all([is_aa(res.get_resname()) for res in self.structure.get_residues()])
+        return None
 
     @property
-    def is_nucleic(self):
+    def is_nucleic(self) -> Optional[bool]:
         """Check if component is DNA or RNA"""
         return self.is_polymer and not self.is_peptide
 
     @property
-    def is_metal(self):
+    def is_metal(self) -> bool:
         """Check if component is single-atom metal"""
         return self.resname in METALS
 
     @property
-    def is_reactive_nonmetal(self):
+    def is_reactive_nonmetal(self) -> bool:
         """Check if component is a metal or a reactive non metal"""
         return self.resname in REACTIVE_NONMETALS
 
     @property
-    def is_noble_gas(self):
+    def is_noble_gas(self) -> bool:
         """Check if component is a noble gas atom"""
         return self.resname in NOBLE_GASES
 
     @property
-    def is_ion(self):
+    def is_ion(self) -> bool:
         """Check if component is an ion"""
         return self.is_metal or self.is_reactive_nonmetal or self.is_noble_gas
 
     @property
-    def is_cofactor(self):
+    def is_cofactor(self) -> bool:
         """Check if component is annotated as cofactor for this pdb in PDBe or M-CSA"""
         return self.resname in PDBID_COFACTORS[self.pdb_id] or self.resname in MCSA_EC_COFACTORS[self.parent_site.ec]
 
     @property
-    def is_artefact(self):
+    def is_artefact(self) -> bool:
         """Check if component is likely to be a crystallographic artefact"""
         if self.cannot_be_artefact == True:
             return False
         return (self.resname in CRYSTALLIZATION_HETS and (self.similarity is None or self.similarity < 0.3))
 
     @property
-    def type(self):
+    def type(self) -> str:
         """An identifier to tell if component is an artefact, a peptide, a cofactor or a metallic
         compound (in priority order)."""
         flag = 'Substrate (non-polymer)'
@@ -516,8 +526,8 @@ class Het(PdbResidue):
 
     # Public methods
 
-    def get_reaction(self):
-        """Gets filenames of reactants and products either from M-CSA or KEGG, 
+    def get_reaction(self) -> List[str]:
+        """Gets filenames of reactants and products either from M-CSA or KEGG,
         depending on the EC match with the reference active site."""
         if self.parent_site.ec == self.parent_site.parent_entry.info['reaction']['ec']:
             components = self._get_mcsa_reaction()
@@ -531,19 +541,19 @@ class Het(PdbResidue):
                 self.components_missing = True
         return components
 
-    def get_centrality(self):
-        """Calculates an average distance to the catalytic residues of the site, 
+    def get_centrality(self) -> Optional[float]:
+        """Calculates an average distance to the catalytic residues of the site,
         normalized by the average intra-residue distance of the site"""
-        dists = [] 
+        dists = []
         if not self.parent_site:
-            return
+            return None
         for res in self.parent_site:
             dists.append(self.get_distance(res, kind='com'))
         mean_site_dist = np.nanmean(self.parent_site.get_distances(kind='com'))
         centrality = np.nanmean(np.array(dists)) / mean_site_dist
         return np.round(centrality, 2)
 
-    def get_similarity(self):
+    def get_similarity(self) -> Tuple[Optional[float], Optional[str]]:
         """Calculates the best PARITY match with the cognate reaction components"""
         #TODO: Check the dataset first and then calculate parity.
         if self.structure and self.structure.get_id()[0] != ' ':
@@ -552,8 +562,8 @@ class Het(PdbResidue):
             except Exception as e:
                 return None, None
         return None, None
-        
-    def generate_parity(self):
+
+    def generate_parity(self) -> Tuple[Optional[float], Optional[str]]:
         """Calculates parity score for each cognate reaction component and
         for the best match, it returns the score, the match ID, and the type
         (Reactant or Product)."""
@@ -580,7 +590,7 @@ class Het(PdbResidue):
 
     # Private methods
 
-    def _get_mcsa_reaction(self):
+    def _get_mcsa_reaction(self) -> List[str]:
         """Gets component filenames of the parent M-CSA reaction."""
         components = []
         try:
@@ -590,7 +600,7 @@ class Het(PdbResidue):
             pass
         return components
 
-    def _get_kegg_reaction(self):
+    def _get_kegg_reaction(self) -> List[str]:
         """Gets component filenames of the corresponding KEGG reaction."""
         components = []
         try:
@@ -600,7 +610,7 @@ class Het(PdbResidue):
             pass
         return components
 
-    def _get_rhea_reaction(self):
+    def _get_rhea_reaction(self) -> List[str]:
         """Gets component filenames of the corresponding KEGG reaction."""
         components = []
         try:
