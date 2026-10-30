@@ -19,10 +19,18 @@ from Bio.PDB.MMCIFParser import MMCIFParser, FastMMCIFParser
 from Bio.PDB.PDBExceptions import PDBConstructionException, PDBConstructionWarning
 from Bio.PDB.NeighborSearch import NeighborSearch
 from rmsd import reorder_hungarian
-from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
-from .config import PDB2EC, PDB2UNI
-from .PdbResidue import PdbResidue, Het
-from .Superimposer import Superimposer
+
+# Handle imports from both package and root-level contexts
+try:
+    from residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
+    from config import PDB2EC, PDB2UNI
+    from PdbResidue import PdbResidue, Het
+    from Superimposer import Superimposer
+except ImportError:
+    from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
+    from .config import PDB2EC, PDB2UNI
+    from .PdbResidue import PdbResidue, Het
+    from .Superimposer import Superimposer
 
 logger = logging.getLogger(__name__)
 warnings.simplefilter('ignore', PDBConstructionWarning)

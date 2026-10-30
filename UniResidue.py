@@ -2,7 +2,12 @@
 """UniProt sequence residue representation for M-CSA catalytic sites."""
 
 from typing import Optional, List, Tuple, Generator, Any, Dict
-from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
+
+# Handle imports from both package and root-level contexts
+try:
+    from residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
+except ImportError:
+    from .residue_definitions import AA_3TO1, STANDARD_RESIDUES, EQUIVALENT_RESIDUES
 
 
 class UniResidue:
