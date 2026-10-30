@@ -159,8 +159,8 @@ CSA-3D requires data from several external sources. Some datasets have been reti
 - `sifts/pdb_chain_enzyme.csv` - PDB to EC number mapping
 
 ### Reaction Data
+- `rhea/rhea_reaction_components.csv` - **Bundled** - RHEA reaction components (requires raw .rd files to recompile)
 - `kegg/kegg_reaction_components.csv` - KEGG enzyme reactions
-- `rhea/rhea_reaction_components.csv` - RHEA reactions
 - `pdbe/resolu.idx` - PDB resolution index
 
 ### Molecule Data

@@ -133,7 +133,7 @@ class DataDownloader:
     def setup_rhea(self) -> bool:
         """Setup RHEA reaction data.
 
-        Downloads from RHEA database.
+        Uses bundled compiled data that requires the raw RHEA .rd files.
 
         Returns:
             True if successful
@@ -142,9 +142,8 @@ class DataDownloader:
         rhea_dir = self.data_dir / "rhea"
         rhea_dir.mkdir(parents=True, exist_ok=True)
 
-        url = urljoin(self.RHEA_URL, "rhea_reaction_components.csv")
         output = rhea_dir / "rhea_reaction_components.csv"
-        return self.download_file(url, output)
+        return self.copy_bundled_file("rhea_reaction_components.csv", output)
 
     def setup_pdbe(self) -> bool:
         """Setup PDBe data (ions, cofactors, resolution).
