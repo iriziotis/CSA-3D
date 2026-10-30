@@ -71,6 +71,7 @@ Repository = "https://github.com/your-username/csa3d"
 
 [tool.setuptools]
 packages = ["csa3d", "csa3d.config", "csa3d._vendor"]
+py-modules = ["Mcsa", "Entry", "PdbSite", "PdbResidue", "UniResidue", "UniSite", "Superimposer", "config"]
 
 [tool.black]
 line-length = 100
