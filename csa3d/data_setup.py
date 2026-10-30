@@ -5,6 +5,7 @@ Includes bundled datasets that have been retired from the public domain.
 """
 
 import csv
+import json
 import logging
 import os
 import shutil
@@ -32,6 +33,7 @@ class DataDownloader:
     RHEA_TSV_URL = "https://ftp.expasy.org/databases/rhea/tsv/"
     PDBE_URL = "https://www.ebi.ac.uk/pdbe/download/"
     MCSA_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/download/"
+    MCSA_API_URL = "https://www.ebi.ac.uk/thornton-srv/m-csa/api/"
 
     def __init__(self, data_dir: Path):
         """Initialize data downloader.
@@ -191,6 +193,89 @@ class DataDownloader:
             logger.error(f"Error compiling RHEA data: {e}")
             return None
 
+    def compile_kegg_reactions(self) -> Optional[Path]:
+        """Compile KEGG reaction components using Biopython REST API.
+
+        Returns:
+            Path to compiled CSV file if successful, None otherwise
+        """
+        try:
+            logger.info("Compiling KEGG reaction data from REST API...")
+
+            try:
+                from Bio.KEGG import REST
+            except ImportError:
+                logger.error("Biopython not installed. Cannot compile KEGG data.")
+                logger.info("Install with: pip install biopython")
+                return None
+
+            # Get EC-compound mappings from KEGG
+            kegg_dir = self.data_dir / "kegg"
+            kegg_dir.mkdir(parents=True, exist_ok=True)
+            output_csv = kegg_dir / "kegg_reaction_components.csv"
+
+            logger.info("Querying KEGG REST API for enzyme-compound mappings...")
+            request = REST.kegg_link("compound", "enzyme").readlines()
+
+            ec_compounds = defaultdict(list)
+            for line in request:
+                line = line.strip().split("\t")
+                ec = line[0].split(":")[-1]
+                compound = line[1].split(":")[-1]
+                ec_compounds[ec].append(compound)
+
+            # Write output CSV
+            with open(output_csv, "w") as f:
+                f.write("EC,KEGG_COMPOUNDS\n")
+                for ec in sorted(ec_compounds.keys()):
+                    compounds = sorted(set(ec_compounds[ec]))
+                    f.write(f"{ec},{';'.join(compounds)}\n")
+
+            logger.info(f"✓ Compiled {len(ec_compounds)} KEGG EC entries")
+            return output_csv
+
+        except Exception as e:
+            logger.error(f"Error compiling KEGG data: {e}")
+            return None
+
+    def download_mcsa_catalytic_residues(self) -> bool:
+        """Download M-CSA catalytic residue data from API.
+
+        Downloads homologues and reference residue annotations from the M-CSA API.
+
+        Returns:
+            True if successful
+        """
+        try:
+            logger.info("Downloading M-CSA catalytic residue data from API...")
+            mcsa_dir = self.data_dir / "mcsa"
+            mcsa_dir.mkdir(parents=True, exist_ok=True)
+
+            # Download homologues residues
+            homologues_url = urljoin(self.MCSA_API_URL, "homologues_residues.json")
+            homologues_file = mcsa_dir / "catalytic_residues_homologues.json"
+
+            logger.info("Downloading homologues residues...")
+            if not self.download_file(homologues_url, homologues_file):
+                logger.warning("Failed to download homologues residues")
+                return False
+
+            # Download reference residues
+            reference_url = urljoin(self.MCSA_API_URL, "references_residues.json")
+            reference_file = mcsa_dir / "catalytic_residues_references.json"
+
+            logger.info("Downloading reference residues...")
+            if not self.download_file(reference_url, reference_file):
+                logger.warning("Failed to download reference residues")
+                return False
+
+            logger.info("✓ Downloaded M-CSA catalytic residue data")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error downloading M-CSA data: {e}")
+            return False
+
     def setup_sifts(self) -> bool:
         """Setup SIFTS (PDB-UniProt mappings).
 
@@ -221,18 +306,28 @@ class DataDownloader:
     def setup_kegg(self) -> bool:
         """Setup KEGG reaction data.
 
+        Attempts to compile fresh KEGG data using Biopython REST API.
+        Falls back to bundled data if compilation fails.
+
         Returns:
             True if successful
         """
         logger.info("Setting up KEGG data...")
         kegg_dir = self.data_dir / "kegg"
         kegg_dir.mkdir(parents=True, exist_ok=True)
-
-        # KEGG reactions endpoint
         output = kegg_dir / "kegg_reaction_components.csv"
-        logger.info("Note: KEGG data requires special API handling")
-        logger.info("Please obtain KEGG reaction data from: https://www.kegg.jp/")
-        return False
+
+        # Try to compile fresh data
+        try:
+            compiled_file = self.compile_kegg_reactions()
+            if compiled_file and compiled_file.exists():
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to compile fresh KEGG data: {e}")
+
+        # Fall back to bundled data
+        logger.info("Falling back to bundled KEGG data...")
+        return self.copy_bundled_file("kegg_reaction_components.csv", output)
 
     def setup_rhea(self) -> bool:
         """Setup RHEA reaction data.
@@ -291,7 +386,8 @@ class DataDownloader:
     def setup_mcsa(self) -> bool:
         """Setup M-CSA catalytic site data.
 
-        Uses bundled data files that have been retired from the public domain.
+        Downloads latest catalytic residue annotations from M-CSA API.
+        Uses bundled cofactor data that has been retired from public domain.
 
         Returns:
             True if successful
@@ -300,8 +396,19 @@ class DataDownloader:
         mcsa_dir = self.data_dir / "mcsa"
         mcsa_dir.mkdir(parents=True, exist_ok=True)
 
+        success = True
+
+        # Download latest catalytic residue data from API
+        if not self.download_mcsa_catalytic_residues():
+            logger.warning("Failed to download M-CSA catalytic residue data from API")
+            success = False
+
+        # Use bundled cofactor data
         output = mcsa_dir / "mcsa_cofactors.csv"
-        return self.copy_bundled_file("mcsa_cofactors.csv", output)
+        if not self.copy_bundled_file("mcsa_cofactors.csv", output):
+            success = False
+
+        return success
 
     def setup_metals(self) -> bool:
         """Setup metals reference data.
