@@ -692,21 +692,30 @@ class Het(PdbResidue):
         return np.round(centrality, 2)
 
     def get_similarity(self) -> Tuple[Optional[float], Optional[str]]:
-        """Calculates the best PARITY match with the cognate reaction components"""
-        #TODO: Check the dataset first and then calculate parity.
+        """Calculate molecular similarity to cognate reaction components using Tanimoto.
+        
+        Computes Morgan fingerprint Tanimoto similarity between this ligand and 
+        each known reaction component, returning the best match and its score.
+        
+        Returns:
+            tuple: (similarity_score, best_match_id) or (None, None) if not applicable
+        """
         if self.structure and self.structure.get_id()[0] != ' ':
             try:
-                return self.generate_parity()
+                return self._calculate_tanimoto_similarity()
             except Exception as e:
                 return None, None
         return None, None
 
-    def generate_parity(self) -> Tuple[Optional[float], Optional[str]]:
-        """Calculate Tanimoto similarity score for cognate reaction components.
-
-        Computes molecular fingerprint similarity (Tanimoto) between the bound
-        molecule and each cognate reaction component, returning the best match
-        score and its ID.
+    def _calculate_tanimoto_similarity(self) -> Tuple[Optional[float], Optional[str]]:
+        """Calculate Tanimoto similarity to cognate reaction components.
+        
+        Uses Morgan fingerprints (radius 2, 1024 bits) to compute Tanimoto similarity
+        between the bound ligand and each known reaction component. Returns the 
+        highest similarity score and the matching component ID.
+        
+        Returns:
+            tuple: (max_similarity_score, best_match_id) where similarity is in [0, 1]
         """
         if self.is_polymer:
             return None, None

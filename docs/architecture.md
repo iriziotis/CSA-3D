@@ -264,7 +264,7 @@ Alternative: Bayesian cut available for probabilistic selection.
 - `scikit-learn` - K-means clustering
 - `rmsd` - Optimal structural superposition
 - `dendrogram-cut` - Bayesian cluster detection
-- `parity_core` - (Used in original, purpose unclear)
+- `rdkit.Chem` / `rdkit.DataStructs` - Molecular fingerprinting and Tanimoto similarity
 
 ## Testing Strategy
 
