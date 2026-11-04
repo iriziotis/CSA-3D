@@ -9,6 +9,7 @@ __pycache__/
 *.cif
 *.pdb
 *.ent
+**/debugging.ipynb
 tt
 aa
 yy
