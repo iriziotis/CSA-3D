@@ -24,6 +24,7 @@ from . import datasets
 from .residue_definitions import AA_3TO1, RESIDUE_DEFINITIONS, EQUIVALENT_ATOMS, TEMPLATE_FUZZY_ATOMS
 from .PdbResidue import PdbResidue, Het
 from .Superimposer import Superimposer
+from .cif_preprocessor import validate_cif, cleanup_temp_cif
 
 logger = logging.getLogger(__name__)
 warnings.simplefilter('ignore', PDBConstructionWarning)
@@ -115,17 +116,23 @@ class PdbSite:
         reslist = PdbSite._cleanup_list(reslist)
         site = cls()
         site.parent_entry = parent_entry
+
+        # Preprocess CIF to fill missing occupancies and B-factors
+        cif_path_processed = validate_cif(cif_path)
+
         try:
             if annotate:
                 parser = MMCIFParser(QUIET=True)
-                structure = parser.get_structure('', cif_path)
+                structure = parser.get_structure('', cif_path_processed)
                 mmcif_dict = parser._mmcif_dict
             else:
                 parser = FastMMCIFParser(QUIET=True)
-                structure = parser.get_structure('', cif_path)
+                structure = parser.get_structure('', cif_path_processed)
         except (TypeError, PDBConstructionException) as e:
             logger.warning(f'Could not build site from residue list: {e}')
             return None
+        finally:
+            cleanup_temp_cif(cif_path_processed, cif_path)
 
         for res in reslist:
             if structure:
@@ -233,17 +240,23 @@ class PdbSite:
         """
         sites: List['PdbSite'] = []
         mmcif_dict: Dict[str, Any] = {}
+
+        # Preprocess CIF to fill missing occupancies and B-factors
+        cif_path_processed = validate_cif(cif_path)
+
         try:
             if annotate:
                 parser = MMCIFParser(QUIET=True)
-                structure = parser.get_structure('', cif_path)
+                structure = parser.get_structure('', cif_path_processed)
                 mmcif_dict = parser._mmcif_dict
             else:
                 parser = FastMMCIFParser(QUIET=True)
-                structure = parser.get_structure('', cif_path)
+                structure = parser.get_structure('', cif_path_processed)
         except (TypeError, PDBConstructionException) as e:
             logger.warning(f'Could not parse structure {cif_path}: {e}')
             return sites
+        finally:
+            cleanup_temp_cif(cif_path_processed, cif_path)
 
         reslist = PdbSite._cleanup_list(reslist)
         reslist = PdbSite._get_assembly_residues(reslist, structure)
