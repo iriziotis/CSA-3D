@@ -1,4 +1,4 @@
-# CSA-3D 0.3.1 Release Notes
+# CSA-3D 0.4.0 Release Notes
 
 **Release Date**: November 4, 2024  
 **Status**: Beta Release  
@@ -6,7 +6,7 @@
 
 ---
 
-## 🎉 CSA-3D 0.3.1 - Professional Documentation & API Excellence
+## 🎉 CSA-3D 0.4.0 - Professional Documentation & API Excellence
 
 This release focuses on **comprehensive documentation** and **code quality** with extensive docstrings, professional Sphinx documentation, and Read the Docs integration. Now fully ready for academic publication and widespread adoption.
 
@@ -160,9 +160,9 @@ def fit(self, other, weighted=False, cycles=1, cutoff=999, transform=False, ca=F
 
 ---
 
-## 🔄 Changes from 0.3.0
+## 🔄 Changes from 0.3.1
 
-| Component | 0.3.0 | 0.3.1 | Status |
+| Component | 0.3.1 | 0.4.0 | Status |
 |-----------|-------|-------|--------|
 | Docstrings | Minimal | 900+ lines | ✨ NEW |
 | Sphinx Docs | None | Complete | ✨ NEW |
@@ -178,7 +178,7 @@ def fit(self, other, weighted=False, cycles=1, cutoff=999, transform=False, ca=F
 
 ### Installation
 ```bash
-pip install --upgrade csa3d==0.3.1
+pip install --upgrade csa3d==0.4.0
 ```
 
 ### First Time
@@ -338,6 +338,6 @@ This release includes:
 
 ---
 
-**Install Now**: `pip install --upgrade csa3d==0.3.1`
+**Install Now**: `pip install --upgrade csa3d==0.4.0`
 
 Comprehensive documentation for professional use! 📖✨
