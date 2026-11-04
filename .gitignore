@@ -20,3 +20,4 @@ out/
 dist/
 build/
 *.egg-info/
+docs/_build/

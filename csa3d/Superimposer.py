@@ -264,10 +264,10 @@ class Superimposer:
         """Return the RMSD values from the last superposition.
         
         Returns two RMSD measures:
-        - rms: RMSD after outlier rejection (if used), excluding atoms rejected
+            - rms: RMSD after outlier rejection (if used), excluding atoms rejected
           as outliers during iterative fitting. For unweighted fitting with
           outlier rejection, this is the RMSD of the final subset of atoms.
-        - rms_all: Unweighted RMSD over all original atoms, regardless of whether
+            - rms_all: Unweighted RMSD over all original atoms, regardless of whether
           they were used in the iterative fitting.
         
         For weighted fitting, rms is the weighted RMSD and rms_all is computed
