@@ -1,7 +1,13 @@
-"""mmCIF file preprocessing utilities.
+"""mmCIF file preprocessing and validation utilities.
 
-Handles preprocessing of mmCIF files to ensure completeness by filling
-missing atomic data (occupancies, B-factors) with sensible placeholder values.
+Handles preprocessing of mmCIF (Macromolecular Crystallographic Information File)
+files downloaded from PDBe to ensure they can be reliably parsed by BioPython.
+Specific issues handled include missing atomic properties (occupancies, B-factors)
+and invalid numeric values that can cause parsing failures or incorrect
+coordinate interpretation.
+
+This module is automatically used during PdbSite.from_list() when the CIF file
+needs validation before parsing.
 """
 
 import tempfile
@@ -13,11 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 def cleanup_temp_cif(cif_path: str, original_path: str) -> None:
-    """Clean up temporary CIF file if it differs from original.
-
+    """Remove temporary CIF file if one was created during validation.
+    
+    Safe cleanup of preprocessing artifacts. Only removes the file if it's
+    a temporary file (differs from the original), preventing accidental
+    deletion of original data files.
+    
     Args:
-        cif_path: Path to potentially temporary file
-        original_path: Path to original file
+        cif_path: Path to the file to potentially clean up. May be a temporary
+            file created by validate_cif().
+        original_path: Path to the original input file. If cif_path differs from
+            this, it's assumed to be temporary and will be removed.
     """
     if cif_path != original_path and os.path.exists(cif_path):
         try:
@@ -28,21 +40,46 @@ def cleanup_temp_cif(cif_path: str, original_path: str) -> None:
 
 
 def validate_cif(cif_path: str, occupancy_default: float = 1.0, b_factor_default: float = 20.0) -> str:
-    """Validate and fix CIF file to ensure it can be parsed by BioPython.
-
-    Handles:
-    - Missing occupancy columns
-    - Missing B-factor columns
-    - Invalid numeric values
-    - Missing required fields
-
+    """Validate and fix mmCIF file to ensure BioPython compatibility.
+    
+    Preprocesses mmCIF files to handle common issues that prevent successful
+    parsing or lead to incorrect coordinate interpretation:
+    
+    - Missing occupancy column: Added with default value (typically 1.0 for
+      fully occupied atoms)
+    - Missing B-factor column: Added with default value (typically 20.0 Ų)
+    - Invalid occupancy values: Fixed to valid range [0, 1]
+    - Negative B-factors: Replaced with default (sometimes appears in low-quality
+      structures)
+    - Missing atom records: Filled with placeholder values
+    
+    If no issues are detected, returns the original file path unchanged. If
+    fixes are needed, writes a corrected version to a temporary file and
+    returns that path. Caller should use cleanup_temp_cif() after parsing.
+    
     Args:
-        cif_path: Path to input mmCIF file
-        occupancy_default: Default occupancy value
-        b_factor_default: Default B-factor value
-
+        cif_path: Path to input mmCIF file from PDBe or other source.
+        occupancy_default: Default occupancy value to use for missing or invalid
+            occupancy data. Typically 1.0 for fully occupied atoms. Defaults to 1.0.
+        b_factor_default: Default B-factor (temperature factor) value in Ų for
+            missing or invalid data. Typical values range 10-30 depending on
+            structure quality. Defaults to 20.0.
+    
     Returns:
-        Path to validated CIF file (temp if modified, original if valid)
+        str: Path to validated CIF file. Either:
+            - The original cif_path if no issues were found
+            - Path to a new temporary file if fixes were applied
+        
+        Caller should call cleanup_temp_cif(result, original_path) after use
+        to remove temporary files.
+    
+    Example:
+        >>> from Bio.PDB import MMCIFParser
+        >>> cif_path = "original.cif"
+        >>> fixed_path = validate_cif(cif_path)
+        >>> parser = MMCIFParser()
+        >>> structure = parser.get_structure('', fixed_path)
+        >>> cleanup_temp_cif(fixed_path, cif_path)
     """
     if not os.path.exists(cif_path):
         logger.warning(f'CIF file not found: {cif_path}')
@@ -51,7 +88,7 @@ def validate_cif(cif_path: str, occupancy_default: float = 1.0, b_factor_default
     with open(cif_path, 'r') as f:
         lines = f.readlines()
 
-    # Find atom_site loop
+    # Find atom_site loop block
     in_atom_loop = False
     atom_loop_start = -1
     field_names = []
@@ -67,7 +104,7 @@ def validate_cif(cif_path: str, occupancy_default: float = 1.0, b_factor_default
     if not in_atom_loop:
         return cif_path
 
-    # Collect field names
+    # Collect field names and find occupancy/B-factor columns
     i = atom_loop_start + 1
     while i < len(lines):
         line = lines[i].strip()
@@ -85,7 +122,7 @@ def validate_cif(cif_path: str, occupancy_default: float = 1.0, b_factor_default
     data_start = i
     needs_fix = False
 
-    # Always copy everything from beginning up to and including field definitions
+    # Copy header and field definitions
     fixed_lines = lines[:data_start]
 
     # Check if we need to add missing columns
@@ -103,7 +140,7 @@ def validate_cif(cif_path: str, occupancy_default: float = 1.0, b_factor_default
         needs_fix = True
         fixed_lines.append('_atom_site.B_iso_or_equiv\n')
 
-    # Process atom records - ALWAYS check for invalid values
+    # Process atom records - check for invalid values
     replacements = {'occupancy': 0, 'b_factor': 0, 'negative_b_factor': 0}
 
     for i in range(data_start, len(lines)):

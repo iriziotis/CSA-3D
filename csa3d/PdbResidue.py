@@ -33,6 +33,28 @@ logger = logging.getLogger(__name__)
 class PdbResidue:
     """Catalytic residue in a PDB structure.
 
+    Represents a single catalytic residue from the M-CSA database with 3D coordinates,
+    structural information from PDB, and functional annotations. Each residue contains
+    a reference to the parent site and optional Biopython Residue object with atomic details.
+
+    Attributes:
+        mcsa_id: Mechanism and Catalytic Site Atlas entry identifier
+        pdb_id: PDB structure identifier (4-letter code, e.g., "1ABC")
+        resname: Residue name in 3-letter code (e.g., "ALA", "SER"). Empty string for gaps.
+        resid: Internal sequential residue number used in file formats
+        auth_resid: Author-assigned residue number (e.g., displayed in PDB viewers)
+        chain: Chain identifier (e.g., "A", "AB" for assembly chains)
+        alt_chain: Alternative chain ID from the source file
+        funclocs: List of functional location descriptions (e.g., ["Side chain"])
+        is_reference: True if this residue is from the M-CSA reference structure
+        is_standard: True if one of the 20 standard amino acids
+        chiral_id: Identifier for stereoisomer when multiple catalytic roles exist
+        structure: Biopython Residue object with full atomic coordinates and details
+        reference_residue: Parent PdbResidue if this is a homologue
+        parent_site: Parent PdbSite object
+    """
+    """Catalytic residue in a PDB structure.
+
     Represents a single catalytic residue with 3D coordinates, structural
     information, and functional annotations from M-CSA.
 
@@ -65,7 +87,24 @@ class PdbResidue:
         chiral_id: Optional[int] = None,
         dummy_structure: bool = False,
     ) -> None:
-        """Initialize PdbResidue."""
+        """Initialize a PdbResidue object.
+
+        Args:
+            mcsa_id: M-CSA entry identifier
+            pdb_id: PDB structure ID
+            resname: Residue 3-letter code
+            resid: Internal residue number
+            auth_resid: Author residue number
+            chain: Chain identifier
+            alt_chain: Alternative chain ID
+            ptm_resname: Post-translational modification name if applicable
+            funclocs: Functional location descriptions
+            domain_name: Structural domain name
+            domain_cath_id: CATH structural classification
+            is_reference: Flag for M-CSA reference structure
+            chiral_id: Stereoisomer identifier
+            dummy_structure: If True, create a dummy atom for visualization
+        """
         self.parent_site: Optional[Any] = None
         self.mcsa_id: Optional[int] = mcsa_id
         self.pdb_id: Optional[str] = pdb_id
@@ -146,8 +185,17 @@ class PdbResidue:
     # Public methods
 
     def copy(self, include_structure: bool = False) -> 'PdbResidue':
-        """Returns a copy of the residue. If include_structure is False,
-        then structure is not copied."""
+        """Create a shallow or deep copy of this residue.
+        
+        Args:
+            include_structure: If True, also copy the Biopython Residue object
+                with all atomic coordinates. If False (default), structure is set
+                to None. Copying the structure is slower but needed for independent
+                coordinate manipulation.
+        
+        Returns:
+            PdbResidue: A copy of this residue with the same attributes.
+        """
         res = copy(self)
         if include_structure:
             try:
@@ -158,17 +206,21 @@ class PdbResidue:
         return res
 
     def add_structure(self, structure: 'Union[Residue, Structure]') -> bool:
-        """
-        Map residue to Biopython residue object
-
+        """Map this residue to atomic coordinates from a PDB structure.
+        
+        Finds and stores the corresponding Biopython Residue object that contains
+        the atomic coordinates and connectivity information. If given a Structure
+        object, automatically finds the residue with matching chain and position.
+        
         Args:
-             structure: Biopython Structure or Residue object. If
-                        object is Structure, it automatically gets the
-                        Residue that has the same chain and auth_resid
+            structure: Either a Biopython Residue object that matches this residue,
+                or a Biopython Structure object from which the matching residue
+                will be extracted using chain ID and author residue number.
+        
         Returns:
-            True if structure is added successfully or the PdbResidue is a gap
-            (non-aligned, empty residue), False if residue cannot be found in the
-            given structure.
+            True if structure was successfully added or if this is a gap residue
+            (no alignment). False if the residue cannot be found in the given
+            structure or if coordinates cannot be extracted.
         """
         if self.is_gap:
             return True
@@ -215,6 +267,20 @@ class PdbResidue:
         return True
 
     def get_distance(self, other: 'PdbResidue', kind: str = 'com') -> float:
+        """Calculate distance to another residue.
+        
+        Args:
+            other: The residue to compare distance to.
+            kind: Type of distance metric:
+                - 'com': Center of mass (default)
+                - 'cog': Center of geometry
+                - 'min': Minimum atom-to-atom distance
+                - 'avg': Average atom-to-atom distance
+                - 'ca': C-alpha distance (falls back to 'com' if missing)
+        
+        Returns:
+            float: Distance in Ångströms, or np.nan if structures are unavailable.
+        """
         if self.structure is None or other.structure is None:
             return np.nan
         if kind == 'com':
@@ -247,20 +313,22 @@ class PdbResidue:
         return basic
 
     def get_func_atoms(self, allow_symmetrics: bool = True) -> Tuple[np.ndarray, np.ndarray]:
-        """Gets atoms and coordinates for superposition and atom reordering
-        calculations
-
+        """Extract functional atoms for superposition and analysis.
+        
+        Retrieves atoms that are relevant for catalytic function (excluding
+        hydrogens and non-functional side chain atoms). Used for superposition
+        and atom correspondence calculations.
+        
         Args:
-            allow_symmetrics: If True, equivalent residues and atoms
-                              get the same id string, according to the
-                              definitions in residue_definitions.py
-                              (EQUIVALENT_ATOMS)
+            allow_symmetrics: If True (default), treat symmetric atoms and
+                residue equivalents as identical for matching. Uses definitions
+                from residue_definitions.EQUIVALENT_ATOMS. If False, distinguishes
+                all atoms individually.
+        
         Returns:
-            atoms: A NumPy array of atom identifier strings of type
-                   'N.RES.AT' where N is the residue serial number
-                   in the .pdb file (consistent among all sites),
-                   RES is the residue name and AT is the atom name
-            coords: A NumPy array of the atomic coordinates
+            tuple: (atoms, coords) where:
+                - atoms: NumPy array of atom ID strings, format "RESNAME.ATOMNAME"
+                - coords: NumPy array of atomic coordinates (N×3), in Ångströms
         """
         atoms = []
         coords = []
@@ -348,8 +416,20 @@ class PdbResidue:
 
     @classmethod
     def from_json(cls, residue: Dict[str, Any], chiral_id: Optional[int] = None) -> Generator['PdbResidue', None, None]:
-        """Constructs a list of PdbResidue objects using information directly from
-        the M-CSA homologues json file. Input is a top-level residue entry in the json.
+        """Generate PdbResidue objects from M-CSA JSON data.
+        
+        Parses a catalytic residue entry from the M-CSA database and yields
+        PdbResidue objects for each occurrence in different PDB structures.
+        
+        Args:
+            residue: A single catalytic residue entry from M-CSA JSON file
+                (from catalytic_residues_homologues.json)
+            chiral_id: Stereoisomer identifier (0 or 1 for distinct stereo roles).
+                Defaults to None.
+        
+        Yields:
+            PdbResidue: One residue object for each PDB structure containing
+                this catalytic residue position.
         """
         for pdb_res in residue['residue_chains']:
             mcsa_id = residue['mcsa_id']
@@ -375,16 +455,22 @@ class PdbResidue:
 
     @staticmethod
     def transform_chain(chain: str, to_dash: bool = False) -> str:
-        """
-        Transforms the chain field from X-n to XY and reverse.
-        Useful for chain IDs found in PDB assembly structures.
-
+        """Transform chain identifier between PDB and assembly formats.
+        
+        Converts chain IDs between two formats:
+        - Standard: Single or double letter (e.g., "A", "AB")
+        - Dash format: Letter-number with dash (e.g., "A-2")
+        
+        Useful for converting between conventional PDB chains and biological
+        assembly notation where chains are numbered.
+        
         Args:
-            chain: The chain ID to be transformed
-            to_dash: if True, transform to X-n format. If false,
-                     transform to XY
+            chain: Chain ID to transform
+            to_dash: If True, convert to dash format "X-n". If False (default),
+                convert from dash format to letter format "XY".
+        
         Returns:
-            Transformed ID if input was of different format
+            str: Transformed chain ID, or original if already in target format.
         """
         letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
         if to_dash:
@@ -400,10 +486,28 @@ class PdbResidue:
 
 
 class Het(PdbResidue):
-    """PdbResidue with two extra attributes.
-        parity_score: chemical similarity to the cognate ligand (PARITY score,
-                      from a pre-compiled dataset)
-        centrality: the mean minimum distance of the het to the catalytic
+    """Ligand, cofactor, ion, or substrate near a catalytic site.
+    
+    Represents non-protein components (heteroatoms) found within 5 Ångströms of
+    catalytic residues. Extends PdbResidue with chemistry-specific classification
+    and scoring. Automatically classifies components as artifacts, ions, cofactors,
+    or substrates based on similarity to reaction components and known annotations.
+    
+    Attributes:
+        similarity: Chemical fingerprint similarity (0-1) to the enzyme's known
+            reaction components. Higher values indicate likely substrates or
+            cofactors. None if structure files unavailable.
+        best_match: Name of the best-matching reaction component (if similarity
+            was computed).
+        centrality: Mean minimum distance to catalytic residues, normalized by
+            average intra-residue distance. Indicates how central the component
+            is to the active site geometry.
+        type: Classification as one of: "Ion", "Artefact", "Substrate (polymer)",
+            "Substrate (non-polymer)", "Co-factor (ion)", "Co-factor (non-ion)".
+        is_metal: True if single-atom metal (Fe, Zn, Mg, etc.)
+        is_ion: True if ion or metal
+        is_cofactor: True if annotated as cofactor in PDBe or M-CSA
+        is_artefact: True if likely crystallographic artefact (e.g., PEG, glycerol)
     """
 
     def __init__(
@@ -417,6 +521,20 @@ class Het(PdbResidue):
         parent_site: Optional[Any] = None,
         calculate_scores: bool = True
     ) -> None:
+        """Initialize a Het (ligand/cofactor) object.
+        
+        Args:
+            mcsa_id: M-CSA entry ID
+            pdb_id: PDB structure identifier
+            resname: Heteroatom residue name (e.g., "ZN", "NAG", "ADP")
+            resid: Residue number in structure
+            chain: Chain identifier
+            structure: Biopython Residue object with atomic coordinates
+            parent_site: Parent PdbSite object for calculating centrality
+            calculate_scores: If True (default), compute similarity and centrality
+                scores using the parent site. Set False for faster creation if
+                these values are not needed.
+        """
         super().__init__(mcsa_id=mcsa_id, pdb_id=pdb_id, resname=resname, resid=resid, chain=chain)
         self.structure = None
         self.parent_site = parent_site
@@ -439,8 +557,21 @@ class Het(PdbResidue):
 
     @classmethod
     def polymer(cls, reslist: List[Residue], mcsa_id: Optional[int] = None, pdb_id: Optional[str] = None, chain: str = '', parent_site: Optional[Any] = None) -> 'Het':
-        """Alternative constructor for polymers. Takes a residue list and returns
-        a polymer ligand"""
+        """Create a Het object representing a protein or nucleic acid chain.
+        
+        Used for substrates that are macromolecules (whole protein chain or
+        nucleic acid) rather than small molecules.
+        
+        Args:
+            reslist: List of Biopython Residue objects comprising the polymer
+            mcsa_id: M-CSA entry ID
+            pdb_id: PDB structure identifier
+            chain: Chain identifier
+            parent_site: Parent PdbSite for scoring
+        
+        Returns:
+            Het: Object representing the polymer with resname='*P*'
+        """
         poly = cls(mcsa_id, pdb_id, resname='*P*', resid=None, chain=chain, 
                    structure=None, parent_site=parent_site, calculate_scores=False)
         poly.structure = Chain(chain)
@@ -541,8 +672,16 @@ class Het(PdbResidue):
         return components
 
     def get_centrality(self) -> Optional[float]:
-        """Calculates an average distance to the catalytic residues of the site,
-        normalized by the average intra-residue distance of the site"""
+        """Calculate how central this ligand is to the catalytic site geometry.
+        
+        Computes the mean minimum distance from this component to all catalytic
+        residues, normalized by the typical intra-residue distance. This gives
+        a unitless measure where lower values indicate components more tightly
+        bound into the active site geometry.
+        
+        Returns:
+            float: Centrality score (unitless), or None if parent_site is unavailable.
+        """
         dists = []
         if not self.parent_site:
             return None
