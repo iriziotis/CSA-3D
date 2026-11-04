@@ -1,4 +1,4 @@
 """Version information for csa3d."""
 
-__version__ = "0.3.1"
+__version__ = "0.4.1"
 __version_tuple__ = tuple(int(x) for x in __version__.split(".")[:3])

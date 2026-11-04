@@ -13,6 +13,8 @@ With CSA-3D you can:
   [Jess](https://github.com/iriziotis/jess) / [PyJess](https://github.com/althonos/pyjess)
 - **Annotate** ligands, cofactors and metal ions found in catalytic sites
 
+**📖 [Full Documentation](https://csa-3d.readthedocs.io/en/latest/)** - Comprehensive guides, API reference, and examples
+
 See the [CSA-3D paper](https://doi.org/10.1016/j.jmb.2022.167517) for the method and applications.
 
 ## Installation
