@@ -96,3 +96,11 @@ autodoc_typehints = 'description'
 
 # Suppress warnings for missing references
 suppress_warnings = ['ref.python']
+
+
+# Setup function for autodoc
+def setup(app):
+    """Configure Sphinx extensions."""
+    app.setup_extension('sphinx.ext.autodoc')
+    # Ensure autodoc can find the package
+    return {'version': release}
