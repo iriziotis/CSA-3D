@@ -39,11 +39,8 @@ napoleon_use_rtype = False
 # Autodoc settings
 autodoc_default_options = {
     'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__,__str__,__len__,__iter__,__eq__,__contains__,__getitem__',
     'undoc-members': True,
     'show-inheritance': True,
-    'imported-members': True,
 }
 
 # Autodoc settings
