@@ -5,6 +5,33 @@ All notable changes to CSA-3D are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-11-12
+
+### Fixed
+- `import csa3d` failed unless matplotlib was installed: the vendored dendrogram-cut module imported
+  matplotlib and plotly at module level. They are now imported only by its plotting methods, which
+  still need the `clustering` extra.
+
+### Documentation
+- API reference on Read the Docs now renders all classes and functions; docstring formatting fixes.
+
+## [0.4.2] - 2026-11-04
+
+### Changed
+- `Het.generate_parity()` renamed to the private `Het._calculate_tanimoto_similarity()`; remaining
+  references to PARITY removed (similarity has been computed with RDKit Tanimoto since 0.2.1).
+
+## [0.4.1] - 2026-11-04
+
+### Documentation
+- Documentation hosted at https://csa-3d.readthedocs.io; project URLs updated.
+
+## [0.4.0] - 2026-11-04
+
+### Documentation
+- Sphinx documentation with user guides and API reference, built on Read the Docs.
+- Expanded docstrings for `Superimposer`, `PdbResidue`, `Het` and `cif_preprocessor`.
+
 ## [0.3.1] - 2026-11-02
 
 ### Documentation

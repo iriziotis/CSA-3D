@@ -3,8 +3,6 @@ import itertools
 import numpy as np
 import scipy.spatial
 import scipy.cluster
-import matplotlib.cm
-import plotly.graph_objs as go
 from sklearn.metrics import silhouette_score
 
 
@@ -133,6 +131,9 @@ class DendrogramCut:
         return min_loss_k
 
     def dendrogram_plot(self, k=None, label=None):
+        import matplotlib.cm
+        import plotly.graph_objs as go
+
         cmap = matplotlib.cm.get_cmap('viridis')
 
         order = scipy.cluster.hierarchy.leaves_list(self.linkage)
@@ -249,6 +250,9 @@ class DendrogramCut:
         fig.show()
 
     def heatmap_with_dendrogram_plot(self, k=None, label=None):
+        import matplotlib.cm
+        import plotly.graph_objs as go
+
         cmap = matplotlib.cm.get_cmap('viridis')
 
         order = scipy.cluster.hierarchy.leaves_list(self.linkage)
@@ -453,6 +457,8 @@ class DendrogramCut:
         fig.show()
 
     def elbow_plot(self):
+        import plotly.graph_objs as go
+
         x = np.arange(self.k_max) + 1
 
         y = np.asarray([sum(self.linkage_stats[i]['tss'] / len(self.linkage_stats[i]['indices']) for i in self._get_cut_nodes(-1, k)) for k in range(1, self.k_max + 1)])
@@ -462,6 +468,8 @@ class DendrogramCut:
         fig.show()
 
     def silhouette_score_plot(self):
+        import plotly.graph_objs as go
+
         x = np.arange(2, self.k_max + 1)
         y = [silhouette_score(self.distance_matrix, self.get_cluster_label(k), metric='precomputed') for k in x]
 

@@ -47,7 +47,6 @@ class PdbResidue:
         alt_chain: Alternative chain ID from the source file
         funclocs: List of functional location descriptions (e.g., ["Side chain"])
         is_reference: True if this residue is from the M-CSA reference structure
-        is_standard: True if one of the 20 standard amino acids
         chiral_id: Identifier for stereoisomer when multiple catalytic roles exist
         structure: Biopython Residue object with full atomic coordinates and details
         reference_residue: Parent PdbResidue if this is a homologue
@@ -502,12 +501,6 @@ class Het(PdbResidue):
         centrality: Mean minimum distance to catalytic residues, normalized by
             average intra-residue distance. Indicates how central the component
             is to the active site geometry.
-        type: Classification as one of: "Ion", "Artefact", "Substrate (polymer)",
-            "Substrate (non-polymer)", "Co-factor (ion)", "Co-factor (non-ion)".
-        is_metal: True if single-atom metal (Fe, Zn, Mg, etc.)
-        is_ion: True if ion or metal
-        is_cofactor: True if annotated as cofactor in PDBe or M-CSA
-        is_artefact: True if likely crystallographic artefact (e.g., PEG, glycerol)
     """
 
     def __init__(

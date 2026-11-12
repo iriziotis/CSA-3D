@@ -27,7 +27,6 @@ using the catalytic residue annotations of the
    :caption: API Reference
 
    api/core
-   api/structures
    api/analysis
    api/utilities
 

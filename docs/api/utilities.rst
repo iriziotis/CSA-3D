@@ -12,11 +12,15 @@ Configuration
 -------------
 
 .. autofunction:: csa3d.set_data_dir
+
 .. autofunction:: csa3d.get_data_dir
+
 .. autofunction:: csa3d.validate_config
 
 CIF Preprocessing
 ------------------
+
+Utilities for validating and fixing mmCIF files from PDBe.
 
 .. automodule:: csa3d.cif_preprocessor
    :members:

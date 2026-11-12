@@ -10,11 +10,19 @@ Build a template from conserved sites::
 
     template = entry.create_template(outdir="templates")
     
-    # This writes a PDB file with averaged coordinates of conserved residues
+    # This writes a PDB file with representative coordinates of conserved residues.
 
-The resulting template is suitable for 3D template matching with:
-- `Jess <https://github.com/iriziotis/jess>`_ (standalone tool)
-- `PyJess <https://github.com/althonos/pyjess>`_ (Python interface)
+The representative coordinates derive from the site with the highest
+similarity to the average coordinates of the conserved residues.
+The template nomenclature allows "fuzzy" matching of residues during template comparison.
+This allows for some flexibility in matching residues that are not exactly identical but are chemically similar.
+e.g. matching a Asp to a Glu due to their similar chemical properties.
+You can view the exact definitions of fuzzy matching in the ``csa3d/residue_definitions.py`` module.
+
+| The resulting template is suitable for 3D template matching with:
+
+| - `Jess <https://github.com/iriziotis/jess>`_ (standalone tool)
+| - `PyJess <https://github.com/althonos/pyjess>`_ (Python interface)
 
 Custom Subsets
 --------------
@@ -114,8 +122,7 @@ Use CSA-3D templates with the Jess template-matching program::
     # CSA-3D: Build template
     template = entry.create_template(outdir="templates")
     
-    # Jess: Search PDB structures for similar arrangements
-    # jess --template templates/template_1.pdb --pdb-dir $PDB --output results.json
+    # Jess/PyJess: Search PDB structures for similar arrangements (see relevant documentation)
 
 See Also
 --------

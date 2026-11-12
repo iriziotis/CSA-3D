@@ -639,16 +639,18 @@ class PdbSite:
         include_dummy_atoms: bool = False,
         subset: Optional[List[int]] = None
     ) -> None:
-        """
-        Writes site coordinates in PDB format
+        """Write the site coordinates in PDB format.
+
         Args:
-            write_hets: Include coordinates of ligands.
-            outdir: Directory to save the .pdb file
-            outfile: If unspecified, name is formatted to include info on M-CSA ID, 
-                     chain of each catalytic residue, annotation if the site is a
-                     reference site and an annotation about the conservation, relatively
-                     to the reference (c: conserved, m: mutated, cm: has only conservative
-                     mutation)
+            outdir: Directory to save the .pdb file. Defaults to the current directory.
+            outfile: Output path. If unspecified, the name includes the M-CSA ID, the
+                chain of each catalytic residue, whether the site is a reference site,
+                and its conservation relative to the reference (c: conserved,
+                m: mutated, cm: only conservative mutations).
+            write_hets: Include coordinates of nearby ligands.
+            func_atoms_only: Write only the functional atoms of each catalytic residue.
+            include_dummy_atoms: Write gap residues (as their dummy atom, if they have one).
+            subset: Indices of the residues to write. Defaults to all residues.
         """
         if not outdir:
             outdir = '.'

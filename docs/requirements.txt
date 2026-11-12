@@ -1,8 +1,5 @@
-# Documentation build dependencies for Read the Docs
-# Read the Docs automatically installs csa3d from pyproject.toml,
-# so we only need Sphinx extensions here
-
+# Sphinx extensions for the docs build. csa3d itself (and its dependencies)
+# is installed from pyproject.toml via .readthedocs.yml.
 sphinx>=6.0
 sphinx-rtd-theme>=1.2
 myst-parser>=0.19
-sphinx-autodoc-typehints>=1.19
