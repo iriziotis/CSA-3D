@@ -25,7 +25,6 @@ Utilities for validating and fixing mmCIF files from PDBe.
 .. automodule:: csa3d.cif_preprocessor
    :members:
    :undoc-members:
-   :noindex:
 
 Dataset Access
 --------------
@@ -35,4 +34,3 @@ The ``csa3d.datasets`` module provides access to pre-loaded reference data:
 .. automodule:: csa3d.datasets
    :members:
    :undoc-members:
-   :noindex:
