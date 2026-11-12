@@ -37,7 +37,7 @@ To use a custom location::
     db.build(entry_ids=1)
     entry = db.entries[1]
 
-This loads M-CSA entry 1 (Serine Proteases). The ``build()`` method constructs
+This loads M-CSA entry 1 (Glutamate Racemases). The ``build()`` method constructs
 ``Entry`` objects with PDB structures and UniProt sequences automatically
 downloaded on demand.
 
@@ -47,8 +47,8 @@ downloaded on demand.
 ::
 
     # Get entry metadata
-    print(entry.info["enzyme_name"])      # e.g., "Serine Protease"
-    print(entry.info["all_ecs"])          # e.g., ["3.4.21.4"]
+    print(entry.info["enzyme_name"])      # e.g., "Glutamate Racemase"
+    print(entry.info["all_ecs"])          # e.g., ["5.1.1.3"]
     
     # Iterate over PDB sites
     for site in entry.get_pdbsites(sane_only=True):
