@@ -1,44 +1,12 @@
-Structures: Sites and Residues
-===============================
+Structures
+==========
 
-Classes representing catalytic sites and individual residues.
+Core structure classes are documented in :doc:`core`. This module is kept
+for reference to the detailed architecture documentation.
 
-PdbSite
--------
-
-.. autoclass:: csa3d.PdbSite
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-PdbResidue
-----------
-
-.. autoclass:: csa3d.PdbResidue
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Het
----
-
-.. autoclass:: csa3d.Het
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-UniSite
--------
-
-.. autoclass:: csa3d.UniSite
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-UniResidue
-----------
-
-.. autoclass:: csa3d.UniResidue
-   :members:
-   :undoc-members:
-   :show-inheritance:
+See :doc:`core` for:
+- PdbSite - Catalytic sites in PDB structures
+- PdbResidue - Catalytic residues with coordinates
+- Het - Ligands, cofactors, and ions
+- UniSite - Catalytic sites at sequence level
+- UniResidue - Catalytic residues in sequences
