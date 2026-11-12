@@ -10,6 +10,7 @@ Mcsa
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 Entry
 -----
@@ -18,3 +19,4 @@ Entry
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
