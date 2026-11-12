@@ -16,7 +16,7 @@ from .Superimposer import Superimposer
 from .UniResidue import UniResidue
 from .UniSite import UniSite
 
-__version__ = "0.4.2"
+__version__ = "0.4.3"
 
 __all__ = [
     "setup_data",
