@@ -48,6 +48,13 @@ autodoc_typehints = 'description'
 autodoc_class_signature = 'separated'
 autodoc_inherit_docstrings = True
 
+# Mock imports for optional dependencies that might not be available on RTD
+autodoc_mock_imports = [
+    'rdkit',
+    'rdkit.Chem',
+    'rdkit.DataStructs',
+]
+
 # Intersphinx mappings
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
